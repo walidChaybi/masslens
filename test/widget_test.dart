@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mass_lens/app/app_controller.dart';
+import 'package:mass_lens/app/mass_lens_app.dart';
+import 'package:mass_lens/core/theme/app_theme.dart';
+import 'package:mass_lens/features/measurements/data/measurement_store.dart';
+import 'package:mass_lens/features/measurements/domain/measurement.dart';
+import 'package:mass_lens/features/scan/data/photo_picker.dart';
+import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
+import 'package:mass_lens/features/scan/presentation/scan_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('onboarding opens the main measurement workspace', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const MeasurementStore(),
+    );
+    await tester.pumpWidget(MassLensApp(controller: controller));
+
+    expect(find.text('Measure what\nyou cannot weigh.'), findsOneWidget);
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What are we\nmeasuring today?'), findsOneWidget);
+    expect(find.byKey(const Key('shell_scan_button')), findsOneWidget);
+  });
+
+  testWidgets('bottom navigation exposes history and settings', (tester) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    await tester.pumpWidget(MassLensApp(controller: controller));
+
+    await tester.tap(find.byKey(const Key('nav_history')));
+    await tester.pumpAndSettle();
+    expect(find.text('Measurement history'), findsOneWidget);
+    expect(find.text('Nothing saved yet'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_settings')));
+    await tester.pumpAndSettle();
+    expect(find.text('PREFERENCES AND PRIVACY'), findsOneWidget);
+    expect(find.text('Local demo'), findsOneWidget);
+  });
+
+  testWidgets('photo flow analyzes and saves an estimate', (tester) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    await tester.pumpWidget(
+      AppScope(
+        controller: controller,
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: ScanScreen(
+            photoPicker: const _FakePhotoPicker(),
+            estimateRepository: const _FakeEstimateRepository(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('gallery_button')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('gallery_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm the object'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('analyze_button')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('analyze_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('result_weight')), findsOneWidget);
+    expect(find.text('LIKELY RANGE'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('save_result_button')),
+      350,
+    );
+    final saveButton = tester.widget<FilledButton>(
+      find.byKey(const Key('save_result_button')),
+    );
+    expect(saveButton.onPressed, isNotNull);
+    saveButton.onPressed!();
+    await tester.pumpAndSettle();
+    expect(controller.measurements, hasLength(1));
+    expect(find.text('Saved'), findsOneWidget);
+  });
+}
+
+class _FakePhotoPicker implements PhotoPicker {
+  const _FakePhotoPicker();
+
+  @override
+  Future<String?> pick(PhotoSource source) async => '/tmp/mass-lens-test.jpg';
+}
+
+class _FakeEstimateRepository implements EstimateRepository {
+  const _FakeEstimateRepository();
+
+  @override
+  Future<Measurement> analyze(EstimateRequest request) async {
+    return Measurement(
+      id: 'test-result',
+      createdAt: DateTime(2026, 7, 30, 12),
+      imagePath: request.imagePath,
+      objectLabel: 'Test parcel',
+      category: 'Parcel',
+      estimateGrams: 2400,
+      lowerBoundGrams: 2000,
+      upperBoundGrams: 2800,
+      confidence: ConfidenceLevel.medium,
+      dimensions: const DimensionsMm(width: 300, height: 220, depth: 180),
+      assumptions: const ['Known category', 'No physical scale reference'],
+    );
+  }
+}
+
+class _FakeMeasurementStore extends MeasurementStore {
+  const _FakeMeasurementStore();
+
+  @override
+  Future<Measurement> persistImage(Measurement measurement) async {
+    return measurement;
+  }
+
+  @override
+  Future<void> saveAll(List<Measurement> measurements) async {}
+}
