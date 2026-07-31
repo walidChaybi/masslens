@@ -4,6 +4,7 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
+import '../../scan/data/estimate_repository_factory.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -32,9 +33,11 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     const MassLensLogo(compact: true),
                     const Spacer(),
-                    const StatusPill(
-                      label: 'Demo engine',
-                      icon: Icons.science_outlined,
+                    StatusPill(
+                      label: EstimateEngineConfig.analysisModeLabel,
+                      icon: EstimateEngineConfig.isAiEnabled
+                          ? Icons.auto_awesome_outlined
+                          : Icons.science_outlined,
                       background: AppColors.navySoft,
                     ),
                     const SizedBox(width: 8),

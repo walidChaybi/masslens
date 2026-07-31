@@ -32,6 +32,11 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+.dev.vars*
+.env*
+!*.example
+worker/node_modules/
+.wrangler/
 
 # Symbolication related
 app.*.symbols

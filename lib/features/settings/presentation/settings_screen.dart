@@ -4,6 +4,7 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/domain/measurement.dart';
+import '../../scan/data/estimate_repository_factory.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -99,24 +100,26 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
           const _SettingsHeader(title: 'Engine'),
           const SizedBox(height: 10),
-          const _SettingsCard(
+          _SettingsCard(
             children: [
               _SettingRow(
                 icon: Icons.science_outlined,
                 title: 'Analysis mode',
-                value: 'Local demo',
+                value: EstimateEngineConfig.analysisModeLabel,
               ),
-              Divider(),
+              const Divider(),
               _SettingRow(
-                icon: Icons.cloud_off_outlined,
+                icon: EstimateEngineConfig.isAiEnabled
+                    ? Icons.cloud_upload_outlined
+                    : Icons.cloud_off_outlined,
                 title: 'Cloud uploads',
-                value: 'Off',
+                value: EstimateEngineConfig.cloudUploadLabel,
               ),
-              Divider(),
+              const Divider(),
               _SettingRow(
                 icon: Icons.auto_awesome_outlined,
                 title: 'Production model',
-                value: 'Not connected',
+                value: EstimateEngineConfig.productionModelLabel,
               ),
             ],
           ),

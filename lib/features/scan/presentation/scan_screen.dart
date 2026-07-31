@@ -8,7 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
-import '../data/demo_estimate_repository.dart';
+import '../data/estimate_repository_factory.dart';
 import '../data/photo_picker.dart';
 import '../domain/estimate_repository.dart';
 
@@ -17,8 +17,7 @@ class ScanScreen extends StatefulWidget {
     EstimateRepository? estimateRepository,
     PhotoPicker? photoPicker,
     super.key,
-  }) : estimateRepository =
-           estimateRepository ?? const DemoEstimateRepository(),
+  }) : estimateRepository = estimateRepository ?? buildEstimateRepository(),
        photoPicker = photoPicker ?? DevicePhotoPicker();
 
   final EstimateRepository estimateRepository;
@@ -105,7 +104,8 @@ class _ScanScreenState extends State<ScanScreen> {
       if (!mounted || run != _analysisRun) return;
       setState(() {
         _isAnalyzing = false;
-        _error = 'Analysis stopped unexpectedly. Your photo is still here.';
+        _error =
+            'Analysis stopped unexpectedly. Check connection, then try again.';
       });
     }
   }
@@ -181,6 +181,8 @@ class _ScanScreenState extends State<ScanScreen> {
                 key: const ValueKey('analysis'),
                 imagePath: _imagePath!,
                 step: _analysisStep,
+                engineLabel: EstimateEngineConfig.analysisModeLabel,
+                privacyLabel: EstimateEngineConfig.analysisPrivacyLabel,
               )
             : _imagePath == null
             ? _CaptureView(
@@ -306,10 +308,10 @@ class _ScanScreenState extends State<ScanScreen> {
           label: const Text('Estimate weight and size'),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'Demo mode · No image leaves this device',
+        Text(
+          EstimateEngineConfig.reviewFootnote,
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             color: AppColors.inkMuted,
             fontSize: 11,
             fontWeight: FontWeight.w600,
@@ -488,91 +490,312 @@ class _CaptureView extends StatelessWidget {
   }
 }
 
-class _AnalysisView extends StatelessWidget {
-  const _AnalysisView({required this.imagePath, required this.step, super.key});
+class _AnalysisView extends StatefulWidget {
+  const _AnalysisView({
+    required this.imagePath,
+    required this.step,
+    required this.engineLabel,
+    required this.privacyLabel,
+    super.key,
+  });
 
   final String imagePath;
   final int step;
+  final String engineLabel;
+  final String privacyLabel;
+
+  @override
+  State<_AnalysisView> createState() => _AnalysisViewState();
+}
+
+class _AnalysisViewState extends State<_AnalysisView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1750),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     const labels = [
       'Checking photo quality',
-      'Identifying object and material',
-      'Calculating a plausible range',
+      'Finding object edges',
+      'Matching volume and density',
     ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 34),
-      child: Column(
-        children: [
-          const Spacer(),
-          SizedBox(
-            width: 210,
-            height: 210,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ClipOval(
-                  child: Image.file(
-                    File(imagePath),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      color: AppColors.navySoft,
-                      child: const Icon(Icons.inventory_2_outlined, size: 64),
-                    ),
-                  ),
-                ),
-                CircularProgressIndicator(
-                  value: (step + 1) / 3,
-                  strokeWidth: 8,
-                  strokeCap: StrokeCap.round,
-                  color: AppColors.lime,
-                  backgroundColor: AppColors.line,
-                ),
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: AppColors.ink,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.auto_awesome_rounded,
-                      color: AppColors.lime,
-                    ),
-                  ),
+    final step = widget.step.clamp(0, labels.length - 1);
+
+    return ListView(
+      key: const ValueKey('analysis_content'),
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 34),
+      children: [
+        Eyebrow(widget.engineLabel),
+        const SizedBox(height: 9),
+        Text(
+          'Scanning photo',
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
+        const SizedBox(height: 18),
+        AspectRatio(
+          aspectRatio: 4 / 5,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.ink,
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.ink.withValues(alpha: 0.18),
+                  blurRadius: 28,
+                  offset: const Offset(0, 15),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 34),
-          const Eyebrow('Demo analysis in progress'),
-          const SizedBox(height: 10),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: Text(
-              labels[step.clamp(0, labels.length - 1)],
-              key: ValueKey(step),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(
+                    File(widget.imagePath),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      color: AppColors.ink,
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.inventory_2_outlined,
+                        color: AppColors.aqua,
+                        size: 64,
+                      ),
+                    ),
+                  ),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppColors.ink.withValues(alpha: 0.1),
+                          AppColors.ink.withValues(alpha: 0.55),
+                        ],
+                        stops: const [0.32, 1],
+                      ),
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, child) => CustomPaint(
+                      painter: _ScanSweepPainter(
+                        progress: _controller.value,
+                        step: step,
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(22),
+                    child: InstrumentCorners(color: Colors.white),
+                  ),
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: Row(
+                      children: [
+                        StatusPill(
+                          label: step == 0 ? 'Scanning edges' : 'Target locked',
+                          icon: step == 0
+                              ? Icons.center_focus_strong_rounded
+                              : Icons.check_rounded,
+                          background: step == 0
+                              ? AppColors.aqua
+                              : AppColors.lime,
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${step + 1}/3',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'The production build will combine visual understanding with '
-            'geometry and density priors.',
+        ),
+        const SizedBox(height: 26),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: Text(
+            labels[step],
+            key: ValueKey(step),
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.headlineMedium,
           ),
-          const Spacer(),
-          const StatusPill(
-            label: 'Image stays on device',
-            icon: Icons.lock_outline_rounded,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'MassLens returns a range and confidence level so the estimate stays '
+          'honest about uncertainty.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 22),
+        Center(
+          child: StatusPill(
+            label: widget.privacyLabel,
+            icon: EstimateEngineConfig.isAiEnabled
+                ? Icons.cloud_upload_outlined
+                : Icons.lock_outline_rounded,
           ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+}
+
+class _ScanSweepPainter extends CustomPainter {
+  const _ScanSweepPainter({required this.progress, required this.step});
+
+  final double progress;
+  final int step;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    for (var index = 1; index < 6; index++) {
+      final y = size.height * index / 6;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final sweepY = size.height * progress;
+    final bandHeight = size.height * 0.16;
+    final bandRect = Rect.fromLTRB(
+      0,
+      sweepY - bandHeight / 2,
+      size.width,
+      sweepY + bandHeight / 2,
+    );
+    final bandPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Colors.transparent,
+          AppColors.aqua.withValues(alpha: 0.08),
+          AppColors.lime.withValues(alpha: 0.34),
+          Colors.transparent,
+        ],
+        stops: const [0, 0.35, 0.52, 1],
+      ).createShader(bandRect);
+    canvas.drawRect(bandRect, bandPaint);
+
+    final linePaint = Paint()
+      ..color = AppColors.lime.withValues(alpha: 0.92)
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(16, sweepY),
+      Offset(size.width - 16, sweepY),
+      linePaint,
+    );
+
+    final lockRect = Rect.fromCenter(
+      center: Offset(size.width * 0.5, size.height * 0.45),
+      width: size.width * 0.64,
+      height: size.height * 0.45,
+    );
+    final lockAlpha = step == 0 ? 0.52 : 0.88;
+    final fillPaint = Paint()
+      ..color = AppColors.ink.withValues(alpha: step == 0 ? 0.04 : 0.1)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = AppColors.aqua.withValues(alpha: lockAlpha)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(lockRect, const Radius.circular(26)),
+      fillPaint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(lockRect, const Radius.circular(26)),
+      borderPaint,
+    );
+
+    final cornerPaint = Paint()
+      ..color = AppColors.lime.withValues(alpha: lockAlpha)
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    const cornerLength = 26.0;
+    final corners = [
+      lockRect.topLeft,
+      lockRect.topRight,
+      lockRect.bottomLeft,
+      lockRect.bottomRight,
+    ];
+
+    canvas.drawLine(
+      corners[0],
+      corners[0] + const Offset(cornerLength, 0),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[0],
+      corners[0] + const Offset(0, cornerLength),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[1],
+      corners[1] - const Offset(cornerLength, 0),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[1],
+      corners[1] + const Offset(0, cornerLength),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[2],
+      corners[2] + const Offset(cornerLength, 0),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[2],
+      corners[2] - const Offset(0, cornerLength),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[3],
+      corners[3] - const Offset(cornerLength, 0),
+      cornerPaint,
+    );
+    canvas.drawLine(
+      corners[3],
+      corners[3] - const Offset(0, cornerLength),
+      cornerPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScanSweepPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.step != step;
   }
 }
 
