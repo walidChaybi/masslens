@@ -29,6 +29,10 @@ void main() {
 
     expect(find.text('What are we\nmeasuring today?'), findsOneWidget);
     expect(find.byKey(const Key('shell_scan_button')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const Key('shell_scan_icon'))),
+      const Size(40, 34),
+    );
   });
 
   testWidgets('bottom navigation exposes history and settings', (tester) async {
@@ -54,14 +58,16 @@ void main() {
       measurementStore: const _FakeMeasurementStore(),
       onboardingComplete: true,
     );
+    final photoPicker = _FakePhotoPicker();
+    final estimateRepository = _FakeEstimateRepository();
     await tester.pumpWidget(
       AppScope(
         controller: controller,
         child: MaterialApp(
           theme: buildAppTheme(),
           home: ScanScreen(
-            photoPicker: const _FakePhotoPicker(),
-            estimateRepository: const _FakeEstimateRepository(),
+            photoPicker: photoPicker,
+            estimateRepository: estimateRepository,
           ),
         ),
       ),
@@ -76,13 +82,29 @@ void main() {
     expect(find.text('Confirm the object'), findsOneWidget);
 
     await tester.scrollUntilVisible(
+      find.byKey(const Key('add_second_photo_button')),
+      250,
+    );
+    await tester.tap(find.byKey(const Key('add_second_photo_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('second_photo_gallery_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('second_photo_preview')), findsOneWidget);
+
+    await tester.scrollUntilVisible(
       find.byKey(const Key('analyze_button')),
       300,
     );
     await tester.tap(find.byKey(const Key('analyze_button')));
     await tester.pumpAndSettle();
+    expect(estimateRepository.lastRequest?.secondaryImagePath, isNotNull);
     expect(find.byKey(const Key('result_weight')), findsOneWidget);
     expect(find.text('LIKELY RANGE'), findsOneWidget);
+    final photoRect = tester.getRect(find.byKey(const Key('result_photo')));
+    final labelRect = tester.getRect(
+      find.byKey(const Key('result_object_label')),
+    );
+    expect(labelRect.top, greaterThanOrEqualTo(photoRect.bottom));
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('save_result_button')),
@@ -100,17 +122,21 @@ void main() {
 }
 
 class _FakePhotoPicker implements PhotoPicker {
-  const _FakePhotoPicker();
+  int _pickCount = 0;
 
   @override
-  Future<String?> pick(PhotoSource source) async => '/tmp/mass-lens-test.jpg';
+  Future<String?> pick(PhotoSource source) async {
+    _pickCount++;
+    return '/tmp/mass-lens-test-$_pickCount.jpg';
+  }
 }
 
 class _FakeEstimateRepository implements EstimateRepository {
-  const _FakeEstimateRepository();
+  EstimateRequest? lastRequest;
 
   @override
   Future<Measurement> analyze(EstimateRequest request) async {
+    lastRequest = request;
     return Measurement(
       id: 'test-result',
       createdAt: DateTime(2026, 7, 30, 12),
@@ -122,7 +148,11 @@ class _FakeEstimateRepository implements EstimateRepository {
       upperBoundGrams: 2800,
       confidence: ConfidenceLevel.medium,
       dimensions: const DimensionsMm(width: 300, height: 220, depth: 180),
-      assumptions: const ['Known category', 'No physical scale reference'],
+      assumptions: const [
+        'Known category',
+        'Estimated material based on visible appearance because no manufacturer '
+            'specification or physical scale reference was provided',
+      ],
     );
   }
 }

@@ -10,7 +10,7 @@ abstract final class EstimateEngineConfig {
   static const cloudflareApiUrl = String.fromEnvironment('MASSLENS_API_URL');
   static const cloudModelLabel = String.fromEnvironment(
     'CLOUD_MODEL_LABEL',
-    defaultValue: 'gpt-5.6-terra',
+    defaultValue: 'gpt-5.4-mini',
   );
 
   static bool get isCloudflareEnabled => estimateEngine == 'cloudflare';

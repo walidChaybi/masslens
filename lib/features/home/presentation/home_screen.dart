@@ -26,7 +26,7 @@ class HomeScreen extends StatelessWidget {
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 120),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
             sliver: SliverList.list(
               children: [
                 Row(

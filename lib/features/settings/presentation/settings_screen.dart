@@ -51,7 +51,7 @@ class SettingsScreen extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
           const Eyebrow('Preferences and privacy'),
           const SizedBox(height: 8),

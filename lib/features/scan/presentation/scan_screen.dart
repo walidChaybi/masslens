@@ -39,6 +39,7 @@ class _ScanScreenState extends State<ScanScreen> {
   static const _structures = ['Unknown', 'Solid', 'Hollow'];
 
   String? _imagePath;
+  String? _secondaryImagePath;
   String _category = 'Auto';
   String _structure = 'Unknown';
   bool _isPicking = false;
@@ -49,7 +50,7 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _saved = false;
   int _analysisRun = 0;
 
-  Future<void> _pick(PhotoSource source) async {
+  Future<void> _pick(PhotoSource source, {bool secondary = false}) async {
     if (_isPicking) return;
     setState(() {
       _isPicking = true;
@@ -59,7 +60,12 @@ class _ScanScreenState extends State<ScanScreen> {
       final path = await widget.photoPicker.pick(source);
       if (!mounted || path == null) return;
       setState(() {
-        _imagePath = path;
+        if (secondary) {
+          _secondaryImagePath = path;
+        } else {
+          _imagePath = path;
+          _secondaryImagePath = null;
+        }
         _result = null;
         _saved = false;
       });
@@ -73,6 +79,16 @@ class _ScanScreenState extends State<ScanScreen> {
     } finally {
       if (mounted) setState(() => _isPicking = false);
     }
+  }
+
+  Future<void> _showSecondAnglePicker() async {
+    final source = await showModalBottomSheet<PhotoSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => const _SecondAngleSourceSheet(),
+    );
+    if (source == null || !mounted) return;
+    await _pick(source, secondary: true);
   }
 
   Future<void> _analyze() async {
@@ -90,6 +106,7 @@ class _ScanScreenState extends State<ScanScreen> {
       final result = await widget.estimateRepository.analyze(
         EstimateRequest(
           imagePath: imagePath,
+          secondaryImagePath: _secondaryImagePath,
           category: _category,
           structure: _structure,
         ),
@@ -123,6 +140,7 @@ class _ScanScreenState extends State<ScanScreen> {
     _analysisRun++;
     setState(() {
       _imagePath = null;
+      _secondaryImagePath = null;
       _category = 'Auto';
       _structure = 'Unknown';
       _isAnalyzing = false;
@@ -162,7 +180,9 @@ class _ScanScreenState extends State<ScanScreen> {
               ? 'Analyzing'
               : _imagePath == null
               ? 'New estimate'
-              : 'Review photo',
+              : _secondaryImagePath == null
+              ? 'Review photo'
+              : 'Review photos',
         ),
         actions: [
           if (_imagePath != null && !_isAnalyzing)
@@ -180,6 +200,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ? _AnalysisView(
                 key: const ValueKey('analysis'),
                 imagePath: _imagePath!,
+                photoCount: _secondaryImagePath == null ? 1 : 2,
                 step: _analysisStep,
                 engineLabel: EstimateEngineConfig.analysisModeLabel,
                 privacyLabel: EstimateEngineConfig.analysisPrivacyLabel,
@@ -237,14 +258,21 @@ class _ScanScreenState extends State<ScanScreen> {
                   left: 16,
                   bottom: 16,
                   child: StatusPill(
-                    label: 'Object centered',
-                    icon: Icons.check_rounded,
-                    background: AppColors.lime.withValues(alpha: 0.92),
+                    label: 'Primary view',
+                    icon: Icons.looks_one_outlined,
+                    background: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],
             ),
           ),
+        ),
+        const SizedBox(height: 14),
+        _SecondAngleCard(
+          imagePath: _secondaryImagePath,
+          isPicking: _isPicking,
+          onAddOrReplace: _showSecondAnglePicker,
+          onRemove: () => setState(() => _secondaryImagePath = null),
         ),
         const SizedBox(height: 24),
         Text('Object category', style: Theme.of(context).textTheme.titleMedium),
@@ -490,9 +518,211 @@ class _CaptureView extends StatelessWidget {
   }
 }
 
+class _SecondAngleCard extends StatelessWidget {
+  const _SecondAngleCard({
+    required this.imagePath,
+    required this.isPicking,
+    required this.onAddOrReplace,
+    required this.onRemove,
+  });
+
+  final String? imagePath;
+  final bool isPicking;
+  final VoidCallback onAddOrReplace;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = imagePath;
+    return Material(
+      color: AppColors.aqua.withValues(alpha: 0.09),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: const BorderSide(color: AppColors.line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: path == null
+          ? InkWell(
+              key: const Key('add_second_photo_button'),
+              onTap: isPicking ? null : onAddOrReplace,
+              child: const Padding(
+                padding: EdgeInsets.all(15),
+                child: Row(
+                  children: [
+                    _SecondAngleIcon(icon: Icons.add_a_photo_outlined),
+                    SizedBox(width: 13),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Add a second angle',
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Optional · show the same object from the side or top',
+                            style: TextStyle(
+                              color: AppColors.inkMuted,
+                              fontSize: 11.5,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.inkMuted,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    key: const Key('second_photo_preview'),
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      width: 76,
+                      height: 76,
+                      child: Image.file(
+                        File(path),
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          color: AppColors.navySoft,
+                          child: const Icon(
+                            Icons.photo_outlined,
+                            color: AppColors.inkMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 13),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Second angle added',
+                          style: TextStyle(
+                            color: AppColors.ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Used to improve depth and shape estimates.',
+                          style: TextStyle(
+                            color: AppColors.inkMuted,
+                            fontSize: 11.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        key: const Key('replace_second_photo_button'),
+                        tooltip: 'Replace second angle',
+                        onPressed: isPicking ? null : onAddOrReplace,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                      IconButton(
+                        key: const Key('remove_second_photo_button'),
+                        tooltip: 'Remove second angle',
+                        onPressed: isPicking ? null : onRemove,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+class _SecondAngleIcon extends StatelessWidget {
+  const _SecondAngleIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.ink,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Icon(icon, color: AppColors.lime, size: 21),
+    );
+  }
+}
+
+class _SecondAngleSourceSheet extends StatelessWidget {
+  const _SecondAngleSourceSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Add a second angle',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 7),
+            Text(
+              'Photograph the same object from the side or above. Keep the '
+              'whole object visible.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              key: const Key('second_photo_camera_button'),
+              onPressed: () => Navigator.pop(context, PhotoSource.camera),
+              icon: const Icon(Icons.photo_camera_outlined),
+              label: const Text('Take second photo'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('second_photo_gallery_button'),
+              onPressed: () => Navigator.pop(context, PhotoSource.gallery),
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Choose from gallery'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AnalysisView extends StatefulWidget {
   const _AnalysisView({
     required this.imagePath,
+    required this.photoCount,
     required this.step,
     required this.engineLabel,
     required this.privacyLabel,
@@ -500,6 +730,7 @@ class _AnalysisView extends StatefulWidget {
   });
 
   final String imagePath;
+  final int photoCount;
   final int step;
   final String engineLabel;
   final String privacyLabel;
@@ -529,9 +760,9 @@ class _AnalysisViewState extends State<_AnalysisView>
 
   @override
   Widget build(BuildContext context) {
-    const labels = [
+    final labels = [
       'Checking photo quality',
-      'Finding object edges',
+      widget.photoCount == 2 ? 'Comparing both angles' : 'Finding object edges',
       'Matching volume and density',
     ];
     final step = widget.step.clamp(0, labels.length - 1);
@@ -595,10 +826,7 @@ class _AnalysisViewState extends State<_AnalysisView>
                   AnimatedBuilder(
                     animation: _controller,
                     builder: (context, child) => CustomPaint(
-                      painter: _ScanSweepPainter(
-                        progress: _controller.value,
-                        step: step,
-                      ),
+                      painter: _ScanSweepPainter(progress: _controller.value),
                     ),
                   ),
                   const Padding(
@@ -612,13 +840,13 @@ class _AnalysisViewState extends State<_AnalysisView>
                     child: Row(
                       children: [
                         StatusPill(
-                          label: step == 0 ? 'Scanning edges' : 'Target locked',
-                          icon: step == 0
-                              ? Icons.center_focus_strong_rounded
-                              : Icons.check_rounded,
-                          background: step == 0
-                              ? AppColors.aqua
-                              : AppColors.lime,
+                          label: widget.photoCount == 2
+                              ? '2 angles included'
+                              : '1 photo included',
+                          icon: widget.photoCount == 2
+                              ? Icons.compare_rounded
+                              : Icons.photo_outlined,
+                          background: AppColors.aqua,
                         ),
                         const Spacer(),
                         Text(
@@ -670,10 +898,9 @@ class _AnalysisViewState extends State<_AnalysisView>
 }
 
 class _ScanSweepPainter extends CustomPainter {
-  const _ScanSweepPainter({required this.progress, required this.step});
+  const _ScanSweepPainter({required this.progress});
 
   final double progress;
-  final int step;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -716,86 +943,11 @@ class _ScanSweepPainter extends CustomPainter {
       Offset(size.width - 16, sweepY),
       linePaint,
     );
-
-    final lockRect = Rect.fromCenter(
-      center: Offset(size.width * 0.5, size.height * 0.45),
-      width: size.width * 0.64,
-      height: size.height * 0.45,
-    );
-    final lockAlpha = step == 0 ? 0.52 : 0.88;
-    final fillPaint = Paint()
-      ..color = AppColors.ink.withValues(alpha: step == 0 ? 0.04 : 0.1)
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = AppColors.aqua.withValues(alpha: lockAlpha)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(lockRect, const Radius.circular(26)),
-      fillPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(lockRect, const Radius.circular(26)),
-      borderPaint,
-    );
-
-    final cornerPaint = Paint()
-      ..color = AppColors.lime.withValues(alpha: lockAlpha)
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round;
-    const cornerLength = 26.0;
-    final corners = [
-      lockRect.topLeft,
-      lockRect.topRight,
-      lockRect.bottomLeft,
-      lockRect.bottomRight,
-    ];
-
-    canvas.drawLine(
-      corners[0],
-      corners[0] + const Offset(cornerLength, 0),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[0],
-      corners[0] + const Offset(0, cornerLength),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[1],
-      corners[1] - const Offset(cornerLength, 0),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[1],
-      corners[1] + const Offset(0, cornerLength),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[2],
-      corners[2] + const Offset(cornerLength, 0),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[2],
-      corners[2] - const Offset(0, cornerLength),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[3],
-      corners[3] - const Offset(cornerLength, 0),
-      cornerPaint,
-    );
-    canvas.drawLine(
-      corners[3],
-      corners[3] - const Offset(0, cornerLength),
-      cornerPaint,
-    );
   }
 
   @override
   bool shouldRepaint(covariant _ScanSweepPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.step != step;
+    return oldDelegate.progress != progress;
   }
 }
 

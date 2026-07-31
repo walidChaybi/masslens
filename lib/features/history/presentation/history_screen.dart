@@ -36,7 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             sliver: SliverList.list(
               children: [
                 Row(

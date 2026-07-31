@@ -57,7 +57,7 @@ flutter run \
   --dart-define=MASSLENS_API_URL=https://masslens-api.YOUR-SUBDOMAIN.workers.dev/estimate
 ```
 
-The Worker uses `gpt-5.6-terra` with medium reasoning by default. Change the
+The Worker uses `gpt-5.4-mini` with medium reasoning by default. Change the
 non-secret values in `worker/wrangler.jsonc` and redeploy if evaluation shows a
 different model or effort is a better cost/quality fit.
 
@@ -71,9 +71,9 @@ npm run check
 ## Included
 
 - Three-page trust-focused onboarding
-- Camera and gallery image selection
+- Camera and gallery image selection with an optional second angle
 - Category and object-structure review
-- Animated scan-line analysis with target lock feedback
+- Animated scan-line analysis with clear progress feedback
 - Weight range, confidence, dimensions, and assumptions
 - Private on-device image/history persistence
 - Metric and imperial units

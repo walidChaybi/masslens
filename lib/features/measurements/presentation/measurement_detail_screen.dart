@@ -82,6 +82,7 @@ class MeasurementSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AspectRatio(
+          key: const Key('result_photo'),
           aspectRatio: 4 / 3,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(28),
@@ -98,62 +99,42 @@ class MeasurementSummary extends StatelessWidget {
                           color: AppColors.inkMuted,
                         ),
                       ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        AppColors.ink.withValues(alpha: 0.76),
-                      ],
-                      stops: const [0.45, 1],
-                    ),
-                  ),
-                ),
                 const InstrumentCorners(),
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 18,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              measurement.category.toUpperCase(),
-                              style: const TextStyle(
-                                color: AppColors.lime,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              measurement.objectLabel,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      StatusPill(
-                        label: measurement.isDemo ? 'Demo' : 'AI estimate',
-                        background: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    measurement.category.toUpperCase(),
+                    style: const TextStyle(
+                      color: AppColors.limeDark,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    measurement.objectLabel,
+                    key: const Key('result_object_label'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            StatusPill(label: measurement.isDemo ? 'Demo' : 'AI estimate'),
+          ],
         ),
         const SizedBox(height: 16),
         Container(
@@ -242,12 +223,16 @@ class MeasurementSummary extends StatelessWidget {
         _ResultSection(
           title: 'Assumptions',
           icon: Icons.tune_rounded,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          child: Column(
             children: [
-              for (final assumption in measurement.assumptions)
-                StatusPill(label: assumption),
+              for (
+                var index = 0;
+                index < measurement.assumptions.length;
+                index++
+              ) ...[
+                if (index > 0) const SizedBox(height: 8),
+                _AssumptionItem(label: measurement.assumptions[index]),
+              ],
             ],
           ),
         ),
@@ -320,6 +305,49 @@ class _ResultSection extends StatelessWidget {
             child,
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AssumptionItem extends StatelessWidget {
+  const _AssumptionItem({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.navySoft,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.check_circle_outline_rounded,
+              size: 16,
+              color: AppColors.limeDark,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

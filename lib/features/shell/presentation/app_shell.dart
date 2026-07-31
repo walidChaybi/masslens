@@ -36,27 +36,8 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       body: IndexedStack(index: _index, children: screens),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Semantics(
-        button: true,
-        label: 'Start a new estimate',
-        child: FloatingActionButton.large(
-          key: const Key('shell_scan_button'),
-          heroTag: 'shell_scan',
-          tooltip: 'New estimate',
-          onPressed: _openScan,
-          backgroundColor: AppColors.ink,
-          foregroundColor: AppColors.lime,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(23),
-            side: const BorderSide(color: AppColors.canvas, width: 5),
-          ),
-          child: const Icon(Icons.center_focus_strong_rounded, size: 29),
-        ),
-      ),
       bottomNavigationBar: BottomAppBar(
         height: 76,
         padding: EdgeInsets.zero,
@@ -64,8 +45,6 @@ class _AppShellState extends State<AppShell> {
         surfaceTintColor: Colors.transparent,
         elevation: 8,
         shadowColor: AppColors.ink.withValues(alpha: 0.15),
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 9,
         child: Row(
           children: [
             Expanded(
@@ -88,7 +67,7 @@ class _AppShellState extends State<AppShell> {
                 onTap: () => setState(() => _index = 1),
               ),
             ),
-            const SizedBox(width: 74),
+            Expanded(child: _ScanNavigationItem(onTap: _openScan)),
             Expanded(
               child: _NavigationItem(
                 key: const Key('nav_guide'),
@@ -107,6 +86,55 @@ class _AppShellState extends State<AppShell> {
                 label: 'Settings',
                 selected: _index == 3,
                 onTap: () => setState(() => _index = 3),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScanNavigationItem extends StatelessWidget {
+  const _ScanNavigationItem({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkResponse(
+      key: const Key('shell_scan_button'),
+      onTap: onTap,
+      radius: 32,
+      child: Semantics(
+        button: true,
+        label: 'Start a new estimate',
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.ink,
+                borderRadius: BorderRadius.all(Radius.circular(13)),
+              ),
+              child: SizedBox(
+                key: Key('shell_scan_icon'),
+                width: 40,
+                height: 34,
+                child: Icon(
+                  Icons.center_focus_strong_rounded,
+                  size: 21,
+                  color: AppColors.lime,
+                ),
+              ),
+            ),
+            SizedBox(height: 3),
+            Text(
+              'Scan',
+              style: TextStyle(
+                color: AppColors.ink,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

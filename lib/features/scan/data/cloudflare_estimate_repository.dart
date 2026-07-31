@@ -20,17 +20,21 @@ class CloudflareEstimateRepository implements EstimateRepository {
   @override
   Future<Measurement> analyze(EstimateRequest request) async {
     final uri = _validatedApiUri();
-    final imageFile = File(request.imagePath);
-    if (!await imageFile.exists()) {
-      throw CloudflareEstimateException(
-        'Image not found: ${request.imagePath}',
-      );
+    final imagePaths = [request.imagePath, ?request.secondaryImagePath];
+    final images = <Map<String, String>>[];
+    for (final imagePath in imagePaths) {
+      final imageFile = File(imagePath);
+      if (!await imageFile.exists()) {
+        throw CloudflareEstimateException('Image not found: $imagePath');
+      }
+      images.add({
+        'imageBase64': base64Encode(await imageFile.readAsBytes()),
+        'mimeType': mimeTypeForImagePath(imagePath),
+      });
     }
 
-    final imageBytes = await imageFile.readAsBytes();
     final payload = await _postJson(uri, {
-      'imageBase64': base64Encode(imageBytes),
-      'mimeType': mimeTypeForImagePath(request.imagePath),
+      'images': images,
       'category': request.category,
       'structure': request.structure,
     }, clientId: await _installationId());

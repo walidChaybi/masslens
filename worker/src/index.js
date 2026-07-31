@@ -1,5 +1,7 @@
-const maxRequestCharacters = 9 * 1024 * 1024;
+const maxRequestCharacters = 17 * 1024 * 1024;
 const maxImageBase64Characters = 8 * 1024 * 1024;
+const maxTotalImageBase64Characters = 15 * 1024 * 1024;
+const maxImages = 2;
 const clientIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 
 const categoryChoices = [
@@ -63,18 +65,12 @@ async function routeRequest(request, env) {
     "structure",
     structureChoices,
   );
-  const mimeType = readChoice(
-    data.mimeType || "image/jpeg",
-    "mimeType",
-    mimeTypeChoices,
-  );
-  const imageBase64 = readImageBase64(data.imageBase64);
+  const images = readImages(data);
 
   const estimate = await requestOpenAi(env, {
     category,
     structure,
-    mimeType,
-    imageBase64,
+    images,
     safetyIdentifier: await hashIdentifier(clientId),
   });
   return jsonResponse(estimate);
@@ -166,9 +162,63 @@ function readImageBase64(value) {
   return imageBase64;
 }
 
+function readImages(data) {
+  if (data.images === undefined) {
+    return [
+      {
+        imageBase64: readImageBase64(data.imageBase64),
+        mimeType: readChoice(
+          data.mimeType || "image/jpeg",
+          "mimeType",
+          mimeTypeChoices,
+        ),
+      },
+    ];
+  }
+
+  if (
+    !Array.isArray(data.images) ||
+    data.images.length === 0 ||
+    data.images.length > maxImages
+  ) {
+    throw new ApiError(
+      400,
+      "invalid_request",
+      "Provide one or two images.",
+    );
+  }
+
+  const images = data.images.map((image, index) => {
+    if (!image || typeof image !== "object" || Array.isArray(image)) {
+      throw new ApiError(
+        400,
+        "invalid_request",
+        `Invalid image at position ${index + 1}.`,
+      );
+    }
+    return {
+      imageBase64: readImageBase64(image.imageBase64),
+      mimeType: readChoice(
+        image.mimeType || "image/jpeg",
+        "mimeType",
+        mimeTypeChoices,
+      ),
+    };
+  });
+
+  const totalCharacters = images.reduce(
+    (total, image) => total + image.imageBase64.length,
+    0,
+  );
+  if (totalCharacters > maxTotalImageBase64Characters) {
+    throw new ApiError(413, "request_too_large", "The images are too large.");
+  }
+  return images;
+}
+
 async function requestOpenAi(
   env,
-  {category, structure, mimeType, imageBase64, safetyIdentifier},
+  {category, structure, images, safetyIdentifier},
 ) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -177,7 +227,7 @@ async function requestOpenAi(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-5.6-terra",
+      model: env.OPENAI_MODEL || "gpt-5.4-mini",
       reasoning: {effort: env.OPENAI_REASONING_EFFORT || "medium"},
       safety_identifier: safetyIdentifier,
       store: false,
@@ -195,13 +245,22 @@ async function requestOpenAi(
           content: [
             {
               type: "input_text",
-              text: requestPrompt(category, structure),
+              text: requestPrompt(category, structure, images.length),
             },
-            {
-              type: "input_image",
-              image_url: `data:${mimeType};base64,${imageBase64}`,
-              detail: "high",
-            },
+            ...images.flatMap((image, index) => [
+              {
+                type: "input_text",
+                text: index === 0
+                  ? "Primary view of the object:"
+                  : "Second angle of the same physical object:",
+              },
+              {
+                type: "input_image",
+                image_url:
+                  `data:${image.mimeType};base64,${image.imageBase64}`,
+                detail: "high",
+              },
+            ]),
           ],
         },
       ],
@@ -335,17 +394,20 @@ function invalidEstimate(field) {
   );
 }
 
-function requestPrompt(category, structure) {
+function requestPrompt(category, structure, imageCount) {
   return [
     "Analyze this photo for MassLens.",
     "",
     `User-selected category: ${category}.`,
     `User-selected internal structure: ${structure}.`,
+    `Number of views supplied: ${imageCount}.`,
     "",
     "Estimate the primary object's weight and dimensions. If the user selected",
     "Auto, infer the category from the image. If the user selected Unknown",
     "structure, infer the most likely construction and mention uncertainty in",
-    "assumptions.",
+    "assumptions. When two views are supplied, treat them as different angles",
+    "of the same physical object, not as two objects. Use the second view to",
+    "resolve depth, construction, and occluded details.",
   ].join("\n");
 }
 
