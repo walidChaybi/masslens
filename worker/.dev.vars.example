@@ -1,1 +1,2 @@
 OPENAI_API_KEY=replace_with_a_development_key
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"your-project"}

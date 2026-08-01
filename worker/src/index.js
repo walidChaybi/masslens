@@ -1,3 +1,10 @@
+import {
+  handleMonetizationRoute,
+  MonetizationError,
+  refundScan,
+  reserveScan,
+} from "./monetization.js";
+
 const maxRequestCharacters = 17 * 1024 * 1024;
 const maxImageBase64Characters = 8 * 1024 * 1024;
 const maxTotalImageBase64Characters = 15 * 1024 * 1024;
@@ -46,7 +53,7 @@ export default {
     try {
       return await routeRequest(request, env);
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (error instanceof ApiError || error instanceof MonetizationError) {
         return errorResponse(error.status, error.code, error.message);
       }
 
@@ -64,6 +71,13 @@ async function routeRequest(request, env) {
   if (request.method === "GET" && url.pathname === "/health") {
     return jsonResponse({ok: true});
   }
+
+  const monetizationResponse = await handleMonetizationRoute(
+    request,
+    env,
+    url,
+  );
+  if (monetizationResponse) return monetizationResponse;
 
   if (request.method !== "POST" || url.pathname !== "/estimate") {
     throw new ApiError(404, "not_found", "Endpoint not found.");
@@ -109,18 +123,25 @@ async function routeRequest(request, env) {
   );
   const knownDimension = readKnownDimension(data.knownDimension);
   const images = readImages(data);
+  const clientIdHash = await hashIdentifier(clientId);
+  const reservation = await reserveScan(env, clientIdHash);
 
-  const estimate = await requestOpenAi(env, {
-    category,
-    structure,
-    material,
-    fillState,
-    referenceObject,
-    knownDimension,
-    images,
-    safetyIdentifier: await hashIdentifier(clientId),
-  });
-  return jsonResponse(estimate);
+  try {
+    const estimate = await requestOpenAi(env, {
+      category,
+      structure,
+      material,
+      fillState,
+      referenceObject,
+      knownDimension,
+      images,
+      safetyIdentifier: clientIdHash,
+    });
+    return jsonResponse(estimate);
+  } catch (error) {
+    await refundScan(env, clientIdHash, reservation);
+    throw error;
+  }
 }
 
 function readClientId(request) {

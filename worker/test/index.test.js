@@ -29,6 +29,54 @@ test("unknown routes return JSON 404", async () => {
   assert.equal((await response.json()).error.code, "not_found");
 });
 
+test("access endpoint is safe before billing enforcement is enabled", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/access", {
+      headers: {"X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx"},
+    }),
+    {...env, BILLING_ENFORCED: "false"},
+  );
+
+  assert.equal(response.status, 200);
+  const access = await response.json();
+  assert.equal(access.planId, "free");
+  assert.equal(access.scanLimit, 3);
+  assert.equal(access.billingEnforced, false);
+  assert.equal(access.adsEnabled, false);
+});
+
+test("billing cannot be enforced without D1 storage", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/access", {
+      headers: {"X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx"},
+    }),
+    {...env, BILLING_ENFORCED: "true"},
+  );
+
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "billing_not_configured");
+});
+
+test("billing rejects product IDs that are not owned by MassLens", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/billing/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+      },
+      body: JSON.stringify({
+        productId: "attacker_product",
+        purchaseToken: "abcdefghijklmnopqrstuvwxyz123456",
+      }),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "invalid_product");
+});
+
 test("estimate endpoint requires an installation identifier", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/estimate", {

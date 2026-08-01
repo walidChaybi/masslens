@@ -8,6 +8,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
+import '../../monetization/presentation/paywall_sheet.dart';
+import '../data/cloudflare_estimate_repository.dart';
 import '../data/estimate_repository_factory.dart';
 import '../data/photo_picker.dart';
 import '../domain/estimate_repository.dart';
@@ -151,6 +153,19 @@ class _ScanScreenState extends State<ScanScreen> {
         _isAnalyzing = false;
         _analysisStep = 3;
       });
+      unawaited(AppScope.of(context).monetization.refreshAccess());
+    } on CloudflareEstimateException catch (error) {
+      if (!mounted || run != _analysisRun) return;
+      setState(() {
+        _isAnalyzing = false;
+        _error = error.isScanLimitReached
+            ? 'You have used your available scans.'
+            : error.message;
+      });
+      if (error.isScanLimitReached) {
+        await AppScope.of(context).monetization.refreshAccess();
+        if (mounted) await showMassLensPaywall(context);
+      }
     } on Object {
       if (!mounted || run != _analysisRun) return;
       setState(() {
@@ -214,7 +229,7 @@ class _ScanScreenState extends State<ScanScreen> {
       appBar: AppBar(
         leading: IconButton(
           tooltip: 'Close',
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(_result != null),
           icon: const Icon(Icons.close_rounded),
         ),
         title: Text(
@@ -398,7 +413,7 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
         const SizedBox(height: 12),
         TextButton.icon(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(true),
           icon: const Icon(Icons.home_outlined),
           label: const Text('Return home'),
         ),

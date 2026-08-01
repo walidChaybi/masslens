@@ -38,6 +38,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Google's official test App ID is the safe default. Set ADMOB_APP_ID
+        // in android/gradle.properties before a production ads build.
+        manifestPlaceholders["admobAppId"] = providers.gradleProperty(
+            "ADMOB_APP_ID"
+        ).getOrElse("ca-app-pub-3940256099942544~3347511713")
     }
 
     signingConfigs {

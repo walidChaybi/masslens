@@ -4,6 +4,7 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/domain/measurement.dart';
+import '../../monetization/presentation/paywall_sheet.dart';
 import '../../scan/data/estimate_repository_factory.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -48,6 +49,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final monetization = controller.monetization;
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -124,6 +126,30 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          const _SettingsHeader(title: 'Plan'),
+          const SizedBox(height: 10),
+          _SettingsCard(
+            children: [
+              _ActionRow(
+                icon: monetization.access.isPaid
+                    ? Icons.workspace_premium_rounded
+                    : Icons.auto_awesome_rounded,
+                title: '${monetization.access.planName} plan',
+                subtitle: monetization.access.usageLabel,
+                color: AppColors.ink,
+                onTap: () => showMassLensPaywall(context),
+              ),
+              const Divider(),
+              _ActionRow(
+                icon: Icons.restore_rounded,
+                title: 'Restore Google Play purchases',
+                subtitle: 'Already subscribed on this account',
+                color: AppColors.ink,
+                onTap: monetization.restorePurchases,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           const _SettingsHeader(title: 'Privacy'),
           const SizedBox(height: 10),
           _SettingsCard(
@@ -133,6 +159,16 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Saved photos',
                 value: 'Private storage',
               ),
+              if (monetization.privacyOptionsRequired) ...[
+                const Divider(),
+                _ActionRow(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Ad privacy choices',
+                  subtitle: 'Review or change consent',
+                  color: AppColors.ink,
+                  onTap: monetization.showPrivacyOptions,
+                ),
+              ],
               const Divider(),
               _ActionRow(
                 icon: Icons.delete_sweep_outlined,

@@ -6,7 +6,10 @@
   "workers_dev": true,
   "vars": {
     "OPENAI_MODEL": "gpt-5.4-mini",
-    "OPENAI_REASONING_EFFORT": "medium"
+    "OPENAI_REASONING_EFFORT": "medium",
+    "BILLING_ENFORCED": "false",
+    "GOOGLE_PLAY_PACKAGE_NAME": "com.lilai.aivirtual",
+    "ADMOB_REWARDED_AD_UNIT_ID": ""
   },
   "ratelimits": [
     {
@@ -24,6 +27,13 @@
         "limit": 30,
         "period": 60
       }
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "masslens-billing",
+      "database_id": "b4b1f8e6-a2f5-4adb-88fe-d77cc2d38de7"
     }
   ],
   "observability": {

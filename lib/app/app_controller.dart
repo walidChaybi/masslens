@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/measurements/data/measurement_store.dart';
 import '../features/measurements/domain/measurement.dart';
+import '../features/monetization/application/monetization_controller.dart';
 
 class AppController extends ChangeNotifier {
   AppController({
@@ -10,15 +11,21 @@ class AppController extends ChangeNotifier {
     List<Measurement> measurements = const [],
     bool onboardingComplete = false,
     UnitSystem unitSystem = UnitSystem.metric,
+    MonetizationController? monetizationController,
   }) : _measurementStore = measurementStore,
        _measurements = List<Measurement>.from(measurements),
        _onboardingComplete = onboardingComplete,
-       _unitSystem = unitSystem;
+       _unitSystem = unitSystem,
+       monetization =
+           monetizationController ?? MonetizationController.disabled() {
+    monetization.addListener(notifyListeners);
+  }
 
   static const _onboardingKey = 'mass_lens.onboarding_complete';
   static const _unitKey = 'mass_lens.unit_system';
 
   final MeasurementStore _measurementStore;
+  final MonetizationController monetization;
   final List<Measurement> _measurements;
   bool _onboardingComplete;
   UnitSystem _unitSystem;
@@ -47,8 +54,11 @@ class AppController extends ChangeNotifier {
       measurements: await store.load(),
       onboardingComplete: onboardingComplete,
       unitSystem: unitSystem,
+      monetizationController: MonetizationController.create(),
     );
   }
+
+  Future<void> initializeMonetization() => monetization.initialize();
 
   Future<void> completeOnboarding() async {
     _onboardingComplete = true;
@@ -96,6 +106,14 @@ class AppController extends ChangeNotifier {
       await _measurementStore.deleteImage(measurement);
     }
     await _measurementStore.saveAll(_measurements);
+  }
+
+  @override
+  void dispose() {
+    monetization
+      ..removeListener(notifyListeners)
+      ..dispose();
+    super.dispose();
   }
 }
 

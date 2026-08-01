@@ -68,6 +68,14 @@ cd worker
 npm run check
 ```
 
+## Monetization
+
+MassLens now contains direct Google Play subscriptions, Worker-side purchase
+verification, D1 scan quotas, and AdMob for free users. RevenueCat is not used.
+Billing enforcement and ads remain off by default until the console resources
+are connected. Follow [MONETIZATION_SETUP.md](MONETIZATION_SETUP.md) for the
+exact safe activation sequence.
+
 ## Included
 
 - Three-page trust-focused onboarding
@@ -77,6 +85,8 @@ npm run check
 - Weight range, confidence, dimensions, and assumptions
 - Private on-device image/history persistence
 - Metric and imperial units
+- Google Play plans for 50, 100, or 300 monthly scans
+- Paid-user ad removal, UMP consent, native/interstitial/rewarded AdMob flows
 - Capture guidance, history filtering, deletion, and empty/error states
 
 ## Run

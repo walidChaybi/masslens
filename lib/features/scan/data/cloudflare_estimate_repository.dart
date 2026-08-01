@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
+import '../../../core/services/installation_id_store.dart';
 import '../../measurements/domain/measurement.dart';
 import '../domain/estimate_repository.dart';
 import 'ai_estimate_payload.dart';
@@ -40,7 +38,7 @@ class CloudflareEstimateRepository implements EstimateRepository {
       'referenceObject': request.referenceObject,
       if (request.knownDimension case final knownDimension?)
         'knownDimension': knownDimension.toJson(),
-    }, clientId: await _installationId());
+    }, clientId: await InstallationIdStore.getOrCreate());
 
     return measurementFromAiEstimatePayload(
       payload,
@@ -98,6 +96,10 @@ class CloudflareEstimateRepository implements EstimateRepository {
             : 'Cloud AI request failed.';
         throw CloudflareEstimateException(
           'Cloud AI request failed (${response.statusCode}): $message',
+          statusCode: response.statusCode,
+          code: decoded is Map
+              ? _errorCode(Map<String, Object?>.from(decoded))
+              : null,
         );
       }
 
@@ -122,24 +124,24 @@ class CloudflareEstimateRepository implements EstimateRepository {
     return 'No error message was returned.';
   }
 
-  static Future<String> _installationId() async {
-    const preferenceKey = 'masslens_api_installation_id';
-    final preferences = await SharedPreferences.getInstance();
-    final existing = preferences.getString(preferenceKey);
-    if (existing != null && existing.isNotEmpty) return existing;
-
-    final random = Random.secure();
-    final bytes = List<int>.generate(18, (_) => random.nextInt(256));
-    final created = base64UrlEncode(bytes).replaceAll('=', '');
-    await preferences.setString(preferenceKey, created);
-    return created;
+  static String? _errorCode(Map<String, Object?> decoded) {
+    final error = decoded['error'];
+    if (error is Map && error['code'] is String) {
+      return error['code'] as String;
+    }
+    return null;
   }
 }
 
 class CloudflareEstimateException implements Exception {
-  const CloudflareEstimateException(this.message);
+  const CloudflareEstimateException(this.message, {this.statusCode, this.code});
 
   final String message;
+  final int? statusCode;
+  final String? code;
+
+  bool get isScanLimitReached =>
+      statusCode == 402 || code == 'scan_limit_reached';
 
   @override
   String toString() => message;

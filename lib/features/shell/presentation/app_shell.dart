@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../guide/presentation/guide_screen.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../home/presentation/home_screen.dart';
+import '../../monetization/presentation/paywall_sheet.dart';
 import '../../scan/presentation/scan_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 
@@ -18,9 +20,17 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
 
   Future<void> _openScan() async {
-    await Navigator.of(
+    final monetization = AppScope.of(context).monetization;
+    await monetization.refreshAccess();
+    if (!mounted) return;
+    if (!monetization.access.canScan) {
+      await showMassLensPaywall(context);
+      return;
+    }
+    final completed = await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => ScanScreen()));
+    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => ScanScreen()));
+    if (completed == true) await monetization.onScanCompleted();
   }
 
   @override

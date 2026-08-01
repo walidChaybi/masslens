@@ -4,6 +4,9 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
+import '../../monetization/presentation/access_card.dart';
+import '../../monetization/presentation/native_ad_card.dart';
+import '../../monetization/presentation/paywall_sheet.dart';
 import '../../scan/data/estimate_repository_factory.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -19,6 +22,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final monetization = controller.monetization;
     final recent = controller.measurements.take(2).toList();
 
     return SafeArea(
@@ -47,6 +51,27 @@ class HomeScreen extends StatelessWidget {
                       icon: const Icon(Icons.info_outline_rounded),
                     ),
                   ],
+                ),
+                const SizedBox(height: 18),
+                AccessCard(
+                  access: monetization.access,
+                  onManage: () => showMassLensPaywall(context),
+                  rewardedAdReady: monetization.rewardedAdReady,
+                  onRewardedAd: () async {
+                    final added = await monetization.watchAdForScan();
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          added
+                              ? 'One bonus scan was added.'
+                              : monetization.message ??
+                                    'The reward is still processing.',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 28),
                 const Eyebrow('AI-assisted measurement'),
@@ -90,6 +115,10 @@ class HomeScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (monetization.canRequestAds) ...[
+                  const SizedBox(height: 18),
+                  NativeAdCard(enabled: monetization.canRequestAds),
+                ],
                 const SizedBox(height: 30),
                 SectionTitle(
                   title: 'Recent estimates',
@@ -182,8 +211,8 @@ class HomeScreen extends StatelessWidget {
               ),
               SizedBox(height: 12),
               _InfoRow(
-                icon: Icons.category_outlined,
-                text: 'Confirm category and structure to narrow the range.',
+                icon: Icons.tune_rounded,
+                text: 'Add material, fill state, or one known dimension.',
               ),
             ],
           ),
