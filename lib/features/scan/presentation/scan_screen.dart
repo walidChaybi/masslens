@@ -28,20 +28,35 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  static const _categories = [
-    'Auto',
-    'Food',
-    'Parcel',
-    'Furniture',
-    'Electronics',
-    'Other',
+  static const _materials = [
+    'Unknown',
+    'Plastic',
+    'Metal',
+    'Glass/Ceramic',
+    'Wood',
+    'Cardboard/Paper',
+    'Fabric',
+    'Food/Liquid',
+    'Mixed',
   ];
-  static const _structures = ['Unknown', 'Solid', 'Hollow'];
+  static const _fillStates = [
+    'Unknown',
+    'Solid',
+    'Empty',
+    'Partly filled',
+    'Full',
+  ];
+  static const _referenceObjects = ['None', 'Ruler', 'Standard card'];
+  static const _dimensionAxes = ['Width', 'Height', 'Depth'];
 
+  final _dimensionController = TextEditingController();
   String? _imagePath;
   String? _secondaryImagePath;
-  String _category = 'Auto';
-  String _structure = 'Unknown';
+  String _material = 'Unknown';
+  String _fillState = 'Unknown';
+  String _referenceObject = 'None';
+  String _dimensionAxis = 'Width';
+  String _dimensionUnit = 'cm';
   bool _isPicking = false;
   bool _isAnalyzing = false;
   int _analysisStep = 0;
@@ -94,6 +109,23 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _analyze() async {
     final imagePath = _imagePath;
     if (imagePath == null || _isAnalyzing) return;
+    final dimensionText = _dimensionController.text.trim().replaceAll(',', '.');
+    KnownDimensionInput? knownDimension;
+    if (dimensionText.isNotEmpty) {
+      final value = double.tryParse(dimensionText);
+      if (value == null || !value.isFinite || value <= 0) {
+        setState(() {
+          _error =
+              'Enter a known dimension greater than zero, or leave it blank.';
+        });
+        return;
+      }
+      knownDimension = KnownDimensionInput(
+        axis: _dimensionAxis,
+        value: value,
+        unit: _dimensionUnit,
+      );
+    }
     final run = ++_analysisRun;
     setState(() {
       _isAnalyzing = true;
@@ -107,8 +139,10 @@ class _ScanScreenState extends State<ScanScreen> {
         EstimateRequest(
           imagePath: imagePath,
           secondaryImagePath: _secondaryImagePath,
-          category: _category,
-          structure: _structure,
+          material: _material,
+          fillState: _fillState,
+          referenceObject: _referenceObject,
+          knownDimension: knownDimension,
         ),
       );
       if (!mounted || run != _analysisRun) return;
@@ -141,13 +175,23 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() {
       _imagePath = null;
       _secondaryImagePath = null;
-      _category = 'Auto';
-      _structure = 'Unknown';
+      _material = 'Unknown';
+      _fillState = 'Unknown';
+      _referenceObject = 'None';
+      _dimensionAxis = 'Width';
+      _dimensionUnit = 'cm';
+      _dimensionController.clear();
       _isAnalyzing = false;
       _result = null;
       _error = null;
       _saved = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _dimensionController.dispose();
+    super.dispose();
   }
 
   Future<void> _save() async {
@@ -275,54 +319,25 @@ class _ScanScreenState extends State<ScanScreen> {
           onRemove: () => setState(() => _secondaryImagePath = null),
         ),
         const SizedBox(height: 24),
-        Text('Object category', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-        Text(
-          'Choose the closest match, or let the demo engine infer it.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final category in _categories)
-              ChoiceChip(
-                label: Text(category),
-                selected: _category == category,
-                onSelected: (_) => setState(() => _category = category),
-              ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Internal structure',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'This changes the assumed material fill and expected density.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 12),
-        SegmentedButton<String>(
-          segments: [
-            for (final structure in _structures)
-              ButtonSegment<String>(
-                value: structure,
-                label: Text(structure),
-                icon: Icon(switch (structure) {
-                  'Solid' => Icons.square_rounded,
-                  'Hollow' => Icons.check_box_outline_blank_rounded,
-                  _ => Icons.help_outline_rounded,
-                }),
-              ),
-          ],
-          selected: {_structure},
-          onSelectionChanged: (value) {
-            setState(() => _structure = value.single);
-          },
-          showSelectedIcon: false,
+        _PhysicalContextCard(
+          materials: _materials,
+          fillStates: _fillStates,
+          referenceObjects: _referenceObjects,
+          dimensionAxes: _dimensionAxes,
+          material: _material,
+          fillState: _fillState,
+          referenceObject: _referenceObject,
+          dimensionAxis: _dimensionAxis,
+          dimensionUnit: _dimensionUnit,
+          dimensionController: _dimensionController,
+          onMaterialChanged: (value) => setState(() => _material = value),
+          onFillStateChanged: (value) => setState(() => _fillState = value),
+          onReferenceChanged: (value) =>
+              setState(() => _referenceObject = value),
+          onDimensionAxisChanged: (value) =>
+              setState(() => _dimensionAxis = value),
+          onDimensionUnitChanged: (value) =>
+              setState(() => _dimensionUnit = value),
         ),
         if (_error != null) ...[
           const SizedBox(height: 18),
@@ -419,7 +434,8 @@ class _CaptureView extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Use an uncluttered background and keep every edge visible.',
+          'Use an uncluttered background, keep every edge visible, and place '
+          'a ruler or blank standard card beside the object when possible.',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 22),
@@ -715,6 +731,238 @@ class _SecondAngleSourceSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PhysicalContextCard extends StatelessWidget {
+  const _PhysicalContextCard({
+    required this.materials,
+    required this.fillStates,
+    required this.referenceObjects,
+    required this.dimensionAxes,
+    required this.material,
+    required this.fillState,
+    required this.referenceObject,
+    required this.dimensionAxis,
+    required this.dimensionUnit,
+    required this.dimensionController,
+    required this.onMaterialChanged,
+    required this.onFillStateChanged,
+    required this.onReferenceChanged,
+    required this.onDimensionAxisChanged,
+    required this.onDimensionUnitChanged,
+  });
+
+  final List<String> materials;
+  final List<String> fillStates;
+  final List<String> referenceObjects;
+  final List<String> dimensionAxes;
+  final String material;
+  final String fillState;
+  final String referenceObject;
+  final String dimensionAxis;
+  final String dimensionUnit;
+  final TextEditingController dimensionController;
+  final ValueChanged<String> onMaterialChanged;
+  final ValueChanged<String> onFillStateChanged;
+  final ValueChanged<String> onReferenceChanged;
+  final ValueChanged<String> onDimensionAxisChanged;
+  final ValueChanged<String> onDimensionUnitChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const Key('physical_context_card'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.lime.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.tune_rounded,
+                    color: AppColors.ink,
+                    size: 21,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Improve accuracy',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        "Optional · add only what you know. We'll infer the rest.",
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            const _ContextFieldLabel(
+              title: 'Material',
+              subtitle: 'What is most of the object made from?',
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                for (final option in materials)
+                  ChoiceChip(
+                    key: Key('material_$option'),
+                    label: Text(option),
+                    selected: material == option,
+                    onSelected: (_) => onMaterialChanged(option),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            const _ContextFieldLabel(
+              title: 'Fill state',
+              subtitle: 'For containers, parcels, furniture, and solid items.',
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                for (final option in fillStates)
+                  ChoiceChip(
+                    key: Key('fill_state_$option'),
+                    label: Text(option),
+                    selected: fillState == option,
+                    onSelected: (_) => onFillStateChanged(option),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            const _ContextFieldLabel(
+              title: 'One known dimension',
+              subtitle: 'Optional, but very useful for calculating volume.',
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey('dimension_axis_$dimensionAxis'),
+                    initialValue: dimensionAxis,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Side'),
+                    items: [
+                      for (final axis in dimensionAxes)
+                        DropdownMenuItem(value: axis, child: Text(axis)),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) onDimensionAxisChanged(value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 5,
+                  child: TextField(
+                    key: const Key('known_dimension_field'),
+                    controller: dimensionController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      labelText: 'Size',
+                      hintText: 'Optional',
+                      suffixText: dimensionUnit,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            Wrap(
+              spacing: 7,
+              children: [
+                for (final unit in const ['cm', 'in'])
+                  ChoiceChip(
+                    key: Key('dimension_unit_$unit'),
+                    label: Text(unit),
+                    selected: dimensionUnit == unit,
+                    onSelected: (_) => onDimensionUnitChanged(unit),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            const _ContextFieldLabel(
+              title: 'Visible reference',
+              subtitle: 'Select one only when it is beside the object.',
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                for (final option in referenceObjects)
+                  ChoiceChip(
+                    key: Key('reference_$option'),
+                    label: Text(option),
+                    selected: referenceObject == option,
+                    onSelected: (_) => onReferenceChanged(option),
+                  ),
+              ],
+            ),
+            if (referenceObject == 'Standard card') ...[
+              const SizedBox(height: 10),
+              const Text(
+                'Use a blank standard-size card when possible. Do not include '
+                'personal or payment information.',
+                style: TextStyle(
+                  color: AppColors.inkMuted,
+                  fontSize: 11,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContextFieldLabel extends StatelessWidget {
+  const _ContextFieldLabel({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 2),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }

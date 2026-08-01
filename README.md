@@ -72,7 +72,7 @@ npm run check
 
 - Three-page trust-focused onboarding
 - Camera and gallery image selection with an optional second angle
-- Category and object-structure review
+- Optional material, fill-state, known-size, and scale-reference context
 - Animated scan-line analysis with clear progress feedback
 - Weight range, confidence, dimensions, and assumptions
 - Private on-device image/history persistence

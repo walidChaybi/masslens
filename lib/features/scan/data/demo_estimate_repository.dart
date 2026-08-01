@@ -20,18 +20,36 @@ class DemoEstimateRepository implements EstimateRepository {
         fileSize +
         request.imagePath.codeUnits.fold<int>(0, (sum, value) => sum + value);
     final variation = 0.88 + ((seed % 25) / 100);
-    final preset = _presetFor(request.category, seed);
-    final structureFactor = switch (request.structure) {
-      'Hollow' => 0.82,
-      'Solid' => 1.12,
+    final preset = _presetFor(seed);
+    final fillFactor = switch (request.fillState) {
+      'Empty' => 0.72,
+      'Partly filled' => 0.9,
+      'Full' => 1.18,
+      'Solid' => 1.1,
       _ => 1.0,
     };
-    final estimate = preset.grams * variation * structureFactor;
-    final confidence = request.category == 'Auto'
-        ? ConfidenceLevel.low
-        : ConfidenceLevel.medium;
+    final materialFactor = switch (request.material) {
+      'Metal' => 1.15,
+      'Plastic' || 'Fabric' || 'Cardboard/Paper' => 0.9,
+      _ => 1.0,
+    };
+    final estimate = preset.grams * variation * fillFactor * materialFactor;
+    final hasContext =
+        request.material != 'Unknown' ||
+        request.fillState != 'Unknown' ||
+        request.referenceObject != 'None' ||
+        request.knownDimension != null ||
+        request.secondaryImagePath != null;
+    final confidence = hasContext
+        ? ConfidenceLevel.medium
+        : ConfidenceLevel.low;
     final spread = confidence == ConfidenceLevel.low ? 0.24 : 0.16;
     final dimensionVariation = 0.94 + ((seed % 13) / 100);
+    final dimensions = _dimensionsFor(
+      preset.dimensions,
+      dimensionVariation,
+      request.knownDimension,
+    );
 
     return Measurement(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -43,57 +61,25 @@ class DemoEstimateRepository implements EstimateRepository {
       lowerBoundGrams: estimate * (1 - spread),
       upperBoundGrams: estimate * (1 + spread),
       confidence: confidence,
-      dimensions: DimensionsMm(
-        width: preset.dimensions.width * dimensionVariation,
-        height: preset.dimensions.height * dimensionVariation,
-        depth: preset.dimensions.depth * dimensionVariation,
-      ),
+      dimensions: dimensions,
       assumptions: [
-        request.structure == 'Unknown'
-            ? 'Internal structure inferred'
-            : '${request.structure.toLowerCase()} construction',
-        'No physical scale reference',
-        'Typical ${preset.category.toLowerCase()} density',
+        request.material == 'Unknown'
+            ? 'Material inferred from appearance'
+            : '${request.material} material supplied by user',
+        request.fillState == 'Unknown'
+            ? 'Fill state inferred'
+            : '${request.fillState} state supplied by user',
+        if (request.knownDimension case final knownDimension?)
+          '${knownDimension.axis} supplied as ${knownDimension.value} '
+              '${knownDimension.unit}',
+        request.referenceObject == 'None'
+            ? 'No physical scale reference'
+            : '${request.referenceObject} visible as scale reference',
       ],
     );
   }
 
-  _EstimatePreset _presetFor(String category, int seed) {
-    if (category != 'Auto') {
-      return switch (category) {
-        'Food' => const _EstimatePreset(
-          label: 'Fresh produce',
-          category: 'Food',
-          grams: 920,
-          dimensions: DimensionsMm(width: 180, height: 135, depth: 145),
-        ),
-        'Parcel' => const _EstimatePreset(
-          label: 'Shipping parcel',
-          category: 'Parcel',
-          grams: 2450,
-          dimensions: DimensionsMm(width: 360, height: 240, depth: 280),
-        ),
-        'Furniture' => const _EstimatePreset(
-          label: 'Compact side chair',
-          category: 'Furniture',
-          grams: 6300,
-          dimensions: DimensionsMm(width: 480, height: 820, depth: 510),
-        ),
-        'Electronics' => const _EstimatePreset(
-          label: 'Portable electronic device',
-          category: 'Electronics',
-          grams: 780,
-          dimensions: DimensionsMm(width: 245, height: 165, depth: 28),
-        ),
-        _ => const _EstimatePreset(
-          label: 'Household object',
-          category: 'Other',
-          grams: 1350,
-          dimensions: DimensionsMm(width: 260, height: 190, depth: 170),
-        ),
-      };
-    }
-
+  _EstimatePreset _presetFor(int seed) {
     const presets = [
       _EstimatePreset(
         label: 'Hard-shell carry-on',
@@ -121,6 +107,31 @@ class DemoEstimateRepository implements EstimateRepository {
       ),
     ];
     return presets[seed % presets.length];
+  }
+
+  DimensionsMm _dimensionsFor(
+    DimensionsMm base,
+    double variation,
+    KnownDimensionInput? knownDimension,
+  ) {
+    final varied = DimensionsMm(
+      width: base.width * variation,
+      height: base.height * variation,
+      depth: base.depth * variation,
+    );
+    if (knownDimension == null) return varied;
+
+    final current = switch (knownDimension.axis) {
+      'Height' => varied.height,
+      'Depth' => varied.depth,
+      _ => varied.width,
+    };
+    final scale = knownDimension.millimeters / current;
+    return DimensionsMm(
+      width: varied.width * scale,
+      height: varied.height * scale,
+      depth: varied.depth * scale,
+    );
   }
 }
 

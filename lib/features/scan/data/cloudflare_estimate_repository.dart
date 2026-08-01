@@ -35,8 +35,11 @@ class CloudflareEstimateRepository implements EstimateRepository {
 
     final payload = await _postJson(uri, {
       'images': images,
-      'category': request.category,
-      'structure': request.structure,
+      'material': request.material,
+      'fillState': request.fillState,
+      'referenceObject': request.referenceObject,
+      if (request.knownDimension case final knownDimension?)
+        'knownDimension': knownDimension.toJson(),
     }, clientId: await _installationId());
 
     return measurementFromAiEstimatePayload(

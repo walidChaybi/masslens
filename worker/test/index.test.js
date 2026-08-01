@@ -47,6 +47,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
   const originalFetch = globalThis.fetch;
   const clientId = "abcdefghijklmnopqrstuvwx";
   const seenImageCounts = [];
+  const seenPrompts = [];
   const estimate = {
     object_label: "Ceramic mug",
     category: "Household",
@@ -68,7 +69,11 @@ test("one or two views are proxied without exposing the client identifier", asyn
     const imageParts = body.input[1].content.filter(
       (part) => part.type === "input_image",
     );
+    const prompt = body.input[1].content.find(
+      (part) => part.type === "input_text",
+    ).text;
     seenImageCounts.push(imageParts.length);
+    seenPrompts.push(prompt);
     assert.ok(imageParts.every((part) => part.detail === "high"));
     return new Response(
       JSON.stringify({
@@ -111,8 +116,10 @@ test("one or two views are proxied without exposing the client identifier", asyn
             {imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"},
             {imageBase64: "c2Vjb25k", mimeType: "image/png"},
           ],
-          category: "Auto",
-          structure: "Unknown",
+          material: "Metal",
+          fillState: "Partly filled",
+          referenceObject: "Standard card",
+          knownDimension: {axis: "Width", value: 12.5, unit: "cm"},
         }),
       }),
       env,
@@ -121,9 +128,34 @@ test("one or two views are proxied without exposing the client identifier", asyn
     assert.equal(twoViewResponse.status, 200);
     assert.deepEqual(await twoViewResponse.json(), estimate);
     assert.deepEqual(seenImageCounts, [1, 2]);
+    assert.match(seenPrompts[1], /Material: Metal/);
+    assert.match(seenPrompts[1], /Fill state: Partly filled/);
+    assert.match(seenPrompts[1], /Visible reference: Standard card/);
+    assert.match(seenPrompts[1], /Width: 12\.5 cm/);
+    assert.match(seenPrompts[1], /Infer the object category/);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("estimate endpoint rejects an invalid known dimension", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/estimate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+      },
+      body: JSON.stringify({
+        images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+        knownDimension: {axis: "Width", value: 0, unit: "cm"},
+      }),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "invalid_request");
 });
 
 test("estimate endpoint rejects more than two views", async () => {

@@ -1,17 +1,37 @@
 import '../../measurements/domain/measurement.dart';
 
+class KnownDimensionInput {
+  const KnownDimensionInput({
+    required this.axis,
+    required this.value,
+    required this.unit,
+  });
+
+  final String axis;
+  final double value;
+  final String unit;
+
+  Map<String, Object> toJson() => {'axis': axis, 'value': value, 'unit': unit};
+
+  double get millimeters => value * (unit == 'in' ? 25.4 : 10);
+}
+
 class EstimateRequest {
   const EstimateRequest({
     required this.imagePath,
-    required this.category,
-    required this.structure,
     this.secondaryImagePath,
+    this.material = 'Unknown',
+    this.fillState = 'Unknown',
+    this.referenceObject = 'None',
+    this.knownDimension,
   });
 
   final String imagePath;
   final String? secondaryImagePath;
-  final String category;
-  final String structure;
+  final String material;
+  final String fillState;
+  final String referenceObject;
+  final KnownDimensionInput? knownDimension;
 }
 
 abstract interface class EstimateRepository {

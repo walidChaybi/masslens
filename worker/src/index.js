@@ -13,6 +13,27 @@ const categoryChoices = [
   "Other",
 ];
 const structureChoices = ["Unknown", "Solid", "Hollow"];
+const materialChoices = [
+  "Unknown",
+  "Plastic",
+  "Metal",
+  "Glass/Ceramic",
+  "Wood",
+  "Cardboard/Paper",
+  "Fabric",
+  "Food/Liquid",
+  "Mixed",
+];
+const fillStateChoices = [
+  "Unknown",
+  "Solid",
+  "Empty",
+  "Partly filled",
+  "Full",
+];
+const referenceObjectChoices = ["None", "Ruler", "Standard card"];
+const dimensionAxisChoices = ["Width", "Height", "Depth"];
+const dimensionUnitChoices = ["cm", "in"];
 const mimeTypeChoices = [
   "image/jpeg",
   "image/png",
@@ -59,17 +80,43 @@ async function routeRequest(request, env) {
   const clientId = readClientId(request);
   await enforceRateLimits(request, env, clientId);
   const data = await readRequestJson(request);
-  const category = readChoice(data.category, "category", categoryChoices);
+  // Category and structure are retained as optional legacy hints so older app
+  // builds keep working while current builds provide physical context instead.
+  const category = readChoice(
+    data.category ?? "Auto",
+    "category",
+    categoryChoices,
+  );
   const structure = readChoice(
-    data.structure,
+    data.structure ?? "Unknown",
     "structure",
     structureChoices,
   );
+  const material = readChoice(
+    data.material ?? "Unknown",
+    "material",
+    materialChoices,
+  );
+  const fillState = readChoice(
+    data.fillState ?? "Unknown",
+    "fillState",
+    fillStateChoices,
+  );
+  const referenceObject = readChoice(
+    data.referenceObject ?? "None",
+    "referenceObject",
+    referenceObjectChoices,
+  );
+  const knownDimension = readKnownDimension(data.knownDimension);
   const images = readImages(data);
 
   const estimate = await requestOpenAi(env, {
     category,
     structure,
+    material,
+    fillState,
+    referenceObject,
+    knownDimension,
     images,
     safetyIdentifier: await hashIdentifier(clientId),
   });
@@ -142,6 +189,29 @@ function readChoice(value, name, choices) {
     throw new ApiError(400, "invalid_request", `Invalid ${name}.`);
   }
   return value;
+}
+
+function readKnownDimension(value) {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "invalid_request", "Invalid known dimension.");
+  }
+
+  const numericValue = value.value;
+  if (
+    typeof numericValue !== "number" ||
+    !Number.isFinite(numericValue) ||
+    numericValue <= 0 ||
+    numericValue > 100000
+  ) {
+    throw new ApiError(400, "invalid_request", "Invalid known dimension.");
+  }
+
+  return {
+    axis: readChoice(value.axis, "known dimension axis", dimensionAxisChoices),
+    value: numericValue,
+    unit: readChoice(value.unit, "known dimension unit", dimensionUnitChoices),
+  };
 }
 
 function readImageBase64(value) {
@@ -218,7 +288,16 @@ function readImages(data) {
 
 async function requestOpenAi(
   env,
-  {category, structure, images, safetyIdentifier},
+  {
+    category,
+    structure,
+    material,
+    fillState,
+    referenceObject,
+    knownDimension,
+    images,
+    safetyIdentifier,
+  },
 ) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -245,7 +324,15 @@ async function requestOpenAi(
           content: [
             {
               type: "input_text",
-              text: requestPrompt(category, structure, images.length),
+              text: requestPrompt({
+                category,
+                structure,
+                material,
+                fillState,
+                referenceObject,
+                knownDimension,
+                imageCount: images.length,
+              }),
             },
             ...images.flatMap((image, index) => [
               {
@@ -394,20 +481,41 @@ function invalidEstimate(field) {
   );
 }
 
-function requestPrompt(category, structure, imageCount) {
+function requestPrompt({
+  category,
+  structure,
+  material,
+  fillState,
+  referenceObject,
+  knownDimension,
+  imageCount,
+}) {
+  const knownDimensionText = knownDimension
+    ? `${knownDimension.axis}: ${knownDimension.value} ${knownDimension.unit}.`
+    : "None supplied.";
+  const legacyHints = [];
+  if (category !== "Auto") legacyHints.push(`Legacy category hint: ${category}.`);
+  if (structure !== "Unknown") {
+    legacyHints.push(`Legacy structure hint: ${structure}.`);
+  }
+
   return [
-    "Analyze this photo for MassLens.",
+    "Analyze the supplied view or views for MassLens.",
     "",
-    `User-selected category: ${category}.`,
-    `User-selected internal structure: ${structure}.`,
-    `Number of views supplied: ${imageCount}.`,
+    "User-provided physical context:",
+    `- Material: ${material}.`,
+    `- Fill state: ${fillState}.`,
+    `- Visible reference: ${referenceObject}.`,
+    `- Known dimension: ${knownDimensionText}`,
+    ...legacyHints.map((hint) => `- ${hint}`),
+    `- Number of views: ${imageCount}.`,
     "",
-    "Estimate the primary object's weight and dimensions. If the user selected",
-    "Auto, infer the category from the image. If the user selected Unknown",
-    "structure, infer the most likely construction and mention uncertainty in",
-    "assumptions. When two views are supplied, treat them as different angles",
-    "of the same physical object, not as two objects. Use the second view to",
-    "resolve depth, construction, and occluded details.",
+    "Infer the object category from the images. Treat all supplied context as",
+    "helpful evidence, not proof. Use a ruler only when its markings are visible",
+    "and it lies near the object's plane. A standard payment-size card is about",
+    "85.6 by 54.0 mm; use that scale only when the card is clearly visible.",
+    "When two views are supplied, treat them as angles of the same object and",
+    "use the second view to resolve depth, construction, and occluded details.",
   ].join("\n");
 }
 
@@ -453,12 +561,14 @@ Use this estimation method:
    centered, fully visible object. Ignore hands, table surfaces, shadows,
    background clutter, packaging labels, and secondary objects unless they are
    part of the item being weighed.
-2. Estimate visible dimensions in millimeters using perspective, familiar object
-   proportions, and category priors. If there is no reliable scale reference,
-   keep confidence lower and widen the range.
+2. Infer the category. Estimate visible dimensions in millimeters using any
+   supplied known dimension, a clearly visible ruler or standard card,
+   perspective, familiar proportions, and category priors. If there is no
+   reliable scale reference, keep confidence lower and widen the range.
 3. Estimate material and construction. Combine approximate volume with plausible
    density or known category priors. Adjust for hollow, solid, filled, porous,
-   wet, folded, or packaged structure when visible or user-provided.
+   wet, folded, or packaged structure when visible or user-provided. Treat the
+   user's material and fill state as hints; call out important conflicts.
 4. Produce a weight range that honestly reflects uncertainty. The point estimate
    must be inside the range. Low confidence usually needs at least +/-25%.
 5. Never pretend a photo is a scale. Do not use results for safety-critical,
@@ -466,8 +576,9 @@ Use this estimation method:
 
 Precision priorities:
 - Prefer a wider credible range over a precise-looking wrong number.
-- Use the user-selected category and structure as hints, not as commands, when
-  the image clearly contradicts them.
+- Use user-provided material, fill state, dimension, and visible-reference hints
+  as evidence, not commands. Never claim a ruler or card was used unless it is
+  visible in the supplied images.
 - Label the object specifically but briefly, for example "ceramic mug" instead
   of "object".
 - Keep assumptions short, concrete, and useful to a user trying to improve the

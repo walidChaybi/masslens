@@ -41,16 +41,23 @@ void main() {
     final result = await repository.analyze(
       const EstimateRequest(
         imagePath: '/tmp/non-existent.jpg',
-        category: 'Furniture',
-        structure: 'Hollow',
+        material: 'Wood',
+        fillState: 'Solid',
+        referenceObject: 'Ruler',
+        knownDimension: KnownDimensionInput(
+          axis: 'Height',
+          value: 85,
+          unit: 'cm',
+        ),
       ),
     );
 
-    expect(result.objectLabel, 'Compact side chair');
     expect(result.confidence, ConfidenceLevel.medium);
     expect(result.lowerBoundGrams, lessThan(result.estimateGrams));
     expect(result.upperBoundGrams, greaterThan(result.estimateGrams));
-    expect(result.assumptions, contains('hollow construction'));
+    expect(result.dimensions.height, closeTo(850, 0.001));
+    expect(result.assumptions, contains('Wood material supplied by user'));
+    expect(result.assumptions, contains('Ruler visible as scale reference'));
   });
 
   test('repository factory keeps demo mode by default', () {

@@ -92,12 +92,48 @@ void main() {
     expect(find.byKey(const Key('second_photo_preview')), findsOneWidget);
 
     await tester.scrollUntilVisible(
+      find.byKey(const Key('material_Metal')).last,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('material_Metal')).last);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('fill_state_Partly filled')).last,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('fill_state_Partly filled')).last);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('known_dimension_field')).last,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(
+      find.byKey(const Key('known_dimension_field')).last,
+      '12.5',
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('reference_Standard card')).last,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const Key('reference_Standard card')).last);
+
+    await tester.scrollUntilVisible(
       find.byKey(const Key('analyze_button')),
       300,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.tap(find.byKey(const Key('analyze_button')));
     await tester.pumpAndSettle();
     expect(estimateRepository.lastRequest?.secondaryImagePath, isNotNull);
+    expect(estimateRepository.lastRequest?.material, 'Metal');
+    expect(estimateRepository.lastRequest?.fillState, 'Partly filled');
+    expect(estimateRepository.lastRequest?.referenceObject, 'Standard card');
+    expect(estimateRepository.lastRequest?.knownDimension?.axis, 'Width');
+    expect(estimateRepository.lastRequest?.knownDimension?.value, 12.5);
+    expect(estimateRepository.lastRequest?.knownDimension?.unit, 'cm');
+    expect(find.text('Object category'), findsNothing);
     expect(find.byKey(const Key('result_weight')), findsOneWidget);
     expect(find.text('LIKELY RANGE'), findsOneWidget);
     final photoRect = tester.getRect(find.byKey(const Key('result_photo')));
