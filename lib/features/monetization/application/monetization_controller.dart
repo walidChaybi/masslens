@@ -3,8 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:in_app_purchase_android/in_app_purchase_android.dart';
-import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 
 import '../../../core/services/installation_id_store.dart';
 import '../data/app_ad_service.dart';
@@ -48,23 +46,35 @@ class MonetizationController extends ChangeNotifier {
   bool _loading = false;
   bool _purchasePending = false;
   bool _storeAvailable = false;
-  GooglePlayPurchaseDetails? _activeGooglePurchase;
 
   AccessStatus get access => _access;
-  List<PlanDefinition> get plans => MonetizationConfig.plans;
+  List<ScanPackDefinition> get packs => MonetizationConfig.packs;
   String? get message => _message;
   bool get loading => _loading;
   bool get purchasePending => _purchasePending;
   bool get storeAvailable => _storeAvailable;
-  bool get canRequestAds => _adService.canRequestAds && _access.adsEnabled;
+  bool get canRequestAds =>
+      _adService.canRequestNativeAds && _access.adsEnabled;
+  bool get canRequestNativeAds => _adService.canRequestNativeAds;
   bool get rewardedAdReady => _adService.rewardedReady;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
 
   String? priceFor(String productId) => _products[productId]?.price;
 
-  Future<void> initialize() async {
-    if (_initialized || !enabled) return;
+  Future<void> initialize({bool showAppOpenAdOnStart = false}) async {
+    if (_initialized) return;
     _initialized = true;
+
+    if (!enabled) {
+      // Local testing mode without backend
+      await _adService.updatePlan(adsAllowed: true);
+      if (showAppOpenAdOnStart) {
+        unawaited(_adService.showAppOpenIfAvailable());
+      }
+      notifyListeners();
+      return;
+    }
+
     _clientId = await InstallationIdStore.getOrCreate();
     _purchaseSubscription = _store.purchaseStream.listen(
       _handlePurchases,
@@ -75,10 +85,10 @@ class MonetizationController extends ChangeNotifier {
       },
     );
     await Future.wait([refreshAccess(), _loadProducts()]);
-    if (_access.isPaid && _storeAvailable) {
-      // Rehydrates the Google purchase needed for seamless plan changes.
-      await _store.restorePurchases(applicationUserName: _clientId);
+    if (showAppOpenAdOnStart) {
+      unawaited(_adService.showAppOpenIfAvailable());
     }
+    if (_storeAvailable) await _recoverUnfinishedPurchases();
   }
 
   Future<void> refreshAccess() async {
@@ -92,7 +102,7 @@ class MonetizationController extends ChangeNotifier {
       notifyListeners();
     } on Object catch (error) {
       // Keep the last known access. The Worker still enforces every scan.
-      _message = 'Could not refresh plan: $error';
+      _message = 'Could not refresh scan credits: $error';
       notifyListeners();
     }
   }
@@ -115,11 +125,11 @@ class MonetizationController extends ChangeNotifier {
       if (response.error case final error?) {
         _message = error.message;
       } else if (response.notFoundIDs.isNotEmpty) {
-        _message = 'Plans are not active in Google Play yet.';
+        _message = 'Scan packs are not active in Google Play yet.';
       }
     } on Object catch (error) {
       _storeAvailable = false;
-      _message = 'Could not load Google Play plans: $error';
+      _message = 'Could not load Google Play scan packs: $error';
     }
     notifyListeners();
   }
@@ -127,29 +137,24 @@ class MonetizationController extends ChangeNotifier {
   Future<void> purchase(String productId) async {
     final product = _products[productId];
     if (!_storeAvailable || product == null) {
-      _message = 'This plan is not available in Google Play yet.';
+      _message = 'This scan pack is not available in Google Play yet.';
       notifyListeners();
       return;
     }
     _purchasePending = true;
     _message = null;
     notifyListeners();
-    final currentPurchase = _activeGooglePurchase;
-    final purchaseParam =
-        currentPurchase != null && _access.isPaid && _access.planId != productId
-        ? GooglePlayPurchaseParam(
-            productDetails: product,
-            applicationUserName: _clientId,
-            changeSubscriptionParam: ChangeSubscriptionParam(
-              oldPurchaseDetails: currentPurchase,
-              replacementMode: ReplacementMode.withTimeProration,
-            ),
-          )
-        : PurchaseParam(
-            productDetails: product,
-            applicationUserName: _clientId,
-          );
-    final started = await _store.buyNonConsumable(purchaseParam: purchaseParam);
+    final purchaseParam = PurchaseParam(
+      productDetails: product,
+      // This random, non-PII identifier lets the Worker verify ownership.
+      applicationUserName: _clientId,
+    );
+    // The Worker must verify, grant, and consume before Play can sell this
+    // product again. Auto-consumption would run before server verification.
+    final started = await _store.buyConsumable(
+      purchaseParam: purchaseParam,
+      autoConsume: false,
+    );
     if (!started) {
       _purchasePending = false;
       _message = 'Google Play could not start the purchase.';
@@ -157,20 +162,13 @@ class MonetizationController extends ChangeNotifier {
     }
   }
 
-  Future<void> restorePurchases() async {
-    if (!_storeAvailable) {
-      _message = 'Google Play Billing is unavailable.';
-      notifyListeners();
-      return;
-    }
+  Future<void> _recoverUnfinishedPurchases() async {
     _loading = true;
-    _message = null;
     notifyListeners();
     try {
       await _store.restorePurchases(applicationUserName: _clientId);
-      _message = 'Restore requested. Active plans will appear automatically.';
     } on Object catch (error) {
-      _message = 'Could not restore purchases: $error';
+      _message = 'Could not recover an unfinished Play purchase: $error';
     } finally {
       _loading = false;
       notifyListeners();
@@ -179,6 +177,9 @@ class MonetizationController extends ChangeNotifier {
 
   Future<void> _handlePurchases(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
+      if (!MonetizationConfig.productIds.contains(purchase.productID)) {
+        continue;
+      }
       switch (purchase.status) {
         case PurchaseStatus.pending:
           _purchasePending = true;
@@ -208,14 +209,13 @@ class MonetizationController extends ChangeNotifier {
         productId: purchase.productID,
         purchaseToken: token,
       );
-      if (purchase is GooglePlayPurchaseDetails) {
-        _activeGooglePurchase = purchase;
-      }
-      if (purchase.pendingCompletePurchase) {
-        await _store.completePurchase(purchase);
-      }
+      // The Worker consumes the verified one-time product. Consumption also
+      // acknowledges it, so completePurchase must not race that server call.
       _purchasePending = false;
-      _message = '${_access.planName} is active.';
+      final pack = MonetizationConfig.packs.firstWhere(
+        (candidate) => candidate.productId == purchase.productID,
+      );
+      _message = '${pack.scanCredits} scans added.';
       await _adService.updatePlan(adsAllowed: _access.adsEnabled);
     } on Object catch (error) {
       // Never acknowledge or grant a purchase that the Worker did not verify.
@@ -226,7 +226,6 @@ class MonetizationController extends ChangeNotifier {
 
   Future<void> onScanCompleted() async {
     await refreshAccess();
-    await _adService.recordCompletedScanAndMaybeShowInterstitial();
   }
 
   Future<bool> watchAdForScan() async {
@@ -259,6 +258,9 @@ class MonetizationController extends ChangeNotifier {
     await _adService.showPrivacyOptions();
     notifyListeners();
   }
+
+  Future<void> showAppOpenAdIfAvailable() =>
+      _adService.showAppOpenIfAvailable();
 
   void clearMessage() {
     _message = null;

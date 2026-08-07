@@ -58,7 +58,11 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  Future<void> initializeMonetization() => monetization.initialize();
+  Future<void> initializeMonetization({bool showAppOpenAdOnStart = false}) =>
+      monetization.initialize(showAppOpenAdOnStart: showAppOpenAdOnStart);
+
+  Future<void> showAppOpenAdIfAvailable() =>
+      monetization.showAppOpenAdIfAvailable();
 
   Future<void> completeOnboarding() async {
     _onboardingComplete = true;

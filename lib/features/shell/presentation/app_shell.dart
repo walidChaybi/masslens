@@ -2,12 +2,26 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_components.dart';
 import '../../guide/presentation/guide_screen.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../monetization/presentation/paywall_sheet.dart';
+import '../../scale/presentation/digital_scale_screen.dart';
 import '../../scan/presentation/scan_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
+
+enum _AppDestination { digitalScale, aiScan, history, guide, settings }
+
+extension on _AppDestination {
+  String get label => switch (this) {
+    _AppDestination.digitalScale => 'Digital Scale',
+    _AppDestination.aiScan => 'AI Weight Scan',
+    _AppDestination.history => 'History',
+    _AppDestination.guide => 'Capture Guide',
+    _AppDestination.settings => 'Settings',
+  };
+}
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -17,197 +31,133 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 0;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  _AppDestination _destination = _AppDestination.digitalScale;
 
-  Future<void> _openScan() async {
+  Future<void> _openScan({bool startWithGallery = false}) async {
     final monetization = AppScope.of(context).monetization;
     await monetization.refreshAccess();
     if (!mounted) return;
     if (!monetization.access.canScan) {
       await showMassLensPaywall(context);
-      return;
+      if (!mounted || !monetization.access.canScan) return;
     }
-    final completed = await Navigator.of(
-      context,
-    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => ScanScreen()));
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ScanScreen(startWithGallery: startWithGallery),
+      ),
+    );
     if (completed == true) await monetization.onScanCompleted();
+  }
+
+  void _selectDestination(_AppDestination destination) {
+    if (_destination == destination) return;
+    setState(() => _destination = destination);
   }
 
   @override
   Widget build(BuildContext context) {
     final screens = [
+      DigitalScaleScreen(
+        onOpenAiScan: () => _selectDestination(_AppDestination.aiScan),
+        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
       HomeScreen(
-        onScan: _openScan,
-        onViewHistory: () => setState(() => _index = 1),
+        onMeasure: _openScan,
+        onGallery: () => _openScan(startWithGallery: true),
+        onViewHistory: () => _selectDestination(_AppDestination.history),
       ),
       HistoryScreen(onScan: _openScan),
       GuideScreen(onScan: _openScan),
       const SettingsScreen(),
     ];
+    final selectedIndex = _AppDestination.values.indexOf(_destination);
 
     return Scaffold(
-      extendBody: false,
-      body: IndexedStack(index: _index, children: screens),
-      bottomNavigationBar: BottomAppBar(
-        height: 76,
-        padding: EdgeInsets.zero,
-        color: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 8,
-        shadowColor: AppColors.ink.withValues(alpha: 0.15),
-        child: Row(
-          children: [
-            Expanded(
-              child: _NavigationItem(
-                key: const Key('nav_home'),
-                icon: Icons.home_outlined,
-                selectedIcon: Icons.home_rounded,
-                label: 'Home',
-                selected: _index == 0,
-                onTap: () => setState(() => _index = 0),
-              ),
-            ),
-            Expanded(
-              child: _NavigationItem(
-                key: const Key('nav_history'),
-                icon: Icons.history_rounded,
-                selectedIcon: Icons.inventory_2_rounded,
-                label: 'History',
-                selected: _index == 1,
-                onTap: () => setState(() => _index = 1),
-              ),
-            ),
-            Expanded(child: _ScanNavigationItem(onTap: _openScan)),
-            Expanded(
-              child: _NavigationItem(
-                key: const Key('nav_guide'),
-                icon: Icons.menu_book_outlined,
-                selectedIcon: Icons.menu_book_rounded,
-                label: 'Guide',
-                selected: _index == 2,
-                onTap: () => setState(() => _index = 2),
-              ),
-            ),
-            Expanded(
-              child: _NavigationItem(
-                key: const Key('nav_settings'),
-                icon: Icons.tune_rounded,
-                selectedIcon: Icons.settings_rounded,
-                label: 'Settings',
-                selected: _index == 3,
-                onTap: () => setState(() => _index = 3),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ScanNavigationItem extends StatelessWidget {
-  const _ScanNavigationItem({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkResponse(
-      key: const Key('shell_scan_button'),
-      onTap: onTap,
-      radius: 32,
-      child: Semantics(
-        button: true,
-        label: 'Start a new estimate',
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.ink,
-                borderRadius: BorderRadius.all(Radius.circular(13)),
-              ),
-              child: SizedBox(
-                key: Key('shell_scan_icon'),
-                width: 40,
-                height: 34,
-                child: Icon(
-                  Icons.center_focus_strong_rounded,
-                  size: 21,
-                  color: AppColors.lime,
+      key: _scaffoldKey,
+      appBar: _destination == _AppDestination.digitalScale
+          ? null
+          : AppBar(
+              leading: Builder(
+                builder: (context) => IconButton(
+                  key: const Key('open_navigation'),
+                  tooltip: 'Open navigation menu',
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  icon: const Icon(Icons.menu_rounded),
                 ),
               ),
+              title: Text(_destination.label),
             ),
-            SizedBox(height: 3),
-            Text(
-              'Scan',
+      drawer: NavigationDrawer(
+        key: const Key('app_navigation_drawer'),
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (index) {
+          Navigator.of(context).pop();
+          _selectDestination(_AppDestination.values[index]);
+        },
+        children: const [
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, 22, 24, 12),
+            child: MassLensLogo(),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 18),
+            child: Text(
+              'Choose how you want to measure.',
               style: TextStyle(
-                color: AppColors.ink,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
+                color: AppColors.inkMuted,
+                fontSize: 13,
+                height: 1.4,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavigationItem extends StatelessWidget {
-  const _NavigationItem({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkResponse(
-      onTap: onTap,
-      radius: 34,
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 38,
-              height: 31,
-              decoration: BoxDecoration(
-                color: selected ? AppColors.lime : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                selected ? selectedIcon : icon,
-                size: 21,
-                color: selected ? AppColors.ink : AppColors.inkMuted,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
+          ),
+          Divider(),
+          SizedBox(height: 8),
+          NavigationDrawerDestination(
+            key: Key('nav_digital_scale'),
+            icon: Icon(Icons.scale_outlined),
+            selectedIcon: Icon(Icons.scale_rounded),
+            label: Text('Digital Scale'),
+          ),
+          NavigationDrawerDestination(
+            key: Key('nav_ai_scan'),
+            icon: Icon(Icons.center_focus_strong_outlined),
+            selectedIcon: Icon(Icons.center_focus_strong_rounded),
+            label: Text('AI Weight Scan'),
+          ),
+          NavigationDrawerDestination(
+            key: Key('nav_history'),
+            icon: Icon(Icons.history_rounded),
+            selectedIcon: Icon(Icons.inventory_2_rounded),
+            label: Text('History'),
+          ),
+          NavigationDrawerDestination(
+            key: Key('nav_guide'),
+            icon: Icon(Icons.menu_book_outlined),
+            selectedIcon: Icon(Icons.menu_book_rounded),
+            label: Text('Capture Guide'),
+          ),
+          NavigationDrawerDestination(
+            key: Key('nav_settings'),
+            icon: Icon(Icons.tune_rounded),
+            selectedIcon: Icon(Icons.settings_rounded),
+            label: Text('Settings'),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(28, 24, 28, 20),
+            child: Text(
+              'Bluetooth readings are measurements. Touch mode and AI scans '
+              'are clearly labeled demonstrations or estimates.',
               style: TextStyle(
-                color: selected ? AppColors.ink : AppColors.inkMuted,
-                fontSize: 10,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                color: AppColors.inkMuted,
+                fontSize: 11.5,
+                height: 1.45,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+      body: IndexedStack(index: selectedIndex, children: screens),
     );
   }
 }

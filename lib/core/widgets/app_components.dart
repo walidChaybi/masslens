@@ -21,7 +21,7 @@ class MassLensLogo extends StatelessWidget {
           height: size,
           decoration: BoxDecoration(
             color: AppColors.ink,
-            borderRadius: BorderRadius.circular(compact ? 13 : 17),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Stack(
             alignment: Alignment.center,
@@ -32,7 +32,7 @@ class MassLensLogo extends StatelessWidget {
                   color: AppColors.lime,
                   fontSize: compact ? 19 : 26,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -1,
+                  letterSpacing: 0,
                 ),
               ),
               Positioned(
@@ -58,7 +58,7 @@ class MassLensLogo extends StatelessWidget {
             color: AppColors.ink,
             fontSize: compact ? 18 : 22,
             fontWeight: FontWeight.w800,
-            letterSpacing: -0.7,
+            letterSpacing: 0,
           ),
         ),
       ],
@@ -100,7 +100,7 @@ class Eyebrow extends StatelessWidget {
         color: color,
         fontSize: 11,
         fontWeight: FontWeight.w800,
-        letterSpacing: 1.45,
+        letterSpacing: 0,
       ),
     );
   }
@@ -167,7 +167,7 @@ class StatusPill extends StatelessWidget {
               color: foreground,
               fontSize: 9.5,
               fontWeight: FontWeight.w800,
-              letterSpacing: 0.9,
+              letterSpacing: 0,
             ),
           ),
         ],
@@ -195,14 +195,14 @@ class MeasurementCard extends StatelessWidget {
     final imageFile = File(measurement.imagePath);
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
           padding: EdgeInsets.all(compact ? 12 : 14),
           child: Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(17),
+                borderRadius: BorderRadius.circular(6),
                 child: SizedBox(
                   width: compact ? 64 : 76,
                   height: compact ? 64 : 76,
@@ -250,7 +250,7 @@ class MeasurementCard extends StatelessWidget {
                       color: AppColors.ink,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
+                      letterSpacing: 0,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -325,7 +325,7 @@ class EmptyPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border.all(color: AppColors.line),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
@@ -334,7 +334,7 @@ class EmptyPanel extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               color: AppColors.navySoft,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: AppColors.ink),
           ),

@@ -1,29 +1,39 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/app_components.dart';
 import '../../measurements/domain/measurement.dart';
-import '../../measurements/presentation/measurement_detail_screen.dart';
 import '../../monetization/presentation/paywall_sheet.dart';
 import '../data/cloudflare_estimate_repository.dart';
 import '../data/estimate_repository_factory.dart';
 import '../data/photo_picker.dart';
 import '../domain/estimate_repository.dart';
+import '../domain/measurement_capture.dart';
+import '../domain/measured_dimensions.dart';
+import 'capture/measurement_launcher.dart';
 
 class ScanScreen extends StatefulWidget {
   ScanScreen({
     EstimateRepository? estimateRepository,
     PhotoPicker? photoPicker,
+    MeasurementLauncher? measurementLauncher,
+    this.autoStart = true,
+    this.startWithGallery = false,
     super.key,
   }) : estimateRepository = estimateRepository ?? buildEstimateRepository(),
-       photoPicker = photoPicker ?? DevicePhotoPicker();
+       photoPicker = photoPicker ?? DevicePhotoPicker(),
+       measurementLauncher =
+           measurementLauncher ?? const DeviceMeasurementLauncher();
 
   final EstimateRepository estimateRepository;
   final PhotoPicker photoPicker;
+  final MeasurementLauncher measurementLauncher;
+  final bool autoStart;
+  final bool startWithGallery;
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -48,12 +58,13 @@ class _ScanScreenState extends State<ScanScreen> {
     'Partly filled',
     'Full',
   ];
-  static const _referenceObjects = ['None', 'Ruler', 'Standard card'];
-  static const _dimensionAxes = ['Width', 'Height', 'Depth'];
+  static const _references = ['None', 'Ruler', 'Standard card'];
+  static const _axes = ['Width', 'Height', 'Depth'];
 
   final _dimensionController = TextEditingController();
   String? _imagePath;
   String? _secondaryImagePath;
+  MeasuredDimensions? _measuredDimensions;
   String _material = 'Unknown';
   String _fillState = 'Unknown';
   String _referenceObject = 'None';
@@ -62,37 +73,111 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _isPicking = false;
   bool _isAnalyzing = false;
   int _analysisStep = 0;
+  int _analysisRun = 0;
+  Timer? _analysisTimer;
   Measurement? _result;
   String? _error;
   bool _saved = false;
-  int _analysisRun = 0;
 
-  Future<void> _pick(PhotoSource source, {bool secondary = false}) async {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (widget.startWithGallery) {
+          unawaited(_captureFromGallery());
+        } else {
+          unawaited(_captureMeasured());
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _analysisTimer?.cancel();
+    _dimensionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _captureMeasured() async {
     if (_isPicking) return;
     setState(() {
       _isPicking = true;
       _error = null;
     });
     try {
-      final path = await widget.photoPicker.pick(source);
-      if (!mounted || path == null) return;
-      setState(() {
-        if (secondary) {
-          _secondaryImagePath = path;
-        } else {
-          _imagePath = path;
-          _secondaryImagePath = null;
-        }
-        _result = null;
-        _saved = false;
-      });
+      final capture = await widget.measurementLauncher.launch(context);
+      if (!mounted || capture == null) return;
+      _acceptCapture(capture);
     } on Object {
-      if (!mounted) return;
-      setState(() {
-        _error =
-            'The photo could not be opened. Check camera or photo access and '
-            'try again.';
-      });
+      if (mounted) {
+        setState(() => _error = 'Measurement camera could not be opened.');
+      }
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
+
+  Future<void> _captureFromGallery() async {
+    if (_isPicking) return;
+    setState(() {
+      _isPicking = true;
+      _error = null;
+    });
+    try {
+      final imagePath = await widget.photoPicker.pick(PhotoSource.gallery);
+      if (!mounted || imagePath == null) return;
+      MeasuredDimensions? dimensions;
+      if (File(imagePath).existsSync()) {
+        dimensions = await launchPhotoMeasurement(context, imagePath);
+        if (!mounted) return;
+      }
+      _acceptCapture(
+        MeasurementCapture(imagePath: imagePath, dimensions: dimensions),
+      );
+    } on Object {
+      if (mounted) {
+        setState(() => _error = 'The selected photo could not be opened.');
+      }
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
+
+  void _acceptCapture(MeasurementCapture capture) {
+    setState(() {
+      _imagePath = capture.imagePath;
+      _secondaryImagePath = null;
+      _measuredDimensions = capture.dimensions;
+      _result = null;
+      _saved = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _editMeasurement() async {
+    final imagePath = _imagePath;
+    if (imagePath == null || !File(imagePath).existsSync()) return;
+    final measured = await launchPhotoMeasurement(context, imagePath);
+    if (mounted && measured != null) {
+      setState(() => _measuredDimensions = measured);
+    }
+  }
+
+  Future<void> _pickSecondary(PhotoSource source) async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final path = await widget.photoPicker.pick(source);
+      if (mounted && path != null) {
+        setState(() => _secondaryImagePath = path);
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _error = 'The second photo could not be opened.');
+      }
     } finally {
       if (mounted) setState(() => _isPicking = false);
     }
@@ -102,31 +187,35 @@ class _ScanScreenState extends State<ScanScreen> {
     final source = await showModalBottomSheet<PhotoSource>(
       context: context,
       showDragHandle: true,
-      builder: (context) => const _SecondAngleSourceSheet(),
+      builder: (context) => const _SecondAngleSheet(),
     );
-    if (source == null || !mounted) return;
-    await _pick(source, secondary: true);
+    if (source != null && mounted) await _pickSecondary(source);
+  }
+
+  KnownDimensionInput? _knownDimension() {
+    if (_measuredDimensions != null) return null;
+    final text = _dimensionController.text.trim().replaceAll(',', '.');
+    if (text.isEmpty) return null;
+    final value = double.tryParse(text);
+    if (value == null || !value.isFinite || value <= 0) {
+      throw const FormatException();
+    }
+    return KnownDimensionInput(
+      axis: _dimensionAxis,
+      value: value,
+      unit: _dimensionUnit,
+    );
   }
 
   Future<void> _analyze() async {
     final imagePath = _imagePath;
     if (imagePath == null || _isAnalyzing) return;
-    final dimensionText = _dimensionController.text.trim().replaceAll(',', '.');
     KnownDimensionInput? knownDimension;
-    if (dimensionText.isNotEmpty) {
-      final value = double.tryParse(dimensionText);
-      if (value == null || !value.isFinite || value <= 0) {
-        setState(() {
-          _error =
-              'Enter a known dimension greater than zero, or leave it blank.';
-        });
-        return;
-      }
-      knownDimension = KnownDimensionInput(
-        axis: _dimensionAxis,
-        value: value,
-        unit: _dimensionUnit,
-      );
+    try {
+      knownDimension = _knownDimension();
+    } on FormatException {
+      setState(() => _error = 'Enter a dimension greater than zero.');
+      return;
     }
     final run = ++_analysisRun;
     setState(() {
@@ -134,10 +223,9 @@ class _ScanScreenState extends State<ScanScreen> {
       _analysisStep = 0;
       _error = null;
     });
-    unawaited(_advanceProgress(run));
-
+    _startProgress(run);
     try {
-      final result = await widget.estimateRepository.analyze(
+      var result = await widget.estimateRepository.analyze(
         EstimateRequest(
           imagePath: imagePath,
           secondaryImagePath: _secondaryImagePath,
@@ -145,10 +233,24 @@ class _ScanScreenState extends State<ScanScreen> {
           fillState: _fillState,
           referenceObject: _referenceObject,
           knownDimension: knownDimension,
+          measuredDimensions: _measuredDimensions,
         ),
       );
       if (!mounted || run != _analysisRun) return;
+      final measured = _measuredDimensions;
+      if (measured != null) {
+        final measurementNote =
+            '${measured.formatSummary()} measured with ${measured.sourceLabel}';
+        result = result.copyWith(
+          dimensions: measured.mergeWith(result.dimensions),
+          assumptions: [
+            measurementNote,
+            ...result.assumptions.where((item) => item != measurementNote),
+          ],
+        );
+      }
       setState(() {
+        _analysisTimer?.cancel();
         _result = result;
         _isAnalyzing = false;
         _analysisStep = 3;
@@ -157,6 +259,7 @@ class _ScanScreenState extends State<ScanScreen> {
     } on CloudflareEstimateException catch (error) {
       if (!mounted || run != _analysisRun) return;
       setState(() {
+        _analysisTimer?.cancel();
         _isAnalyzing = false;
         _error = error.isScanLimitReached
             ? 'You have used your available scans.'
@@ -167,29 +270,52 @@ class _ScanScreenState extends State<ScanScreen> {
         if (mounted) await showMassLensPaywall(context);
       }
     } on Object {
-      if (!mounted || run != _analysisRun) return;
-      setState(() {
-        _isAnalyzing = false;
-        _error =
-            'Analysis stopped unexpectedly. Check connection, then try again.';
-      });
+      if (mounted && run == _analysisRun) {
+        setState(() {
+          _analysisTimer?.cancel();
+          _isAnalyzing = false;
+          _error = 'Analysis stopped. Check the connection and try again.';
+        });
+      }
     }
   }
 
-  Future<void> _advanceProgress(int run) async {
-    await Future<void>.delayed(const Duration(milliseconds: 520));
-    if (!mounted || run != _analysisRun || !_isAnalyzing) return;
-    setState(() => _analysisStep = 1);
-    await Future<void>.delayed(const Duration(milliseconds: 620));
-    if (!mounted || run != _analysisRun || !_isAnalyzing) return;
-    setState(() => _analysisStep = 2);
+  void _startProgress(int run) {
+    _analysisTimer?.cancel();
+    _analysisTimer = Timer.periodic(const Duration(milliseconds: 600), (timer) {
+      if (!mounted || run != _analysisRun || !_isAnalyzing) {
+        timer.cancel();
+        return;
+      }
+      if (_analysisStep >= 2) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _analysisStep++);
+    });
+  }
+
+  Future<void> _save() async {
+    final result = _result;
+    if (result == null || _saved) return;
+    await AppScope.of(context).addMeasurement(result);
+    if (!mounted) return;
+    setState(() => _saved = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Saved to your private history.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _reset() {
     _analysisRun++;
+    _analysisTimer?.cancel();
     setState(() {
       _imagePath = null;
       _secondaryImagePath = null;
+      _measuredDimensions = null;
       _material = 'Unknown';
       _fillState = 'Unknown';
       _referenceObject = 'None';
@@ -203,28 +329,171 @@ class _ScanScreenState extends State<ScanScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _dimensionController.dispose();
-    super.dispose();
-  }
+  Future<void> _showDetails() {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          void update(VoidCallback change) {
+            setState(change);
+            setSheetState(() {});
+          }
 
-  Future<void> _save() async {
-    final result = _result;
-    if (result == null || _saved) return;
-    await AppScope.of(context).addMeasurement(result);
-    if (!mounted) return;
-    setState(() => _saved = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Estimate saved to your private history.'),
-        behavior: SnackBarBehavior.floating,
+          return SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                20 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Optional details',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 18),
+                  const _SheetLabel('Material'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final item in _materials)
+                        ChoiceChip(
+                          key: Key('material_$item'),
+                          label: Text(item),
+                          selected: _material == item,
+                          onSelected: (_) => update(() => _material = item),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const _SheetLabel('Fill'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final item in _fillStates)
+                        ChoiceChip(
+                          key: Key('fill_state_$item'),
+                          label: Text(item),
+                          selected: _fillState == item,
+                          onSelected: (_) => update(() => _fillState = item),
+                        ),
+                    ],
+                  ),
+                  if (_measuredDimensions == null) ...[
+                    const SizedBox(height: 20),
+                    const _SheetLabel('Known size'),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _dimensionAxis,
+                            items: [
+                              for (final item in _axes)
+                                DropdownMenuItem(
+                                  value: item,
+                                  child: Text(item),
+                                ),
+                            ],
+                            onChanged: (value) => update(
+                              () => _dimensionAxis = value ?? _dimensionAxis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            key: const Key('known_dimension_field'),
+                            controller: _dimensionController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              suffixText: _dimensionUnit,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(value: 'cm', label: Text('cm')),
+                            ButtonSegment(value: 'in', label: Text('in')),
+                          ],
+                          selected: {_dimensionUnit},
+                          onSelectionChanged: (value) =>
+                              update(() => _dimensionUnit = value.single),
+                          showSelectedIcon: false,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    const _SheetLabel('Visible reference'),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final item in _references)
+                          ChoiceChip(
+                            key: Key('reference_$item'),
+                            label: Text(item),
+                            selected: _referenceObject == item,
+                            onSelected: (_) =>
+                                update(() => _referenceObject = item),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    key: const Key('add_second_photo_button'),
+                    onPressed: () async {
+                      Navigator.of(sheetContext).pop();
+                      await _showSecondAnglePicker();
+                    },
+                    icon: Icon(
+                      _secondaryImagePath == null
+                          ? Icons.add_a_photo_outlined
+                          : Icons.refresh_rounded,
+                    ),
+                    label: Text(
+                      _secondaryImagePath == null
+                          ? 'Add second angle'
+                          : 'Replace second angle',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final title = _result != null
+        ? 'Estimate'
+        : _isAnalyzing
+        ? 'Analyzing'
+        : _imagePath == null
+        ? 'New estimate'
+        : 'Review';
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -232,17 +501,7 @@ class _ScanScreenState extends State<ScanScreen> {
           onPressed: () => Navigator.of(context).pop(_result != null),
           icon: const Icon(Icons.close_rounded),
         ),
-        title: Text(
-          _result != null
-              ? 'Your estimate'
-              : _isAnalyzing
-              ? 'Analyzing'
-              : _imagePath == null
-              ? 'New estimate'
-              : _secondaryImagePath == null
-              ? 'Review photo'
-              : 'Review photos',
-        ),
+        title: Text(title),
         actions: [
           if (_imagePath != null && !_isAnalyzing)
             TextButton(onPressed: _reset, child: const Text('Start over')),
@@ -250,1017 +509,609 @@ class _ScanScreenState extends State<ScanScreen> {
         ],
       ),
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
+        duration: const Duration(milliseconds: 220),
         child: _result != null
-            ? _buildResult(context, _result!)
+            ? _ResultView(
+                key: const ValueKey('result'),
+                measurement: _result!,
+                unitSystem: AppScope.of(context).unitSystem,
+                saved: _saved,
+                onSave: _save,
+                onReset: _reset,
+              )
             : _isAnalyzing
             ? _AnalysisView(
                 key: const ValueKey('analysis'),
                 imagePath: _imagePath!,
-                photoCount: _secondaryImagePath == null ? 1 : 2,
                 step: _analysisStep,
-                engineLabel: EstimateEngineConfig.analysisModeLabel,
-                privacyLabel: EstimateEngineConfig.analysisPrivacyLabel,
               )
             : _imagePath == null
             ? _CaptureView(
                 key: const ValueKey('capture'),
-                isPicking: _isPicking,
+                busy: _isPicking,
                 error: _error,
-                onCamera: () => _pick(PhotoSource.camera),
-                onGallery: () => _pick(PhotoSource.gallery),
+                onMeasure: _captureMeasured,
+                onGallery: _captureFromGallery,
               )
-            : _buildReview(context),
+            : _ReviewView(
+                key: const ValueKey('review'),
+                imagePath: _imagePath!,
+                secondImagePath: _secondaryImagePath,
+                measured: _measuredDimensions,
+                error: _error,
+                onEditMeasurement: _editMeasurement,
+                onClearMeasurement: () =>
+                    setState(() => _measuredDimensions = null),
+                onDetails: _showDetails,
+                onAnalyze: _analyze,
+              ),
       ),
-    );
-  }
-
-  Widget _buildReview(BuildContext context) {
-    return ListView(
-      key: const ValueKey('review'),
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
-      children: [
-        Text(
-          'Confirm the object',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 7),
-        Text(
-          'A little context reduces the guesswork and narrows the range.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 18),
-        AspectRatio(
-          aspectRatio: 4 / 3,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.file(
-                  File(_imagePath!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: AppColors.navySoft,
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.broken_image_outlined,
-                      size: 52,
-                      color: AppColors.inkMuted,
-                    ),
-                  ),
-                ),
-                const InstrumentCorners(),
-                Positioned(
-                  left: 16,
-                  bottom: 16,
-                  child: StatusPill(
-                    label: 'Primary view',
-                    icon: Icons.looks_one_outlined,
-                    background: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        _SecondAngleCard(
-          imagePath: _secondaryImagePath,
-          isPicking: _isPicking,
-          onAddOrReplace: _showSecondAnglePicker,
-          onRemove: () => setState(() => _secondaryImagePath = null),
-        ),
-        const SizedBox(height: 24),
-        _PhysicalContextCard(
-          materials: _materials,
-          fillStates: _fillStates,
-          referenceObjects: _referenceObjects,
-          dimensionAxes: _dimensionAxes,
-          material: _material,
-          fillState: _fillState,
-          referenceObject: _referenceObject,
-          dimensionAxis: _dimensionAxis,
-          dimensionUnit: _dimensionUnit,
-          dimensionController: _dimensionController,
-          onMaterialChanged: (value) => setState(() => _material = value),
-          onFillStateChanged: (value) => setState(() => _fillState = value),
-          onReferenceChanged: (value) =>
-              setState(() => _referenceObject = value),
-          onDimensionAxisChanged: (value) =>
-              setState(() => _dimensionAxis = value),
-          onDimensionUnitChanged: (value) =>
-              setState(() => _dimensionUnit = value),
-        ),
-        if (_error != null) ...[
-          const SizedBox(height: 18),
-          _ErrorBanner(message: _error!),
-        ],
-        const SizedBox(height: 26),
-        FilledButton.icon(
-          key: const Key('analyze_button'),
-          onPressed: _analyze,
-          icon: const Icon(Icons.auto_awesome_rounded),
-          label: const Text('Estimate weight and size'),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          EstimateEngineConfig.reviewFootnote,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.inkMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildResult(BuildContext context, Measurement result) {
-    return ListView(
-      key: const ValueKey('result'),
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
-      children: [
-        MeasurementSummary(
-          measurement: result,
-          unitSystem: AppScope.of(context).unitSystem,
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _reset,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Try another'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton.icon(
-                key: const Key('save_result_button'),
-                onPressed: _saved ? null : _save,
-                icon: Icon(
-                  _saved ? Icons.check_rounded : Icons.bookmark_add_outlined,
-                ),
-                label: Text(_saved ? 'Saved' : 'Save result'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: () => Navigator.of(context).pop(true),
-          icon: const Icon(Icons.home_outlined),
-          label: const Text('Return home'),
-        ),
-      ],
     );
   }
 }
 
 class _CaptureView extends StatelessWidget {
   const _CaptureView({
-    required this.isPicking,
+    required this.busy,
     required this.error,
-    required this.onCamera,
+    required this.onMeasure,
     required this.onGallery,
     super.key,
   });
 
-  final bool isPicking;
+  final bool busy;
   final String? error;
-  final VoidCallback onCamera;
+  final VoidCallback onMeasure;
   final VoidCallback onGallery;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
-      children: [
-        const Eyebrow('Step 1 of 3'),
-        const SizedBox(height: 9),
-        Text(
-          'Frame one clear object.',
-          style: Theme.of(context).textTheme.headlineLarge,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Use an uncluttered background, keep every edge visible, and place '
-          'a ruler or blank standard card beside the object when possible.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 22),
-        AspectRatio(
-          aspectRatio: 4 / 5,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.ink,
-              borderRadius: BorderRadius.circular(32),
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 36, 24, 28),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - 64,
+              maxWidth: 640,
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(painter: const _CameraGridPainter()),
-                ),
-                Container(
-                  width: 122,
-                  height: 154,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.inventory_2_outlined,
-                    color: AppColors.aqua,
-                    size: 62,
-                  ),
-                ),
-                const Positioned.fill(
-                  child: Padding(
-                    padding: EdgeInsets.all(26),
-                    child: InstrumentCorners(),
-                  ),
-                ),
-                const Positioned(
-                  top: 24,
-                  child: StatusPill(
-                    label: 'One object · all edges visible',
-                    icon: Icons.center_focus_strong_rounded,
-                    background: AppColors.lime,
-                  ),
-                ),
-                const Positioned(
-                  bottom: 26,
-                  child: Text(
-                    'GOOD LIGHT  •  SIMPLE BACKGROUND',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ),
-                if (isPicking)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.ink.withValues(alpha: 0.72),
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                      alignment: Alignment.center,
-                      child: const CircularProgressIndicator(
-                        color: AppColors.lime,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        if (error != null) ...[
-          const SizedBox(height: 16),
-          _ErrorBanner(message: error!),
-        ],
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          key: const Key('camera_button'),
-          onPressed: isPicking ? null : onCamera,
-          icon: const Icon(Icons.photo_camera_outlined),
-          label: const Text('Take a photo'),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          key: const Key('gallery_button'),
-          onPressed: isPicking ? null : onGallery,
-          icon: const Icon(Icons.photo_library_outlined),
-          label: const Text('Choose from gallery'),
-        ),
-      ],
-    );
-  }
-}
-
-class _SecondAngleCard extends StatelessWidget {
-  const _SecondAngleCard({
-    required this.imagePath,
-    required this.isPicking,
-    required this.onAddOrReplace,
-    required this.onRemove,
-  });
-
-  final String? imagePath;
-  final bool isPicking;
-  final VoidCallback onAddOrReplace;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = imagePath;
-    return Material(
-      color: AppColors.aqua.withValues(alpha: 0.09),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: const BorderSide(color: AppColors.line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: path == null
-          ? InkWell(
-              key: const Key('add_second_photo_button'),
-              onTap: isPicking ? null : onAddOrReplace,
-              child: const Padding(
-                padding: EdgeInsets.all(15),
-                child: Row(
-                  children: [
-                    _SecondAngleIcon(icon: Icons.add_a_photo_outlined),
-                    SizedBox(width: 13),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Add a second angle',
-                            style: TextStyle(
-                              color: AppColors.ink,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Optional · show the same object from the side or top',
-                            style: TextStyle(
-                              color: AppColors.inkMuted,
-                              fontSize: 11.5,
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.inkMuted,
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
-                    key: const Key('second_photo_preview'),
-                    borderRadius: BorderRadius.circular(16),
-                    child: SizedBox(
-                      width: 76,
-                      height: 76,
-                      child: Image.file(
-                        File(path),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          color: AppColors.navySoft,
-                          child: const Icon(
-                            Icons.photo_outlined,
-                            color: AppColors.inkMuted,
-                          ),
-                        ),
-                      ),
-                    ),
+                  Text(
+                    'Measure an object',
+                    style: Theme.of(context).textTheme.headlineLarge,
                   ),
-                  const SizedBox(width: 13),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Second angle added',
-                          style: TextStyle(
-                            color: AppColors.ink,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Used to improve depth and shape estimates.',
-                          style: TextStyle(
-                            color: AppColors.inkMuted,
-                            fontSize: 11.5,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 24),
+                  const AspectRatio(aspectRatio: 16 / 10, child: _ScanFrame()),
+                  const Spacer(),
+                  if (error != null) ...[
+                    _InlineError(error!),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton.icon(
+                    key: const Key('open_camera_button'),
+                    onPressed: busy ? null : onMeasure,
+                    icon: busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Measure'),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        key: const Key('replace_second_photo_button'),
-                        tooltip: 'Replace second angle',
-                        onPressed: isPicking ? null : onAddOrReplace,
-                        icon: const Icon(Icons.refresh_rounded),
-                      ),
-                      IconButton(
-                        key: const Key('remove_second_photo_button'),
-                        tooltip: 'Remove second angle',
-                        onPressed: isPicking ? null : onRemove,
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
+                  TextButton.icon(
+                    key: const Key('gallery_button'),
+                    onPressed: busy ? null : onGallery,
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Photo'),
                   ),
                 ],
               ),
             ),
-    );
-  }
-}
-
-class _SecondAngleIcon extends StatelessWidget {
-  const _SecondAngleIcon({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppColors.ink,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Icon(icon, color: AppColors.lime, size: 21),
-    );
-  }
-}
-
-class _SecondAngleSourceSheet extends StatelessWidget {
-  const _SecondAngleSourceSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Add a second angle',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 7),
-            Text(
-              'Photograph the same object from the side or above. Keep the '
-              'whole object visible.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              key: const Key('second_photo_camera_button'),
-              onPressed: () => Navigator.pop(context, PhotoSource.camera),
-              icon: const Icon(Icons.photo_camera_outlined),
-              label: const Text('Take second photo'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              key: const Key('second_photo_gallery_button'),
-              onPressed: () => Navigator.pop(context, PhotoSource.gallery),
-              icon: const Icon(Icons.photo_library_outlined),
-              label: const Text('Choose from gallery'),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _PhysicalContextCard extends StatelessWidget {
-  const _PhysicalContextCard({
-    required this.materials,
-    required this.fillStates,
-    required this.referenceObjects,
-    required this.dimensionAxes,
-    required this.material,
-    required this.fillState,
-    required this.referenceObject,
-    required this.dimensionAxis,
-    required this.dimensionUnit,
-    required this.dimensionController,
-    required this.onMaterialChanged,
-    required this.onFillStateChanged,
-    required this.onReferenceChanged,
-    required this.onDimensionAxisChanged,
-    required this.onDimensionUnitChanged,
-  });
-
-  final List<String> materials;
-  final List<String> fillStates;
-  final List<String> referenceObjects;
-  final List<String> dimensionAxes;
-  final String material;
-  final String fillState;
-  final String referenceObject;
-  final String dimensionAxis;
-  final String dimensionUnit;
-  final TextEditingController dimensionController;
-  final ValueChanged<String> onMaterialChanged;
-  final ValueChanged<String> onFillStateChanged;
-  final ValueChanged<String> onReferenceChanged;
-  final ValueChanged<String> onDimensionAxisChanged;
-  final ValueChanged<String> onDimensionUnitChanged;
+class _ScanFrame extends StatelessWidget {
+  const _ScanFrame();
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      key: const Key('physical_context_card'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.lime.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.tune_rounded,
-                    color: AppColors.ink,
-                    size: 21,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Improve accuracy',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        "Optional · add only what you know. We'll infer the rest.",
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const _ContextFieldLabel(
-              title: 'Material',
-              subtitle: 'What is most of the object made from?',
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                for (final option in materials)
-                  ChoiceChip(
-                    key: Key('material_$option'),
-                    label: Text(option),
-                    selected: material == option,
-                    onSelected: (_) => onMaterialChanged(option),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const _ContextFieldLabel(
-              title: 'Fill state',
-              subtitle: 'For containers, parcels, furniture, and solid items.',
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                for (final option in fillStates)
-                  ChoiceChip(
-                    key: Key('fill_state_$option'),
-                    label: Text(option),
-                    selected: fillState == option,
-                    onSelected: (_) => onFillStateChanged(option),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const _ContextFieldLabel(
-              title: 'One known dimension',
-              subtitle: 'Optional, but very useful for calculating volume.',
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey('dimension_axis_$dimensionAxis'),
-                    initialValue: dimensionAxis,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Side'),
-                    items: [
-                      for (final axis in dimensionAxes)
-                        DropdownMenuItem(value: axis, child: Text(axis)),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) onDimensionAxisChanged(value);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 5,
-                  child: TextField(
-                    key: const Key('known_dimension_field'),
-                    controller: dimensionController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: 'Size',
-                      hintText: 'Optional',
-                      suffixText: dimensionUnit,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            Wrap(
-              spacing: 7,
-              children: [
-                for (final unit in const ['cm', 'in'])
-                  ChoiceChip(
-                    key: Key('dimension_unit_$unit'),
-                    label: Text(unit),
-                    selected: dimensionUnit == unit,
-                    onSelected: (_) => onDimensionUnitChanged(unit),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const _ContextFieldLabel(
-              title: 'Visible reference',
-              subtitle: 'Select one only when it is beside the object.',
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                for (final option in referenceObjects)
-                  ChoiceChip(
-                    key: Key('reference_$option'),
-                    label: Text(option),
-                    selected: referenceObject == option,
-                    onSelected: (_) => onReferenceChanged(option),
-                  ),
-              ],
-            ),
-            if (referenceObject == 'Standard card') ...[
-              const SizedBox(height: 10),
-              const Text(
-                'Use a blank standard-size card when possible. Do not include '
-                'personal or payment information.',
-                style: TextStyle(
-                  color: AppColors.inkMuted,
-                  fontSize: 11,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return CustomPaint(
+      painter: _ScanFramePainter(),
+      child: const SizedBox.expand(),
     );
   }
 }
 
-class _ContextFieldLabel extends StatelessWidget {
-  const _ContextFieldLabel({required this.title, required this.subtitle});
+class _ScanFramePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+      Paint()..color = AppColors.surface,
+    );
+    final border = Paint()
+      ..color = AppColors.line
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(8)),
+      border,
+    );
 
-  final String title;
-  final String subtitle;
+    final guide = Paint()
+      ..color = AppColors.ink.withValues(alpha: 0.09)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(size.width / 2, 18),
+      Offset(size.width / 2, size.height - 18),
+      guide,
+    );
+    canvas.drawLine(
+      Offset(18, size.height / 2),
+      Offset(size.width - 18, size.height / 2),
+      guide,
+    );
+
+    final line = Paint()
+      ..color = AppColors.ink
+      ..strokeWidth = 2.3
+      ..strokeCap = StrokeCap.round;
+    final accent = Paint()
+      ..color = AppColors.limeDark
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    final a = Offset(size.width * 0.28, size.height * 0.58);
+    final b = Offset(size.width * 0.72, size.height * 0.58);
+    final c = Offset(size.width * 0.72, size.height * 0.30);
+    canvas.drawLine(a, b, accent);
+    canvas.drawLine(b, c, line);
+    for (final point in [a, b, c]) {
+      canvas.drawCircle(point, 8, Paint()..color = AppColors.surface);
+      canvas.drawCircle(point, 8, line..style = PaintingStyle.stroke);
+      line.style = PaintingStyle.fill;
+      canvas.drawCircle(point, 2.5, line);
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 2),
-        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
+  bool shouldRepaint(covariant _ScanFramePainter oldDelegate) => false;
 }
 
-class _AnalysisView extends StatefulWidget {
-  const _AnalysisView({
+class _ReviewView extends StatelessWidget {
+  const _ReviewView({
     required this.imagePath,
-    required this.photoCount,
-    required this.step,
-    required this.engineLabel,
-    required this.privacyLabel,
+    required this.secondImagePath,
+    required this.measured,
+    required this.error,
+    required this.onEditMeasurement,
+    required this.onClearMeasurement,
+    required this.onDetails,
+    required this.onAnalyze,
     super.key,
   });
 
   final String imagePath;
-  final int photoCount;
-  final int step;
-  final String engineLabel;
-  final String privacyLabel;
-
-  @override
-  State<_AnalysisView> createState() => _AnalysisViewState();
-}
-
-class _AnalysisViewState extends State<_AnalysisView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1750),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final String? secondImagePath;
+  final MeasuredDimensions? measured;
+  final String? error;
+  final VoidCallback onEditMeasurement;
+  final VoidCallback onClearMeasurement;
+  final VoidCallback onDetails;
+  final VoidCallback onAnalyze;
 
   @override
   Widget build(BuildContext context) {
-    final labels = [
-      'Checking photo quality',
-      widget.photoCount == 2 ? 'Comparing both angles' : 'Finding object edges',
-      'Matching volume and density',
-    ];
-    final step = widget.step.clamp(0, labels.length - 1);
-
+    final horizontalPadding = math.max(
+      20.0,
+      (MediaQuery.sizeOf(context).width - 720) / 2,
+    );
     return ListView(
-      key: const ValueKey('analysis_content'),
-      padding: const EdgeInsets.fromLTRB(24, 14, 24, 34),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 30),
       children: [
-        Eyebrow(widget.engineLabel),
-        const SizedBox(height: 9),
         Text(
-          'Scanning photo',
-          style: Theme.of(context).textTheme.headlineLarge,
+          'Confirm the object',
+          style: Theme.of(context).textTheme.headlineMedium,
         ),
-        const SizedBox(height: 18),
-        AspectRatio(
-          aspectRatio: 4 / 5,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.ink,
-              borderRadius: BorderRadius.circular(32),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.ink.withValues(alpha: 0.18),
-                  blurRadius: 28,
-                  offset: const Offset(0, 15),
+        const SizedBox(height: 14),
+        Align(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: AspectRatio(
+              aspectRatio: 16 / 10,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(imagePath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppColors.navySoft,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.photo_outlined, size: 48),
+                  ),
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(32),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.file(
-                    File(widget.imagePath),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      color: AppColors.ink,
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
-                        color: AppColors.aqua,
-                        size: 64,
-                      ),
-                    ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.ink.withValues(alpha: 0.1),
-                          AppColors.ink.withValues(alpha: 0.55),
-                        ],
-                        stops: const [0.32, 1],
-                      ),
-                    ),
-                  ),
-                  AnimatedBuilder(
-                    animation: _controller,
-                    builder: (context, child) => CustomPaint(
-                      painter: _ScanSweepPainter(progress: _controller.value),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.all(22),
-                    child: InstrumentCorners(color: Colors.white),
-                  ),
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
-                    child: Row(
-                      children: [
-                        StatusPill(
-                          label: widget.photoCount == 2
-                              ? '2 angles included'
-                              : '1 photo included',
-                          icon: widget.photoCount == 2
-                              ? Icons.compare_rounded
-                              : Icons.photo_outlined,
-                          background: AppColors.aqua,
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${step + 1}/3',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: 26),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: Text(
-            labels[step],
-            key: ValueKey(step),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium,
+        if (measured case final dimensions?) ...[
+          const SizedBox(height: 10),
+          _MeasurementRow(
+            measured: dimensions,
+            onEdit: onEditMeasurement,
+            onClear: onClearMeasurement,
           ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'MassLens returns a range and confidence level so the estimate stays '
-          'honest about uncertainty.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 22),
-        Center(
-          child: StatusPill(
-            label: widget.privacyLabel,
-            icon: EstimateEngineConfig.isAiEnabled
-                ? Icons.cloud_upload_outlined
-                : Icons.lock_outline_rounded,
+        ],
+        if (secondImagePath != null) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              ClipRRect(
+                key: const Key('second_photo_preview'),
+                borderRadius: BorderRadius.circular(6),
+                child: Image.file(
+                  File(secondImagePath!),
+                  width: 42,
+                  height: 42,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 42,
+                    height: 42,
+                    color: AppColors.navySoft,
+                    child: const Icon(Icons.photo_outlined),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text('Second angle added'),
+            ],
           ),
+        ],
+        const SizedBox(height: 14),
+        if (error != null) ...[
+          const SizedBox(height: 12),
+          _InlineError(error!),
+        ],
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('add_details_button'),
+                onPressed: onDetails,
+                icon: const Icon(Icons.tune_rounded),
+                label: const Text('Details'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('analyze_button'),
+                onPressed: onAnalyze,
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Estimate'),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _ScanSweepPainter extends CustomPainter {
-  const _ScanSweepPainter({required this.progress});
+class _MeasurementRow extends StatelessWidget {
+  const _MeasurementRow({
+    required this.measured,
+    required this.onEdit,
+    required this.onClear,
+  });
 
-  final double progress;
+  final MeasuredDimensions measured;
+  final VoidCallback onEdit;
+  final VoidCallback onClear;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..strokeWidth = 1;
-    for (var index = 1; index < 6; index++) {
-      final y = size.height * index / 6;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final sweepY = size.height * progress;
-    final bandHeight = size.height * 0.16;
-    final bandRect = Rect.fromLTRB(
-      0,
-      sweepY - bandHeight / 2,
-      size.width,
-      sweepY + bandHeight / 2,
-    );
-    final bandPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          AppColors.aqua.withValues(alpha: 0.08),
-          AppColors.lime.withValues(alpha: 0.34),
-          Colors.transparent,
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.limeDark.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  measured.formatSummary(),
+                  key: const Key('measured_summary'),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  measured.sourceLabel,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Edit dimensions',
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined, size: 20),
+          ),
+          IconButton(
+            tooltip: 'Remove dimensions',
+            onPressed: onClear,
+            icon: const Icon(Icons.close_rounded, size: 20),
+          ),
         ],
-        stops: const [0, 0.35, 0.52, 1],
-      ).createShader(bandRect);
-    canvas.drawRect(bandRect, bandPaint);
-
-    final linePaint = Paint()
-      ..color = AppColors.lime.withValues(alpha: 0.92)
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(16, sweepY),
-      Offset(size.width - 16, sweepY),
-      linePaint,
+      ),
     );
-  }
-
-  @override
-  bool shouldRepaint(covariant _ScanSweepPainter oldDelegate) {
-    return oldDelegate.progress != progress;
   }
 }
 
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+class _AnalysisView extends StatelessWidget {
+  const _AnalysisView({required this.imagePath, required this.step, super.key});
+
+  final String imagePath;
+  final int step;
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Reading shape', 'Estimating material', 'Building range'];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+      child: Column(
+        children: [
+          const Spacer(),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              File(imagePath),
+              width: 180,
+              height: 180,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
+                width: 180,
+                height: 180,
+                color: AppColors.navySoft,
+                child: const Icon(Icons.inventory_2_outlined, size: 48),
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          Text(
+            labels[step.clamp(0, 2)],
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+          const LinearProgressIndicator(minHeight: 4),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultView extends StatelessWidget {
+  const _ResultView({
+    required this.measurement,
+    required this.unitSystem,
+    required this.saved,
+    required this.onSave,
+    required this.onReset,
+    super.key,
+  });
+
+  final Measurement measurement;
+  final UnitSystem unitSystem;
+  final bool saved;
+  final VoidCallback onSave;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final horizontalPadding = math.max(
+      20.0,
+      (MediaQuery.sizeOf(context).width - 720) / 2,
+    );
+    return ListView(
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 34),
+      children: [
+        Align(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: AspectRatio(
+              aspectRatio: 16 / 10,
+              child: ClipRRect(
+                key: const Key('result_photo'),
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(measurement.imagePath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppColors.navySoft,
+                    child: const Icon(Icons.inventory_2_outlined, size: 52),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          measurement.objectLabel,
+          key: const Key('result_object_label'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: 18),
+        Text(
+          formatWeight(measurement.estimateGrams, unitSystem),
+          key: const Key('result_weight'),
+          style: const TextStyle(
+            color: AppColors.ink,
+            fontSize: 44,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'LIKELY RANGE',
+          style: TextStyle(
+            color: AppColors.inkMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+        ),
+        Text(
+          '${formatWeight(measurement.lowerBoundGrams, unitSystem)} – '
+          '${formatWeight(measurement.upperBoundGrams, unitSystem)}',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+        const SizedBox(height: 18),
+        _ResultFact(
+          label: 'Dimensions',
+          value: formatDimensions(measurement.dimensions, unitSystem),
+        ),
+        _ResultFact(label: 'Confidence', value: measurement.confidence.name),
+        const SizedBox(height: 8),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 12),
+          title: const Text('How this was estimated'),
+          children: [
+            for (final assumption in measurement.assumptions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('• $assumption'),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onReset,
+                child: const Text('Try another'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton(
+                key: const Key('save_result_button'),
+                onPressed: saved ? null : onSave,
+                child: Text(saved ? 'Saved' : 'Save'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ResultFact extends StatelessWidget {
+  const _ResultFact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  const _InlineError(this.message);
 
   final String message;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.coral.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.coral.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.coral),
-          const SizedBox(width: 10),
-          Expanded(child: Text(message)),
-        ],
-      ),
+      child: Text(message, style: const TextStyle(color: AppColors.coral)),
     );
   }
 }
 
-class _CameraGridPainter extends CustomPainter {
-  const _CameraGridPainter();
+class _SheetLabel extends StatelessWidget {
+  const _SheetLabel(this.label);
+
+  final String label;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.055)
-      ..strokeWidth = 1;
-    for (var index = 1; index < 4; index++) {
-      final x = size.width * index / 4;
-      final y = size.height * index / 4;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-    final glow = Paint()
-      ..shader = RadialGradient(
-        colors: [AppColors.aqua.withValues(alpha: 0.22), Colors.transparent],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(Offset.zero & size, glow);
+  Widget build(BuildContext context) {
+    return Text(label, style: Theme.of(context).textTheme.titleMedium);
   }
+}
+
+class _SecondAngleSheet extends StatelessWidget {
+  const _SecondAngleSheet();
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Second angle',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(context, PhotoSource.camera),
+              icon: const Icon(Icons.photo_camera_outlined),
+              label: const Text('Take photo'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              key: const Key('second_photo_gallery_button'),
+              onPressed: () => Navigator.pop(context, PhotoSource.gallery),
+              icon: const Icon(Icons.photo_library_outlined),
+              label: const Text('Choose photo'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

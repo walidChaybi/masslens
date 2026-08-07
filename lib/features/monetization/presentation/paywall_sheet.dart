@@ -30,30 +30,73 @@ class _PaywallBody extends StatelessWidget {
           children: [
             const Center(child: MassLensLogo(compact: true)),
             const SizedBox(height: 20),
-            const Center(child: Eyebrow('More scans · no ads')),
+            const Center(child: Eyebrow('One-time packs · no subscription')),
             const SizedBox(height: 8),
             Text(
-              'Choose the plan that\nfits your projects',
+              'Add scans when\nyou need them',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             const SizedBox(height: 12),
             const Text(
-              'Every plan is verified securely by Google Play. '
+              'Each pack is a single Google Play purchase with no renewal. '
               'Your OpenAI key is never inside the app.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.inkMuted, height: 1.45),
             ),
             const SizedBox(height: 22),
-            for (final plan in monetization.plans) ...[
-              _PlanCard(
-                plan: plan,
-                price: monetization.priceFor(plan.productId),
-                selected: monetization.access.planId == plan.productId,
+            if (!monetization.access.hasPaidCredits &&
+                monetization.access.billingEnforced &&
+                monetization.access.remainingScans <= 0) ...[
+              _RewardedScanCard(
+                ready: monetization.rewardedAdReady,
+                onPressed: () async {
+                  final added = await monetization.watchAdForScan();
+                  if (!context.mounted) return;
+                  if (added) {
+                    Navigator.of(context).pop();
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        monetization.message ??
+                            'The reward is still processing.',
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              const Row(
+                children: [
+                  Expanded(child: Divider()),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR BUY A PACK',
+                      style: TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: Divider()),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+            for (final pack in monetization.packs) ...[
+              _ScanPackCard(
+                pack: pack,
+                price: monetization.priceFor(pack.productId),
                 enabled:
                     monetization.storeAvailable &&
-                    monetization.priceFor(plan.productId) != null,
-                onPressed: () => monetization.purchase(plan.productId),
+                    monetization.priceFor(pack.productId) != null,
+                onPressed: () => monetization.purchase(pack.productId),
               ),
               const SizedBox(height: 12),
             ],
@@ -91,17 +134,10 @@ class _PaywallBody extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: monetization.loading
-                  ? null
-                  : monetization.restorePurchases,
-              child: const Text('Restore purchases'),
-            ),
             const Text(
-              'Subscriptions renew automatically through Google Play unless '
-              'canceled. Scan allowance resets each billing period. Max is '
-              'capped at 300 scans/month to keep the service reliable.',
+              'One-time purchase. No recurring charge. Purchased scans do not '
+              'expire. Until account recovery is added, clearing app data or '
+              'changing devices can prevent recovery of unused scans.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppColors.inkMuted,
@@ -139,18 +175,62 @@ class _PaywallBody extends StatelessWidget {
   }
 }
 
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({
-    required this.plan,
+class _RewardedScanCard extends StatelessWidget {
+  const _RewardedScanCard({required this.ready, required this.onPressed});
+
+  final bool ready;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: AppColors.navySoft,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.play_circle_outline_rounded, size: 28),
+          const SizedBox(width: 13),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Need one more scan?',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'Watch one ad to receive one bonus scan.',
+                  style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton(
+            onPressed: ready ? onPressed : null,
+            child: Text(ready ? 'Watch' : 'Loading'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScanPackCard extends StatelessWidget {
+  const _ScanPackCard({
+    required this.pack,
     required this.price,
-    required this.selected,
     required this.enabled,
     required this.onPressed,
   });
 
-  final PlanDefinition plan;
+  final ScanPackDefinition pack;
   final String? price;
-  final bool selected;
   final bool enabled;
   final VoidCallback onPressed;
 
@@ -159,10 +239,10 @@ class _PlanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: plan.recommended ? AppColors.ink : AppColors.surface,
+        color: pack.recommended ? AppColors.ink : AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: plan.recommended ? AppColors.ink : AppColors.line,
+          color: pack.recommended ? AppColors.ink : AppColors.line,
         ),
       ),
       child: Row(
@@ -171,12 +251,12 @@ class _PlanCard extends StatelessWidget {
             width: 49,
             height: 49,
             decoration: BoxDecoration(
-              color: plan.recommended ? AppColors.lime : AppColors.navySoft,
+              color: pack.recommended ? AppColors.lime : AppColors.navySoft,
               borderRadius: BorderRadius.circular(16),
             ),
             alignment: Alignment.center,
             child: Text(
-              '${plan.scanLimit}',
+              '${pack.scanCredits}',
               style: const TextStyle(
                 color: AppColors.ink,
                 fontWeight: FontWeight.w800,
@@ -192,9 +272,9 @@ class _PlanCard extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        plan.name,
+                        pack.name,
                         style: TextStyle(
-                          color: plan.recommended
+                          color: pack.recommended
                               ? Colors.white
                               : AppColors.ink,
                           fontSize: 17,
@@ -202,10 +282,10 @@ class _PlanCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (plan.recommended) ...[
+                    if (pack.recommended) ...[
                       const SizedBox(width: 8),
                       const Text(
-                        'POPULAR',
+                        'BEST VALUE',
                         style: TextStyle(
                           color: AppColors.lime,
                           fontSize: 9,
@@ -218,9 +298,9 @@ class _PlanCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${plan.scanLimit} scans/month · ${plan.subtitle}',
+                  '${pack.scanCredits} scans · ${pack.subtitle}',
                   style: TextStyle(
-                    color: plan.recommended
+                    color: pack.recommended
                         ? Colors.white70
                         : AppColors.inkMuted,
                     fontSize: 12,
@@ -231,19 +311,19 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           FilledButton(
-            onPressed: selected || !enabled ? null : onPressed,
+            onPressed: enabled ? onPressed : null,
             style: FilledButton.styleFrom(
               minimumSize: const Size(82, 46),
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              backgroundColor: plan.recommended
+              backgroundColor: pack.recommended
                   ? AppColors.lime
                   : AppColors.ink,
-              foregroundColor: plan.recommended ? AppColors.ink : Colors.white,
-              disabledBackgroundColor: plan.recommended
+              foregroundColor: pack.recommended ? AppColors.ink : Colors.white,
+              disabledBackgroundColor: pack.recommended
                   ? AppColors.lime.withValues(alpha: 0.35)
                   : AppColors.navySoft,
             ),
-            child: Text(selected ? 'Active' : price ?? 'Soon'),
+            child: Text(price ?? 'Soon'),
           ),
         ],
       ),

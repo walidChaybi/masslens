@@ -1,93 +1,39 @@
 # MassLens
 
-MassLens is an Android-first Flutter MVP for honest, AI-assisted weight and
-dimension estimation.
+MassLens is an Android-first Flutter app for AI-assisted weight estimates,
+camera-guided dimensions, and compatible Bluetooth scales.
 
-The current build contains a deterministic local demo engine, so the complete
-capture → review → analysis → result → history flow works without API keys or
-uploading photos. The estimator is isolated behind `EstimateRepository` and can
-switch to the secure Cloudflare Worker without changing the UI flow.
+## Measurement modes
+
+- **Bluetooth scale:** reads standard BLE Weight Scale Service measurements.
+- **Touch demo:** demonstrates pressure input and is never presented as a real
+  weight measurement.
+- **AR measurement:** uses optional Google ARCore depth, plane, or feature-point
+  hit tests to trace width, height, and optional depth.
+- **Photo measurement:** calibrates a photo against a payment card, €1 coin, or
+  custom known reference.
+- **AI estimate:** combines one or two photos, measured dimensions, and optional
+  material/fill context to return a weight range and confidence level.
+
+ARCore is optional. Devices without ARCore automatically use calibrated photo
+measurement, and users may skip dimensions for a lower-confidence photo-only
+estimate.
 
 ## AI engine
 
-Production AI requests go through a small Cloudflare Worker. The OpenAI key is
-stored as an encrypted Worker secret and is never included in the Flutter app.
-The Worker validates requests, limits scans per installation and network, calls
-the OpenAI Responses API, and returns only the structured estimate.
-
-The app remains in local demo mode unless cloud mode is enabled at build/run
-time.
-
-### Cloudflare setup
-
-1. Create a free Cloudflare account.
-2. Install the Worker dependencies and sign in:
+Production AI requests go through the Cloudflare Worker in `worker/`. The
+OpenAI key stays in an encrypted Worker secret and is never bundled into the
+Flutter app. Local builds use the deterministic demo repository unless cloud
+mode is enabled with Dart defines.
 
 ```bash
-cd worker
-npm install
-npx wrangler login
-```
-
-3. Deploy the Worker once. Wrangler prints its `workers.dev` URL:
-
-```bash
-npm run deploy
-```
-
-4. Store the OpenAI key. Paste it only into Wrangler's interactive prompt:
-
-```bash
-npx wrangler secret put OPENAI_API_KEY
-```
-
-5. Verify the deployed health endpoint, replacing the example URL with the URL
-   from step 3:
-
-```bash
-curl https://masslens-api.YOUR-SUBDOMAIN.workers.dev/health
-```
-
-6. Run the Flutter app with the Worker estimate endpoint:
-
-```bash
-cd ..
 flutter run \
   --dart-define=ESTIMATE_ENGINE=cloudflare \
-  --dart-define=MASSLENS_API_URL=https://masslens-api.YOUR-SUBDOMAIN.workers.dev/estimate
+  --dart-define=MASSLENS_API_URL=https://masslens-api.example.workers.dev/estimate
 ```
 
-The Worker uses `gpt-5.4-mini` with medium reasoning by default. Change the
-non-secret values in `worker/wrangler.jsonc` and redeploy if evaluation shows a
-different model or effort is a better cost/quality fit.
-
-Check the Worker before deployment with:
-
-```bash
-cd worker
-npm run check
-```
-
-## Monetization
-
-MassLens now contains direct Google Play subscriptions, Worker-side purchase
-verification, D1 scan quotas, and AdMob for free users. RevenueCat is not used.
-Billing enforcement and ads remain off by default until the console resources
-are connected. Follow [MONETIZATION_SETUP.md](MONETIZATION_SETUP.md) for the
-exact safe activation sequence.
-
-## Included
-
-- Three-page trust-focused onboarding
-- Camera and gallery image selection with an optional second angle
-- Optional material, fill-state, known-size, and scale-reference context
-- Animated scan-line analysis with clear progress feedback
-- Weight range, confidence, dimensions, and assumptions
-- Private on-device image/history persistence
-- Metric and imperial units
-- Google Play plans for 50, 100, or 300 monthly scans
-- Paid-user ad removal, UMP consent, native/interstitial/rewarded AdMob flows
-- Capture guidance, history filtering, deletion, and empty/error states
+The Worker validates images and physical context, enforces scan access, calls
+the OpenAI Responses API, and returns a structured estimate.
 
 ## Run
 
@@ -103,14 +49,20 @@ dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
 flutter build apk --debug
+
+cd worker
+npm run check
 ```
 
-## Production seams
+AR behavior must also be checked on a physical ARCore-compatible Android phone.
+The emulator and Flutter widget tests cover fallback and UI behavior, but they
+cannot validate real-world tracking accuracy.
 
-- Keep AI provider keys and Google Play purchase verification in server-side
-  secrets only.
-- Add real user authentication and account quotas before paid or large-scale
-  public access; installation and network rate limits are the MVP abuse guard.
-- Add ARCore depth/reference-object measurement as a separate guided-scan mode.
-- Add explicit upload consent, retention controls, and production privacy terms
-  before any photo leaves the device.
+## Production notes
+
+- Keep provider keys and Google Play verification credentials server-side.
+- AR and photo dimensions are estimates, not legal-trade measurements.
+- Never use camera estimates for medical dosing, safety limits, load-bearing
+  decisions, or regulated shipping charges.
+- Follow `MONETIZATION_SETUP.md` before enabling billing enforcement or live
+  advertising.

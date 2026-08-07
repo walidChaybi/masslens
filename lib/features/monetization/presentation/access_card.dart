@@ -19,9 +19,9 @@ class AccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = access.scanLimit <= 0
+    final progress = access.freeScanLimit <= 0
         ? 0.0
-        : (access.scansUsed / access.scanLimit).clamp(0.0, 1.0);
+        : (access.freeScansUsed / access.freeScanLimit).clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
@@ -39,13 +39,15 @@ class AccessCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: access.isPaid ? AppColors.lime : Colors.white12,
+                  color: access.hasPaidCredits
+                      ? AppColors.lime
+                      : Colors.white12,
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: Text(
-                  '${access.planName} plan',
+                  access.balanceName,
                   style: TextStyle(
-                    color: access.isPaid ? AppColors.ink : Colors.white,
+                    color: access.hasPaidCredits ? AppColors.ink : Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
@@ -55,7 +57,7 @@ class AccessCard extends StatelessWidget {
               TextButton(
                 onPressed: onManage,
                 style: TextButton.styleFrom(foregroundColor: AppColors.lime),
-                child: const Text('Manage'),
+                child: const Text('Buy scans'),
               ),
             ],
           ),
@@ -79,7 +81,18 @@ class AccessCard extends StatelessWidget {
               valueColor: const AlwaysStoppedAnimation(AppColors.lime),
             ),
           ),
-          if (!access.isPaid && access.billingEnforced) ...[
+          if (access.billingEnforced) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${access.freeScansRemaining} free · '
+              '${access.bonusCredits} bonus · '
+              '${access.purchasedCredits} purchased',
+              style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+            ),
+          ],
+          if (!access.hasPaidCredits &&
+              access.billingEnforced &&
+              access.remainingScans <= 0) ...[
             const SizedBox(height: 12),
             Row(
               children: [

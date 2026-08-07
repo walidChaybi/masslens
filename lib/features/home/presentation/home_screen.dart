@@ -1,487 +1,143 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
-import '../../monetization/presentation/access_card.dart';
-import '../../monetization/presentation/native_ad_card.dart';
 import '../../monetization/presentation/paywall_sheet.dart';
-import '../../scan/data/estimate_repository_factory.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
-    required this.onScan,
+    required this.onMeasure,
+    required this.onGallery,
     required this.onViewHistory,
     super.key,
   });
 
-  final VoidCallback onScan;
+  final VoidCallback onMeasure;
+  final VoidCallback onGallery;
   final VoidCallback onViewHistory;
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final monetization = controller.monetization;
-    final recent = controller.measurements.take(2).toList();
+    final access = controller.monetization.access;
+    final recent = controller.measurements.firstOrNull;
+    final horizontalPadding = math.max(
+      20.0,
+      (MediaQuery.sizeOf(context).width - 720) / 2,
+    );
 
     return SafeArea(
       bottom: false,
-      child: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
-            sliver: SliverList.list(
-              children: [
-                Row(
-                  children: [
-                    const MassLensLogo(compact: true),
-                    const Spacer(),
-                    StatusPill(
-                      label: EstimateEngineConfig.analysisModeLabel,
-                      icon: EstimateEngineConfig.isAiEnabled
-                          ? Icons.auto_awesome_outlined
-                          : Icons.science_outlined,
-                      background: AppColors.navySoft,
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      tooltip: 'Measurement guide',
-                      onPressed: () => _showAccuracySheet(context),
-                      icon: const Icon(Icons.info_outline_rounded),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                AccessCard(
-                  access: monetization.access,
-                  onManage: () => showMassLensPaywall(context),
-                  rewardedAdReady: monetization.rewardedAdReady,
-                  onRewardedAd: () async {
-                    final added = await monetization.watchAdForScan();
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          added
-                              ? 'One bonus scan was added.'
-                              : monetization.message ??
-                                    'The reward is still processing.',
-                        ),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 28),
-                const Eyebrow('AI-assisted measurement'),
-                const SizedBox(height: 9),
-                Text(
-                  'What are we\nmeasuring today?',
-                  style: Theme.of(context).textTheme.headlineLarge,
-                ),
-                const SizedBox(height: 22),
-                _ScanHero(onScan: onScan),
-                const SizedBox(height: 28),
-                const SectionTitle(title: 'Choose a mode'),
-                const SizedBox(height: 13),
-                SizedBox(
-                  height: 174,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
-                    children: [
-                      _ModeCard(
-                        icon: Icons.photo_camera_outlined,
-                        title: 'Photo estimate',
-                        subtitle: 'Available now',
-                        accent: AppColors.lime,
-                        onTap: onScan,
-                      ),
-                      const SizedBox(width: 12),
-                      const _ModeCard(
-                        icon: Icons.view_in_ar_outlined,
-                        title: 'Guided scan',
-                        subtitle: 'AR · Coming next',
-                        accent: AppColors.aqua,
-                      ),
-                      const SizedBox(width: 12),
-                      const _ModeCard(
-                        icon: Icons.straighten_rounded,
-                        title: 'Smart ruler',
-                        subtitle: 'AR · Coming next',
-                        accent: Color(0xFFFFD36A),
-                      ),
-                    ],
-                  ),
-                ),
-                if (monetization.canRequestAds) ...[
-                  const SizedBox(height: 18),
-                  NativeAdCard(enabled: monetization.canRequestAds),
-                ],
-                const SizedBox(height: 30),
-                SectionTitle(
-                  title: 'Recent estimates',
-                  actionLabel: recent.isEmpty ? null : 'View all',
-                  onAction: onViewHistory,
-                ),
-                const SizedBox(height: 13),
-                if (recent.isEmpty)
-                  EmptyPanel(
-                    icon: Icons.history_rounded,
-                    title: 'Your workbench is clear',
-                    message:
-                        'Your saved estimates will appear here, ready to '
-                        'compare or revisit.',
-                    action: OutlinedButton.icon(
-                      onPressed: onScan,
-                      icon: const Icon(Icons.add_a_photo_outlined),
-                      label: const Text('Make first estimate'),
-                    ),
-                  )
-                else
-                  for (final measurement in recent) ...[
-                    MeasurementCard(
-                      measurement: measurement,
-                      unitSystem: controller.unitSystem,
-                      compact: true,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              MeasurementDetailScreen(measurement: measurement),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                const SizedBox(height: 28),
-                const _TrustCard(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAccuracySheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (context) => const SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(24, 4, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          28,
+          horizontalPadding,
+          32,
+        ),
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Eyebrow('Accuracy note'),
-              SizedBox(height: 10),
-              Text(
-                'A camera estimates. A scale measures.',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.7,
+              Expanded(
+                child: Text(
+                  'AI weight',
+                  style: Theme.of(context).textTheme.headlineLarge,
                 ),
               ),
-              SizedBox(height: 13),
-              Text(
-                'One photo cannot reveal hidden contents or exact density. '
-                'MassLens reports a range and confidence level instead of '
-                'pretending the result is physically exact.',
-                style: TextStyle(
-                  color: AppColors.inkMuted,
-                  fontSize: 15,
-                  height: 1.5,
-                ),
-              ),
-              SizedBox(height: 18),
-              _InfoRow(
-                icon: Icons.wb_sunny_outlined,
-                text: 'Use bright, even light and a simple background.',
-              ),
-              SizedBox(height: 12),
-              _InfoRow(
-                icon: Icons.crop_free_rounded,
-                text: 'Keep the complete object visible in the frame.',
-              ),
-              SizedBox(height: 12),
-              _InfoRow(
-                icon: Icons.tune_rounded,
-                text: 'Add material, fill state, or one known dimension.',
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScanHero extends StatelessWidget {
-  const _ScanHero({required this.onScan});
-
-  final VoidCallback onScan;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 294,
-      decoration: BoxDecoration(
-        color: AppColors.ink,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink.withValues(alpha: 0.14),
-            blurRadius: 30,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: const _HeroPainter())),
-          const Positioned(
-            top: 22,
-            left: 22,
-            child: StatusPill(
-              label: 'Quick estimate',
-              icon: Icons.bolt_rounded,
-              background: AppColors.lime,
-            ),
-          ),
-          Positioned(
-            top: 72,
-            left: 22,
-            right: 22,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Point. Capture.\nUnderstand.',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          height: 1.03,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      SizedBox(height: 11),
-                      Text(
-                        'Get a weight range and\nconfidence in a few taps.',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => showMassLensPaywall(context),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
                   ),
-                ),
-                Container(
-                  width: 94,
-                  height: 94,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
+                  child: Text(
+                    access.usageLabel,
+                    key: const Key('scan_balance'),
+                    style: const TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: const BoxDecoration(
-                          color: AppColors.aqua,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          color: AppColors.ink,
-                          size: 28,
-                        ),
-                      ),
-                      const Positioned(
-                        right: 0,
-                        top: 8,
-                        child: StatusPill(
-                          label: '±',
-                          background: AppColors.lime,
-                        ),
-                      ),
-                    ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _HomeCapturePanel(onMeasure: onMeasure, onGallery: onGallery),
+          if (recent != null) ...[
+            const SizedBox(height: 30),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Latest estimate',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
+                ),
+                TextButton(
+                  onPressed: onViewHistory,
+                  child: const Text('History'),
                 ),
               ],
             ),
-          ),
-          Positioned(
-            left: 18,
-            right: 18,
-            bottom: 18,
-            child: FilledButton.icon(
-              key: const Key('home_scan_button'),
-              onPressed: onScan,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.ink,
+            const SizedBox(height: 10),
+            MeasurementCard(
+              measurement: recent,
+              unitSystem: controller.unitSystem,
+              compact: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => MeasurementDetailScreen(measurement: recent),
+                ),
               ),
-              icon: const Icon(Icons.center_focus_strong_rounded),
-              label: const Text('Start a photo estimate'),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _HeroPainter extends CustomPainter {
-  const _HeroPainter();
+class _HomeCapturePanel extends StatelessWidget {
+  const _HomeCapturePanel({required this.onMeasure, required this.onGallery});
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.055)
-      ..strokeWidth = 1;
-    for (var x = -size.height; x < size.width; x += 34) {
-      canvas.drawLine(
-        Offset(x, size.height),
-        Offset(x + size.height, 0),
-        linePaint,
-      );
-    }
-    final glowPaint = Paint()
-      ..shader =
-          RadialGradient(
-            colors: [
-              AppColors.aqua.withValues(alpha: 0.3),
-              AppColors.aqua.withValues(alpha: 0),
-            ],
-          ).createShader(
-            Rect.fromCircle(
-              center: Offset(size.width * 0.86, size.height * 0.42),
-              radius: 130,
-            ),
-          );
-    canvas.drawCircle(
-      Offset(size.width * 0.86, size.height * 0.42),
-      130,
-      glowPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _ModeCard extends StatelessWidget {
-  const _ModeCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.accent,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color accent;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 154,
-      child: Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: AppColors.ink),
-                ),
-                const Spacer(),
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TrustCard extends StatelessWidget {
-  const _TrustCard();
+  final VoidCallback onMeasure;
+  final VoidCallback onGallery;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.lime.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.limeDark.withValues(alpha: 0.18)),
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.verified_user_outlined, color: AppColors.ink),
-          SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Built for useful estimates',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 5),
-                Text(
-                  'MassLens always shows uncertainty. Never use estimates for '
-                  'medical dosing, safety limits, or regulated shipping.',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    height: 1.45,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
-            ),
+          const AspectRatio(aspectRatio: 16 / 9, child: _QuietViewfinder()),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const Key('home_scan_button'),
+            onPressed: onMeasure,
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: const Text('Measure'),
+          ),
+          const SizedBox(height: 4),
+          TextButton.icon(
+            key: const Key('home_gallery_button'),
+            onPressed: onGallery,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('Photo'),
           ),
         ],
       ),
@@ -489,21 +145,74 @@ class _TrustCard extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
+class _QuietViewfinder extends StatelessWidget {
+  const _QuietViewfinder();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: AppColors.limeDark),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text)),
-      ],
+    return CustomPaint(
+      painter: _QuietViewfinderPainter(),
+      child: const SizedBox.expand(),
     );
   }
+}
+
+class _QuietViewfinderPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+      Paint()..color = const Color(0xFFEFF4F3),
+    );
+
+    final gridPaint = Paint()
+      ..color = AppColors.ink.withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    for (var i = 1; i < 3; i++) {
+      final x = size.width * i / 3;
+      final y = size.height * i / 3;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    final cornerPaint = Paint()
+      ..color = AppColors.ink
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    const inset = 16.0;
+    const length = 28.0;
+    for (final origin in [
+      Offset(inset, inset),
+      Offset(size.width - inset, inset),
+      Offset(inset, size.height - inset),
+      Offset(size.width - inset, size.height - inset),
+    ]) {
+      final xSign = origin.dx < size.width / 2 ? 1.0 : -1.0;
+      final ySign = origin.dy < size.height / 2 ? 1.0 : -1.0;
+      canvas.drawLine(origin, origin + Offset(length * xSign, 0), cornerPaint);
+      canvas.drawLine(origin, origin + Offset(0, length * ySign), cornerPaint);
+    }
+
+    final center = size.center(Offset.zero);
+    canvas.drawCircle(
+      center,
+      15,
+      Paint()
+        ..color = AppColors.surface
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawCircle(
+      center,
+      15,
+      Paint()
+        ..color = AppColors.ink
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6,
+    );
+    canvas.drawCircle(center, 3, Paint()..color = AppColors.limeDark);
+  }
+
+  @override
+  bool shouldRepaint(covariant _QuietViewfinderPainter oldDelegate) => false;
 }

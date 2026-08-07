@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/features/measurements/domain/measurement.dart';
+import 'package:mass_lens/features/monetization/data/monetization_config.dart';
 import 'package:mass_lens/features/scan/data/ai_estimate_payload.dart';
 import 'package:mass_lens/features/scan/data/demo_estimate_repository.dart';
 import 'package:mass_lens/features/scan/data/estimate_repository_factory.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
+import 'package:mass_lens/features/scan/domain/measured_dimensions.dart';
 
 void main() {
   test('measurement survives JSON round trip', () {
@@ -63,6 +65,43 @@ void main() {
   test('repository factory keeps demo mode by default', () {
     expect(EstimateEngineConfig.isAiEnabled, isFalse);
     expect(buildEstimateRepository(), isA<DemoEstimateRepository>());
+  });
+
+  test(
+    'measured axes override inferred dimensions without changing confidence',
+    () async {
+      const repository = DemoEstimateRepository(analysisDelay: Duration.zero);
+      final result = await repository.analyze(
+        const EstimateRequest(
+          imagePath: '/tmp/non-existent.jpg',
+          measuredDimensions: MeasuredDimensions(
+            widthMm: 320,
+            heightMm: 210,
+            method: MeasurementMethod.arCoreDepth,
+          ),
+        ),
+      );
+
+      expect(result.dimensions.width, 320);
+      expect(result.dimensions.height, 210);
+      expect(result.dimensions.depth, greaterThan(0));
+      expect(result.confidence, ConfidenceLevel.medium);
+      expect(
+        result.assumptions,
+        contains('32.0 × 21.0 cm measured with AR depth'),
+      );
+    },
+  );
+
+  test('launch catalog contains only Basic and Max scan packs', () {
+    expect(MonetizationConfig.packs.map((pack) => pack.productId), [
+      'masslens_100_scans',
+      'masslens_500_scans',
+    ]);
+    expect(MonetizationConfig.packs.map((pack) => pack.scanCredits), [
+      100,
+      500,
+    ]);
   });
 
   test('AI payload maps to a non-demo measurement', () {

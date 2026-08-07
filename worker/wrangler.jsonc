@@ -9,7 +9,7 @@
     "OPENAI_REASONING_EFFORT": "medium",
     "BILLING_ENFORCED": "false",
     "GOOGLE_PLAY_PACKAGE_NAME": "com.lilai.aivirtual",
-    "ADMOB_REWARDED_AD_UNIT_ID": ""
+    "ADMOB_REWARDED_AD_UNIT_ID": "ca-app-pub-7681170430097585/3756662851"
   },
   "ratelimits": [
     {

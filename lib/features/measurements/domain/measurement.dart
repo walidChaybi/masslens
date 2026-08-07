@@ -57,7 +57,11 @@ class Measurement {
   final List<String> assumptions;
   final bool isDemo;
 
-  Measurement copyWith({String? imagePath}) {
+  Measurement copyWith({
+    String? imagePath,
+    DimensionsMm? dimensions,
+    List<String>? assumptions,
+  }) {
     return Measurement(
       id: id,
       createdAt: createdAt,
@@ -68,8 +72,8 @@ class Measurement {
       lowerBoundGrams: lowerBoundGrams,
       upperBoundGrams: upperBoundGrams,
       confidence: confidence,
-      dimensions: dimensions,
-      assumptions: assumptions,
+      dimensions: dimensions ?? this.dimensions,
+      assumptions: assumptions ?? this.assumptions,
       isDemo: isDemo,
     );
   }

@@ -23,5 +23,5 @@ Future<void> main() async {
 
   final controller = await AppController.bootstrap();
   runApp(MassLensApp(controller: controller));
-  unawaited(controller.initializeMonetization());
+  unawaited(controller.initializeMonetization(showAppOpenAdOnStart: true));
 }

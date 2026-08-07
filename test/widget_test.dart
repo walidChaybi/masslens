@@ -3,10 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
 import 'package:mass_lens/app/mass_lens_app.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
+import 'package:mass_lens/features/home/presentation/home_screen.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
 import 'package:mass_lens/features/measurements/domain/measurement.dart';
 import 'package:mass_lens/features/scan/data/photo_picker.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
+import 'package:mass_lens/features/scan/domain/measurement_capture.dart';
+import 'package:mass_lens/features/scan/domain/measured_dimensions.dart';
+import 'package:mass_lens/features/scan/presentation/capture/measurement_launcher.dart';
 import 'package:mass_lens/features/scan/presentation/scan_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,42 +19,75 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('onboarding opens the main measurement workspace', (
-    tester,
-  ) async {
+  testWidgets('opens directly on the labeled touch scale', (tester) async {
     final controller = AppController(
       measurementStore: const MeasurementStore(),
     );
     await tester.pumpWidget(MassLensApp(controller: controller));
+    await tester.pump();
 
-    expect(find.text('Measure what\nyou cannot weigh.'), findsOneWidget);
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('What are we\nmeasuring today?'), findsOneWidget);
-    expect(find.byKey(const Key('shell_scan_button')), findsOneWidget);
-    expect(
-      tester.getSize(find.byKey(const Key('shell_scan_icon'))),
-      const Size(40, 34),
-    );
+    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.text('DEMO · NOT A MEASUREMENT'), findsOneWidget);
+    expect(find.byKey(const Key('scale_touch_surface')), findsOneWidget);
+    expect(find.byKey(const Key('shell_scan_button')), findsNothing);
   });
 
-  testWidgets('bottom navigation exposes history and settings', (tester) async {
+  testWidgets('left navigation exposes AI scan, history, and settings', (
+    tester,
+  ) async {
     final controller = AppController(
       measurementStore: const _FakeMeasurementStore(),
       onboardingComplete: true,
     );
     await tester.pumpWidget(MassLensApp(controller: controller));
 
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('nav_digital_scale')), findsOneWidget);
+    expect(find.byKey(const Key('nav_ai_scan')), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('nav_history')));
     await tester.pumpAndSettle();
     expect(find.text('Measurement history'), findsOneWidget);
     expect(find.text('Nothing saved yet'), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pumpAndSettle();
     expect(find.text('PREFERENCES AND PRIVACY'), findsOneWidget);
     expect(find.text('Local demo'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav_ai_scan')));
+    await tester.pumpAndSettle();
+    expect(find.text('AI weight'), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+  });
+
+  testWidgets('scan pack sheet contains only one-time Basic and Max products', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    await tester.pumpWidget(MassLensApp(controller: controller));
+
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav_settings')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Free'), 300);
+    await tester.tap(find.text('Free'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add scans when\nyou need them'), findsOneWidget);
+    expect(find.text('100 scans · One-time pack'), findsOneWidget);
+    expect(find.text('500 scans · Save about 20% per scan'), findsOneWidget);
+    expect(find.text('OR SUBSCRIBE'), findsNothing);
+    expect(find.textContaining('/mo'), findsNothing);
   });
 
   testWidgets('photo flow analyzes and saves an estimate', (tester) async {
@@ -68,6 +105,7 @@ void main() {
           home: ScanScreen(
             photoPicker: photoPicker,
             estimateRepository: estimateRepository,
+            autoStart: false,
           ),
         ),
       ),
@@ -81,9 +119,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Confirm the object'), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('add_details_button')));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('add_second_photo_button')),
       250,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.byKey(const Key('add_second_photo_button')));
     await tester.pumpAndSettle();
@@ -91,22 +132,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('second_photo_preview')), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('add_details_button')));
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(
       find.byKey(const Key('material_Metal')).last,
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.byKey(const Key('material_Metal')).last);
     await tester.scrollUntilVisible(
       find.byKey(const Key('fill_state_Partly filled')).last,
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.byKey(const Key('fill_state_Partly filled')).last);
     await tester.scrollUntilVisible(
       find.byKey(const Key('known_dimension_field')).last,
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.enterText(
       find.byKey(const Key('known_dimension_field')).last,
@@ -115,9 +159,12 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const Key('reference_Standard card')).last,
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
     await tester.tap(find.byKey(const Key('reference_Standard card')).last);
+
+    await tester.tap(find.text('Done').last);
+    await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('analyze_button')),
@@ -154,6 +201,116 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.measurements, hasLength(1));
     expect(find.text('Saved'), findsOneWidget);
+  });
+
+  testWidgets('AR capture preserves measured axes through analysis', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    final estimateRepository = _FakeEstimateRepository();
+    final launcher = _FakeMeasurementLauncher(
+      const MeasurementCapture(
+        imagePath: '/tmp/ar-object.jpg',
+        dimensions: MeasuredDimensions(
+          widthMm: 410,
+          heightMm: 205,
+          method: MeasurementMethod.arCoreDepth,
+        ),
+      ),
+    );
+    await tester.pumpWidget(
+      AppScope(
+        controller: controller,
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: ScanScreen(
+            estimateRepository: estimateRepository,
+            measurementLauncher: launcher,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(launcher.launchCount, 1);
+    expect(find.text('41.0 × 20.5 cm'), findsOneWidget);
+    expect(find.text('AR depth'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('analyze_button')),
+      250,
+    );
+    await tester.tap(find.byKey(const Key('analyze_button')));
+    await tester.pumpAndSettle();
+
+    expect(estimateRepository.lastRequest?.measuredDimensions?.widthMm, 410);
+    expect(estimateRepository.lastRequest?.measuredDimensions?.heightMm, 205);
+    expect(find.text('41.0 × 20.5 × 18.0 cm'), findsOneWidget);
+  });
+
+  testWidgets('measurement cancellation returns to the quiet capture view', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    final launcher = _FakeMeasurementLauncher(null);
+    await tester.pumpWidget(
+      AppScope(
+        controller: controller,
+        child: MaterialApp(
+          theme: buildAppTheme(),
+          home: ScanScreen(
+            estimateRepository: _FakeEstimateRepository(),
+            measurementLauncher: launcher,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(launcher.launchCount, 1);
+    expect(find.text('Measure an object'), findsOneWidget);
+    expect(find.text('Measurement camera could not be opened.'), findsNothing);
+  });
+
+  testWidgets('minimal AI entry fits compact and large Android viewports', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+
+    for (final size in const [Size(360, 640), Size(1280, 800)]) {
+      await tester.binding.setSurfaceSize(size);
+      await tester.pumpWidget(
+        AppScope(
+          controller: controller,
+          child: MaterialApp(
+            theme: buildAppTheme(),
+            home: Scaffold(
+              body: HomeScreen(
+                onMeasure: () {},
+                onGallery: () {},
+                onViewHistory: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('AI weight'), findsOneWidget);
+      expect(find.byKey(const Key('scan_balance')), findsOneWidget);
+      expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+      expect(find.byKey(const Key('home_gallery_button')), findsOneWidget);
+      expect(find.text('How it works'), findsNothing);
+    }
   });
 }
 
@@ -203,4 +360,17 @@ class _FakeMeasurementStore extends MeasurementStore {
 
   @override
   Future<void> saveAll(List<Measurement> measurements) async {}
+}
+
+class _FakeMeasurementLauncher implements MeasurementLauncher {
+  _FakeMeasurementLauncher(this.capture);
+
+  final MeasurementCapture? capture;
+  int launchCount = 0;
+
+  @override
+  Future<MeasurementCapture?> launch(BuildContext context) async {
+    launchCount++;
+    return capture;
+  }
 }

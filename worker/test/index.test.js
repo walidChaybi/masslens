@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index.js";
+import {
+  MonetizationError,
+  scanPackCredits,
+  validateGoogleProductPurchase,
+} from "../src/monetization.js";
 
 const env = {
   OPENAI_API_KEY: "test-key",
@@ -41,6 +46,8 @@ test("access endpoint is safe before billing enforcement is enabled", async () =
   const access = await response.json();
   assert.equal(access.planId, "free");
   assert.equal(access.scanLimit, 3);
+  assert.equal(access.purchasedCredits, 0);
+  assert.equal(access.creditDebt, 0);
   assert.equal(access.billingEnforced, false);
   assert.equal(access.adsEnabled, false);
 });
@@ -75,6 +82,108 @@ test("billing rejects product IDs that are not owned by MassLens", async () => {
 
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "invalid_product");
+});
+
+test("billing catalog contains only the 100 and 500 scan packs", () => {
+  assert.deepEqual(scanPackCredits, {
+    masslens_100_scans: 100,
+    masslens_500_scans: 500,
+  });
+});
+
+test("billing rejects retired subscription product IDs", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/billing/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+      },
+      body: JSON.stringify({
+        productId: "masslens_100_monthly",
+        purchaseToken: "abcdefghijklmnopqrstuvwxyz123456",
+      }),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "invalid_product");
+});
+
+test("one-time purchase validation accepts one matching unconsumed item", () => {
+  const result = validateGoogleProductPurchase(
+    {
+      purchaseStateContext: {purchaseState: "PURCHASED"},
+      productLineItem: [
+        {
+          productId: "masslens_100_scans",
+          productOfferDetails: {
+            quantity: 1,
+            consumptionState: "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
+          },
+        },
+      ],
+      purchaseCompletionTime: "2026-08-05T12:00:00Z",
+      obfuscatedExternalAccountId: "abcdefghijklmnopqrstuvwx",
+      orderId: "GPA.1234-5678-9012-34567",
+    },
+    "masslens_100_scans",
+  );
+
+  assert.equal(result.purchaseTimeMs, Date.parse("2026-08-05T12:00:00Z"));
+  assert.equal(result.externalAccountId, "abcdefghijklmnopqrstuvwx");
+  assert.equal(result.orderId, "GPA.1234-5678-9012-34567");
+});
+
+test("one-time purchase validation rejects pending, mismatched, and bulk items", () => {
+  const base = {
+    purchaseStateContext: {purchaseState: "PURCHASED"},
+    productLineItem: [
+      {
+        productId: "masslens_500_scans",
+        productOfferDetails: {
+          quantity: 1,
+          consumptionState: "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
+        },
+      },
+    ],
+    purchaseCompletionTime: "2026-08-05T12:00:00Z",
+    obfuscatedExternalAccountId: "abcdefghijklmnopqrstuvwx",
+  };
+
+  assert.throws(
+    () => validateGoogleProductPurchase(
+      {...base, purchaseStateContext: {purchaseState: "PENDING"}},
+      "masslens_500_scans",
+    ),
+    (error) => error instanceof MonetizationError &&
+      error.code === "purchase_pending",
+  );
+  assert.throws(
+    () => validateGoogleProductPurchase(base, "masslens_100_scans"),
+    (error) => error instanceof MonetizationError &&
+      error.code === "product_mismatch",
+  );
+  assert.throws(
+    () => validateGoogleProductPurchase(
+      {
+        ...base,
+        productLineItem: [
+          {
+            ...base.productLineItem[0],
+            productOfferDetails: {
+              ...base.productLineItem[0].productOfferDetails,
+              quantity: 2,
+            },
+          },
+        ],
+      },
+      "masslens_500_scans",
+    ),
+    (error) => error instanceof MonetizationError &&
+      error.code === "unsupported_quantity",
+  );
 });
 
 test("estimate endpoint requires an installation identifier", async () => {
@@ -168,6 +277,12 @@ test("one or two views are proxied without exposing the client identifier", asyn
           fillState: "Partly filled",
           referenceObject: "Standard card",
           knownDimension: {axis: "Width", value: 12.5, unit: "cm"},
+          measuredDimensions: {
+            widthMm: 142.4,
+            heightMm: 90.1,
+            depthMm: 61,
+            method: "arcore_depth",
+          },
         }),
       }),
       env,
@@ -180,9 +295,66 @@ test("one or two views are proxied without exposing the client identifier", asyn
     assert.match(seenPrompts[1], /Fill state: Partly filled/);
     assert.match(seenPrompts[1], /Visible reference: Standard card/);
     assert.match(seenPrompts[1], /Width: 12\.5 cm/);
+    assert.match(seenPrompts[1], /Measured dimensions: width 142\.4 mm/);
+    assert.match(seenPrompts[1], /height 90\.1 mm, depth 61 mm/);
+    assert.match(seenPrompts[1], /method arcore_depth/);
+    assert.match(seenPrompts[1], /Preserve supplied measured axes exactly/);
     assert.match(seenPrompts[1], /Infer the object category/);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("estimate endpoint rejects invalid measured dimensions", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/estimate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+      },
+      body: JSON.stringify({
+        images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+        measuredDimensions: {
+          widthMm: 142.4,
+          heightMm: 3,
+          method: "magic_camera",
+        },
+      }),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "invalid_request");
+});
+
+test("measured dimension validation enforces shape, bounds, and methods", async () => {
+  const invalidValues = [
+    "not-an-object",
+    {widthMm: 5001, heightMm: 90, method: "arcore_plane"},
+    {widthMm: 140, heightMm: 90, method: "visual_guess"},
+    {widthMm: 140, heightMm: 90, method: "photo_reference"},
+  ];
+
+  for (const measuredDimensions of invalidValues) {
+    const response = await worker.fetch(
+      new Request("https://masslens.example/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+        },
+        body: JSON.stringify({
+          images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+          measuredDimensions,
+        }),
+      }),
+      env,
+    );
+
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, "invalid_request");
   }
 });
 

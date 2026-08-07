@@ -41,6 +41,11 @@ const fillStateChoices = [
 const referenceObjectChoices = ["None", "Ruler", "Standard card"];
 const dimensionAxisChoices = ["Width", "Height", "Depth"];
 const dimensionUnitChoices = ["cm", "in"];
+const measurementMethodChoices = [
+  "arcore_depth",
+  "arcore_plane",
+  "photo_reference",
+];
 const mimeTypeChoices = [
   "image/jpeg",
   "image/png",
@@ -122,6 +127,7 @@ async function routeRequest(request, env) {
     referenceObjectChoices,
   );
   const knownDimension = readKnownDimension(data.knownDimension);
+  const measuredDimensions = readMeasuredDimensions(data.measuredDimensions);
   const images = readImages(data);
   const clientIdHash = await hashIdentifier(clientId);
   const reservation = await reserveScan(env, clientIdHash);
@@ -134,6 +140,7 @@ async function routeRequest(request, env) {
       fillState,
       referenceObject,
       knownDimension,
+      measuredDimensions,
       images,
       safetyIdentifier: clientIdHash,
     });
@@ -235,6 +242,56 @@ function readKnownDimension(value) {
   };
 }
 
+function readMeasuredMillimeters(value, axis) {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < 5 ||
+    value > 5000
+  ) {
+    throw new ApiError(400, "invalid_request", `Invalid measured ${axis}.`);
+  }
+  return value;
+}
+
+function readMeasuredDimensions(value) {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ApiError(400, "invalid_request", "Invalid measured dimensions.");
+  }
+
+  const method = readChoice(
+    value.method,
+    "measurement method",
+    measurementMethodChoices,
+  );
+  const referenceLabel = value.referenceLabel;
+  if (
+    referenceLabel !== undefined &&
+    referenceLabel !== null &&
+    (typeof referenceLabel !== "string" ||
+      referenceLabel.trim().length === 0 ||
+      referenceLabel.length > 60)
+  ) {
+    throw new ApiError(400, "invalid_request", "Invalid measurement reference.");
+  }
+  if (method === "photo_reference" && typeof referenceLabel !== "string") {
+    throw new ApiError(400, "invalid_request", "A photo reference is required.");
+  }
+
+  return {
+    widthMm: readMeasuredMillimeters(value.widthMm, "width"),
+    heightMm: readMeasuredMillimeters(value.heightMm, "height"),
+    depthMm:
+      value.depthMm === undefined || value.depthMm === null
+        ? null
+        : readMeasuredMillimeters(value.depthMm, "depth"),
+    method,
+    referenceLabel:
+      typeof referenceLabel === "string" ? referenceLabel.trim() : null,
+  };
+}
+
 function readImageBase64(value) {
   if (typeof value !== "string" || value.length === 0) {
     throw new ApiError(400, "invalid_request", "Missing image.");
@@ -316,6 +373,7 @@ async function requestOpenAi(
     fillState,
     referenceObject,
     knownDimension,
+    measuredDimensions,
     images,
     safetyIdentifier,
   },
@@ -352,6 +410,7 @@ async function requestOpenAi(
                 fillState,
                 referenceObject,
                 knownDimension,
+                measuredDimensions,
                 imageCount: images.length,
               }),
             },
@@ -509,10 +568,26 @@ function requestPrompt({
   fillState,
   referenceObject,
   knownDimension,
+  measuredDimensions,
   imageCount,
 }) {
   const knownDimensionText = knownDimension
     ? `${knownDimension.axis}: ${knownDimension.value} ${knownDimension.unit}.`
+    : "None supplied.";
+  const measuredText = measuredDimensions
+    ? [
+        `width ${measuredDimensions.widthMm} mm`,
+        `height ${measuredDimensions.heightMm} mm`,
+        measuredDimensions.depthMm
+          ? `depth ${measuredDimensions.depthMm} mm`
+          : null,
+        `method ${measuredDimensions.method}`,
+        measuredDimensions.referenceLabel
+          ? `reference ${measuredDimensions.referenceLabel}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(", ")
     : "None supplied.";
   const legacyHints = [];
   if (category !== "Auto") legacyHints.push(`Legacy category hint: ${category}.`);
@@ -528,11 +603,13 @@ function requestPrompt({
     `- Fill state: ${fillState}.`,
     `- Visible reference: ${referenceObject}.`,
     `- Known dimension: ${knownDimensionText}`,
+    `- Measured dimensions: ${measuredText}`,
     ...legacyHints.map((hint) => `- ${hint}`),
     `- Number of views: ${imageCount}.`,
     "",
     "Infer the object category from the images. Treat all supplied context as",
-    "helpful evidence, not proof. Use a ruler only when its markings are visible",
+    "helpful evidence, not proof. Preserve supplied measured axes exactly and",
+    "estimate only a missing depth. Use a ruler only when its markings are visible",
     "and it lies near the object's plane. A standard payment-size card is about",
     "85.6 by 54.0 mm; use that scale only when the card is clearly visible.",
     "When two views are supplied, treat them as angles of the same object and",
@@ -584,8 +661,10 @@ Use this estimation method:
    part of the item being weighed.
 2. Infer the category. Estimate visible dimensions in millimeters using any
    supplied known dimension, a clearly visible ruler or standard card,
-   perspective, familiar proportions, and category priors. If there is no
-   reliable scale reference, keep confidence lower and widen the range.
+   perspective, familiar proportions, and category priors. Adopt dimensions
+   measured by AR or calibrated tracing exactly, while treating their method as
+   an uncertainty signal. If there is no reliable scale reference, keep
+   confidence lower and widen the range.
 3. Estimate material and construction. Combine approximate volume with plausible
    density or known category priors. Adjust for hollow, solid, filled, porous,
    wet, folded, or packaged structure when visible or user-provided. Treat the

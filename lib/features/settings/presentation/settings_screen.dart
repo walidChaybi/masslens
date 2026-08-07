@@ -97,6 +97,12 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              const Divider(),
+              const _SettingRow(
+                icon: Icons.bluetooth_rounded,
+                title: 'Bluetooth scale support',
+                value: 'Standard BLE WSS',
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -126,26 +132,18 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          const _SettingsHeader(title: 'Plan'),
+          const _SettingsHeader(title: 'Scan credits'),
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
               _ActionRow(
-                icon: monetization.access.isPaid
+                icon: monetization.access.hasPaidCredits
                     ? Icons.workspace_premium_rounded
                     : Icons.auto_awesome_rounded,
-                title: '${monetization.access.planName} plan',
+                title: monetization.access.balanceName,
                 subtitle: monetization.access.usageLabel,
                 color: AppColors.ink,
                 onTap: () => showMassLensPaywall(context),
-              ),
-              const Divider(),
-              _ActionRow(
-                icon: Icons.restore_rounded,
-                title: 'Restore Google Play purchases',
-                subtitle: 'Already subscribed on this account',
-                color: AppColors.ink,
-                onTap: monetization.restorePurchases,
               ),
             ],
           ),
@@ -158,6 +156,17 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.lock_outline_rounded,
                 title: 'Saved photos',
                 value: 'Private storage',
+              ),
+              const Divider(),
+              const Padding(
+                padding: EdgeInsets.all(17),
+                child: _SettingLabel(
+                  icon: Icons.view_in_ar_outlined,
+                  title: 'AR measurement',
+                  subtitle:
+                      'Uses Google Play Services for AR (ARCore), provided by '
+                      'Google LLC and governed by the Google Privacy Policy.',
+                ),
               ),
               if (monetization.privacyOptionsRequired) ...[
                 const Divider(),
@@ -195,9 +204,10 @@ class SettingsScreen extends StatelessWidget {
               Padding(
                 padding: EdgeInsets.all(17),
                 child: Text(
-                  'MassLens provides visual estimates, not physical '
-                  'measurements. Never use results for medical dosing, load '
-                  'limits, legal trade, or other safety-critical decisions.',
+                  'A compatible Bluetooth scale provides physical readings. '
+                  'Touch mode is an interactive demo and AI scans are visual '
+                  'estimates. Never use MassLens for medical dosing, legal '
+                  'trade, or other safety-critical decisions.',
                   style: TextStyle(
                     color: AppColors.inkMuted,
                     fontSize: 12.5,

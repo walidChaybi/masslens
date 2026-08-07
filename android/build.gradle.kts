@@ -19,6 +19,19 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// CameraX 1.6 references CallbackToFutureAdapter without declaring the
+// AndroidX concurrent artifact on its Java compile classpath.
+subprojects {
+    if (name == "camera_android_camerax") {
+        plugins.withId("com.android.library") {
+            dependencies.add(
+                "implementation",
+                "androidx.concurrent:concurrent-futures:1.2.0",
+            )
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

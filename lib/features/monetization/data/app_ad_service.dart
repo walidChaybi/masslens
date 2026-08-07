@@ -11,15 +11,25 @@ class AppAdService {
   bool _adsAllowedForPlan = false;
   bool _canRequestAds = false;
   bool _privacyOptionsRequired = false;
-  InterstitialAd? _interstitial;
+  bool _appOpenLoading = false;
+  bool _appOpenShowing = false;
+  bool _appOpenShowPending = false;
   RewardedAd? _rewarded;
-  int _completedScans = 0;
+  AppOpenAd? _appOpenAd;
+  DateTime? _appOpenLoadedAt;
 
   bool get canRequestAds =>
-      AdMobConfig.hasCompleteConfiguration &&
+      AdMobConfig.hasAnyConfiguration &&
       _adsAllowedForPlan &&
-      _canRequestAds;
-  bool get rewardedReady => canRequestAds && _rewarded != null;
+      (_canRequestAds || AdMobConfig.useTestIds);
+  bool get canRequestNativeAds =>
+      canRequestAds && AdMobConfig.hasNativeConfiguration;
+  bool get canRequestAppOpenAds =>
+      canRequestAds && AdMobConfig.hasAppOpenConfiguration;
+  bool get rewardedReady =>
+      canRequestAds &&
+      AdMobConfig.hasRewardedConfiguration &&
+      _rewarded != null;
   bool get privacyOptionsRequired => _privacyOptionsRequired;
 
   Future<void> updatePlan({required bool adsAllowed}) async {
@@ -28,11 +38,11 @@ class AppAdService {
       _disposeLoadedAds();
       return;
     }
-    if (!AdMobConfig.hasCompleteConfiguration) return;
+    if (!AdMobConfig.hasAnyConfiguration) return;
     if (!_initialized) await _initialize();
     if (canRequestAds) {
-      _loadInterstitial();
       _loadRewarded();
+      _loadAppOpen();
     }
   }
 
@@ -57,29 +67,29 @@ class AppAdService {
         await ConsentInformation.instance
             .getPrivacyOptionsRequirementStatus() ==
         PrivacyOptionsRequirementStatus.required;
-    if (_canRequestAds) await MobileAds.instance.initialize();
+    if (_canRequestAds || AdMobConfig.useTestIds) {
+      await MobileAds.instance.initialize();
+    }
   }
 
   Future<void> showPrivacyOptions() async {
     if (!_privacyOptionsRequired) return;
     await ConsentForm.showPrivacyOptionsForm((_) {});
     _canRequestAds = await ConsentInformation.instance.canRequestAds();
-  }
-
-  void _loadInterstitial() {
-    if (!canRequestAds || _interstitial != null) return;
-    InterstitialAd.load(
-      adUnitId: AdMobConfig.interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitial = ad,
-        onAdFailedToLoad: (_) => _interstitial = null,
-      ),
-    );
+    if (_canRequestAds) {
+      _loadRewarded();
+      _loadAppOpen();
+    } else {
+      _disposeLoadedAds();
+    }
   }
 
   void _loadRewarded() {
-    if (!canRequestAds || _rewarded != null) return;
+    if (!canRequestAds ||
+        !AdMobConfig.hasRewardedConfiguration ||
+        _rewarded != null) {
+      return;
+    }
     RewardedAd.load(
       adUnitId: AdMobConfig.rewardedAdUnitId,
       request: const AdRequest(),
@@ -90,22 +100,76 @@ class AppAdService {
     );
   }
 
-  /// Interstitials are shown only after a completed scan and only every third
-  /// completion, which is a natural break in the workflow.
-  Future<void> recordCompletedScanAndMaybeShowInterstitial() async {
-    if (!canRequestAds) return;
-    _completedScans += 1;
-    if (_completedScans % 3 != 0 || _interstitial == null) return;
-    final ad = _interstitial!;
-    _interstitial = null;
+  void _loadAppOpen() {
+    if (!canRequestAppOpenAds || _appOpenAd != null || _appOpenLoading) {
+      return;
+    }
+    _appOpenLoading = true;
+    AppOpenAd.load(
+      adUnitId: AdMobConfig.appOpenAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: AppOpenAdLoadCallback(
+        onAdLoaded: (ad) {
+          _appOpenLoading = false;
+          _appOpenAd = ad;
+          _appOpenLoadedAt = DateTime.now();
+          if (_appOpenShowPending) unawaited(showAppOpenIfAvailable());
+        },
+        onAdFailedToLoad: (_) {
+          _appOpenLoading = false;
+          _appOpenShowPending = false;
+          _appOpenAd = null;
+          _appOpenLoadedAt = null;
+        },
+      ),
+    );
+  }
+
+  bool get _appOpenFresh {
+    final loadedAt = _appOpenLoadedAt;
+    if (loadedAt == null) return false;
+    return DateTime.now().difference(loadedAt) < const Duration(hours: 4);
+  }
+
+  DateTime? _lastAppOpenDismissedAt;
+
+  Future<void> showAppOpenIfAvailable() async {
+    if (!canRequestAppOpenAds || _appOpenShowing) return;
+
+    // Prevent infinite loops when returning from the ad itself,
+    // and prevent spamming if the user quickly switches apps.
+    if (_lastAppOpenDismissedAt != null &&
+        DateTime.now().difference(_lastAppOpenDismissedAt!) <
+            const Duration(seconds: 15)) {
+      return;
+    }
+
+    if (_appOpenAd == null || !_appOpenFresh) {
+      _appOpenShowPending = true;
+      _appOpenAd?.dispose();
+      _appOpenAd = null;
+      _appOpenLoadedAt = null;
+      _loadAppOpen();
+      return;
+    }
+
+    final ad = _appOpenAd!;
+    _appOpenAd = null;
+    _appOpenLoadedAt = null;
+    _appOpenShowPending = false;
+    _appOpenShowing = true;
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
-        _loadInterstitial();
+        _appOpenShowing = false;
+        _lastAppOpenDismissedAt = DateTime.now();
+        _loadAppOpen();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose();
-        _loadInterstitial();
+        _appOpenShowing = false;
+        _lastAppOpenDismissedAt = DateTime.now();
+        _loadAppOpen();
       },
     );
     await ad.show();
@@ -143,10 +207,14 @@ class AppAdService {
   }
 
   void _disposeLoadedAds() {
-    _interstitial?.dispose();
     _rewarded?.dispose();
-    _interstitial = null;
     _rewarded = null;
+    _appOpenAd?.dispose();
+    _appOpenAd = null;
+    _appOpenLoadedAt = null;
+    _appOpenLoading = false;
+    _appOpenShowing = false;
+    _appOpenShowPending = false;
   }
 
   void dispose() => _disposeLoadedAds();

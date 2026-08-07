@@ -1,16 +1,17 @@
 const clientIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 const purchaseTokenPattern = /^[A-Za-z0-9._~+/=-]{20,4096}$/;
 const freeScanLimit = 3;
-const subscriptionStates = new Set([
-  "SUBSCRIPTION_STATE_ACTIVE",
-  "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
-]);
 
-const plans = new Map([
-  ["masslens_50_monthly", {name: "Basic", scanLimit: 50}],
-  ["masslens_100_monthly", {name: "Plus", scanLimit: 100}],
-  ["masslens_max_monthly", {name: "Max", scanLimit: 300}],
-]);
+export const scanPackCredits = Object.freeze({
+  masslens_100_scans: 100,
+  masslens_500_scans: 500,
+});
+const scanPacks = new Map(
+  Object.entries(scanPackCredits).map(([productId, credits]) => [
+    productId,
+    {credits},
+  ]),
+);
 
 let cachedGoogleAccessToken;
 let cachedAdMobKeys;
@@ -26,7 +27,7 @@ export async function handleMonetizationRoute(request, env, url) {
     const data = await readSmallJson(request);
     const productId = readProductId(data.productId);
     const purchaseToken = readPurchaseToken(data.purchaseToken);
-    await verifyAndStoreSubscription(env, {
+    await verifyAndGrantConsumable(env, {
       clientIdHash,
       productId,
       purchaseToken,
@@ -54,57 +55,47 @@ export async function reserveScan(env, clientIdHash) {
   const db = requireDatabase(env);
   const now = Date.now();
 
-  const paid = await db.prepare(
-    `UPDATE entitlements
-       SET scans_used = scans_used + 1, updated_at_ms = ?
-     WHERE client_id_hash = ?
-       AND state IN ('active', 'grace')
-       AND period_end_ms > ?
-       AND scans_used < scan_limit`,
-  ).bind(now, clientIdHash, now).run();
-  if (changedRows(paid) === 1) return {kind: "paid"};
-
   const periodKey = currentPeriodKey();
   await resetOrCreateFreeUsage(db, clientIdHash, periodKey, now);
-  const before = await getFreeUsage(db, clientIdHash);
-  const free = await db.prepare(
+  const included = await db.prepare(
     `UPDATE free_usage
-       SET included_used = included_used +
-             CASE WHEN included_used < ? THEN 1 ELSE 0 END,
-           bonus_credits = bonus_credits -
-             CASE WHEN included_used >= ? AND bonus_credits > 0 THEN 1 ELSE 0 END,
-           updated_at_ms = ?
+       SET included_used = included_used + 1, updated_at_ms = ?
      WHERE client_id_hash = ?
        AND period_key = ?
-       AND (included_used < ? OR bonus_credits > 0)`,
-  ).bind(
-    freeScanLimit,
-    freeScanLimit,
-    now,
-    clientIdHash,
-    periodKey,
-    freeScanLimit,
-  ).run();
-  if (changedRows(free) !== 1) {
-    throw new MonetizationError(
-      402,
-      "scan_limit_reached",
-      "No scans remain. Watch a rewarded ad or choose a plan.",
-    );
-  }
-  return {
-    kind: before.included_used < freeScanLimit ? "free" : "bonus",
-    periodKey,
-  };
+       AND included_used < ?`,
+  ).bind(now, clientIdHash, periodKey, freeScanLimit).run();
+  if (changedRows(included) === 1) return {kind: "free", periodKey};
+
+  const bonus = await db.prepare(
+    `UPDATE free_usage
+       SET bonus_credits = bonus_credits - 1, updated_at_ms = ?
+     WHERE client_id_hash = ?
+       AND period_key = ?
+       AND bonus_credits > 0`,
+  ).bind(now, clientIdHash, periodKey).run();
+  if (changedRows(bonus) === 1) return {kind: "bonus", periodKey};
+
+  const purchased = await db.prepare(
+    `UPDATE credit_wallets
+       SET balance = balance - 1, updated_at_ms = ?
+     WHERE client_id_hash = ? AND balance > 0`,
+  ).bind(now, clientIdHash).run();
+  if (changedRows(purchased) === 1) return {kind: "purchased"};
+
+  throw new MonetizationError(
+    402,
+    "scan_limit_reached",
+    "No scans remain. Watch a rewarded ad or buy a scan pack.",
+  );
 }
 
 export async function refundScan(env, clientIdHash, reservation) {
   if (!reservation || reservation.kind === "disabled" || !env.DB) return;
   const now = Date.now();
-  if (reservation.kind === "paid") {
+  if (reservation.kind === "purchased") {
     await env.DB.prepare(
-      `UPDATE entitlements
-          SET scans_used = MAX(0, scans_used - 1), updated_at_ms = ?
+      `UPDATE credit_wallets
+          SET balance = balance + 1, updated_at_ms = ?
         WHERE client_id_hash = ?`,
     ).bind(now, clientIdHash).run();
     return;
@@ -152,195 +143,233 @@ async function getAccess(env, clientIdHash) {
   }
 
   const now = Date.now();
-  if (billingEnforced) {
-    await refreshStoredEntitlementIfStale(env, clientIdHash, now);
-  }
-  const entitlement = await env.DB.prepare(
-    `SELECT product_id, state, scan_limit, scans_used, period_end_ms
-       FROM entitlements
-      WHERE client_id_hash = ?
-        AND state IN ('active', 'grace')
-        AND period_end_ms > ?`,
-  ).bind(clientIdHash, now).first();
-
-  if (entitlement && plans.has(entitlement.product_id)) {
-    const plan = plans.get(entitlement.product_id);
-    return accessPayload({
-      planId: entitlement.product_id,
-      planName: plan.name,
-      scanLimit: Number(entitlement.scan_limit),
-      scansUsed: Number(entitlement.scans_used),
-      periodEndMs: Number(entitlement.period_end_ms),
-      isPaid: true,
-      billingEnforced,
-    });
-  }
-
   const periodKey = currentPeriodKey();
   await resetOrCreateFreeUsage(env.DB, clientIdHash, periodKey, now);
   const usage = await getFreeUsage(env.DB, clientIdHash);
+  const wallet = await env.DB.prepare(
+    `SELECT balance FROM credit_wallets WHERE client_id_hash = ?`,
+  ).bind(clientIdHash).first();
   return accessPayload({
     scansUsed: Number(usage.included_used),
     bonusCredits: Number(usage.bonus_credits),
+    walletBalance: Number(wallet?.balance || 0),
     billingEnforced,
   });
 }
 
 function accessPayload({
-  planId = "free",
-  planName = "Free",
-  scanLimit = freeScanLimit,
   scansUsed = 0,
   bonusCredits = 0,
-  periodEndMs,
-  isPaid = false,
+  walletBalance = 0,
   billingEnforced = false,
 } = {}) {
+  const purchasedCredits = Math.max(0, walletBalance);
+  const creditDebt = Math.max(0, -walletBalance);
+  const includedRemaining = Math.max(0, freeScanLimit - scansUsed);
+  const hasPaidCredits = purchasedCredits > 0;
   return {
-    planId,
-    planName,
-    scanLimit,
+    planId: hasPaidCredits ? "credits" : "free",
+    planName: hasPaidCredits ? "Scan credits" : "Free",
+    scanLimit: freeScanLimit,
     scansUsed,
     bonusCredits,
-    remainingScans: Math.max(0, scanLimit - scansUsed + bonusCredits),
-    periodEndsAt: periodEndMs
-      ? new Date(periodEndMs).toISOString()
-      : endOfCurrentMonth().toISOString(),
-    isPaid,
-    adsEnabled: billingEnforced && !isPaid,
+    purchasedCredits,
+    creditDebt,
+    remainingScans: includedRemaining + bonusCredits + purchasedCredits,
+    periodEndsAt: endOfCurrentMonth().toISOString(),
+    isPaid: hasPaidCredits,
+    adsEnabled: billingEnforced && !hasPaidCredits,
     billingEnforced,
   };
 }
 
-async function refreshStoredEntitlementIfStale(env, clientIdHash, now) {
-  const stored = await env.DB.prepare(
-    `SELECT product_id, purchase_token, state, verified_at_ms
-       FROM entitlements WHERE client_id_hash = ?`,
-  ).bind(clientIdHash).first();
-  if (
-    !stored ||
-    stored.state === "inactive" ||
-    Number(stored.verified_at_ms) > now - 6 * 60 * 60 * 1000
-  ) {
-    return;
-  }
-  try {
-    await verifyAndStoreSubscription(env, {
-      clientIdHash,
-      productId: stored.product_id,
-      purchaseToken: stored.purchase_token,
-    });
-  } catch (error) {
-    const isDefinitivelyInactive =
-      error instanceof MonetizationError &&
-      [
-        "subscription_inactive",
-        "subscription_expired",
-        "product_mismatch",
-      ].includes(error.code);
-    if (isDefinitivelyInactive) {
-      await env.DB.prepare(
-        `UPDATE entitlements
-            SET state = 'inactive', verified_at_ms = ?, updated_at_ms = ?
-          WHERE client_id_hash = ?`,
-      ).bind(now, now, clientIdHash).run();
-      return;
-    }
-    // A temporary Google outage should not revoke an already-paid period.
-    console.error("Deferred subscription refresh", {
-      code: error instanceof MonetizationError ? error.code : "unknown",
-    });
-  }
-}
-
-async function verifyAndStoreSubscription(
+async function verifyAndGrantConsumable(
   env,
   {clientIdHash, productId, purchaseToken},
 ) {
   const db = requireDatabase(env);
-  const existingOwner = await db.prepare(
-    "SELECT client_id_hash FROM entitlements WHERE purchase_token = ?",
+  let existing = await db.prepare(
+    `SELECT client_id_hash, product_id, state
+       FROM consumable_purchases WHERE purchase_token = ?`,
   ).bind(purchaseToken).first();
-  if (existingOwner && existingOwner.client_id_hash !== clientIdHash) {
+  validateExistingPurchaseOwner(existing, {clientIdHash, productId});
+  if (existing?.state === "consumed") return;
+  if (existing?.state === "voided") {
+    throw new MonetizationError(
+      402,
+      "purchase_voided",
+      "Google Play has voided this purchase.",
+    );
+  }
+
+  const purchase = await getGoogleProductPurchase(env, purchaseToken);
+  let verified;
+  try {
+    verified = validateGoogleProductPurchase(purchase, productId);
+  } catch (error) {
+    if (
+      existing &&
+      error instanceof MonetizationError &&
+      error.code === "purchase_canceled"
+    ) {
+      const now = Date.now();
+      await db.prepare(
+        `UPDATE consumable_purchases
+            SET state = 'voided', voided_at_ms = ?, updated_at_ms = ?
+          WHERE purchase_token = ? AND state <> 'voided'`,
+      ).bind(now, now, purchaseToken).run();
+    }
+    throw error;
+  }
+
+  const externalAccountId = verified.externalAccountId;
+  if (
+    !externalAccountId ||
+    await hashIdentifier(externalAccountId) !== clientIdHash
+  ) {
+    throw new MonetizationError(
+      409,
+      "purchase_owner_mismatch",
+      "This purchase does not belong to this MassLens installation.",
+    );
+  }
+  if (!existing && verified.consumptionState === "CONSUMPTION_STATE_CONSUMED") {
+    throw new MonetizationError(
+      409,
+      "purchase_already_consumed",
+      "This purchase was already consumed before MassLens could grant it.",
+    );
+  }
+
+  const now = Date.now();
+  if (!existing) {
+    const pack = scanPacks.get(productId);
+    await db.prepare(
+      `INSERT OR IGNORE INTO consumable_purchases (
+         purchase_token, client_id_hash, product_id, credits, order_id,
+         purchase_time_ms, state, verified_at_ms, updated_at_ms
+       ) VALUES (?, ?, ?, ?, ?, ?, 'granted', ?, ?)`,
+    ).bind(
+      purchaseToken,
+      clientIdHash,
+      productId,
+      pack.credits,
+      verified.orderId,
+      verified.purchaseTimeMs,
+      now,
+      now,
+    ).run();
+    existing = await db.prepare(
+      `SELECT client_id_hash, product_id, state
+         FROM consumable_purchases WHERE purchase_token = ?`,
+    ).bind(purchaseToken).first();
+    validateExistingPurchaseOwner(existing, {clientIdHash, productId});
+  }
+
+  if (existing?.state === "consumed") return;
+  if (verified.consumptionState !== "CONSUMPTION_STATE_CONSUMED") {
+    await consumeGoogleProduct(env, productId, purchaseToken);
+  }
+  await db.prepare(
+    `UPDATE consumable_purchases
+        SET state = 'consumed', consumed_at_ms = ?, verified_at_ms = ?,
+            updated_at_ms = ?
+      WHERE purchase_token = ? AND state = 'granted'`,
+  ).bind(
+    now,
+    now,
+    now,
+    purchaseToken,
+  ).run();
+}
+
+function validateExistingPurchaseOwner(existing, {clientIdHash, productId}) {
+  if (!existing) return;
+  if (existing.client_id_hash !== clientIdHash) {
     throw new MonetizationError(
       409,
       "purchase_already_linked",
       "This Google Play purchase is already linked to another installation.",
     );
   }
-
-  const purchase = await getGoogleSubscription(env, purchaseToken);
-  if (!subscriptionStates.has(purchase.subscriptionState)) {
-    throw new MonetizationError(
-      402,
-      "subscription_inactive",
-      "Google Play reports that this subscription is not active.",
-    );
-  }
-  const matchingItems = (purchase.lineItems || []).filter(
-    (item) => item.productId === productId,
-  );
-  if (matchingItems.length === 0) {
+  if (existing.product_id !== productId) {
     throw new MonetizationError(
       400,
       "product_mismatch",
-      "The purchase does not match the selected MassLens plan.",
+      "The purchase does not match the selected MassLens scan pack.",
     );
-  }
-  const periodEndMs = Math.max(
-    ...matchingItems.map((item) => Date.parse(item.expiryTime || "")),
-  );
-  if (!Number.isFinite(periodEndMs) || periodEndMs <= Date.now()) {
-    throw new MonetizationError(
-      402,
-      "subscription_expired",
-      "This subscription period has expired.",
-    );
-  }
-
-  const now = Date.now();
-  const plan = plans.get(productId);
-  const state = purchase.subscriptionState ===
-    "SUBSCRIPTION_STATE_IN_GRACE_PERIOD" ? "grace" : "active";
-  await db.prepare(
-    `INSERT INTO entitlements (
-       client_id_hash, product_id, purchase_token, state, scan_limit,
-       scans_used, period_end_ms, verified_at_ms, updated_at_ms
-     ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
-     ON CONFLICT(client_id_hash) DO UPDATE SET
-       product_id = excluded.product_id,
-       purchase_token = excluded.purchase_token,
-       state = excluded.state,
-       scan_limit = excluded.scan_limit,
-       scans_used = CASE
-         WHEN excluded.period_end_ms > entitlements.period_end_ms
-         THEN 0 ELSE entitlements.scans_used END,
-       period_end_ms = excluded.period_end_ms,
-       verified_at_ms = excluded.verified_at_ms,
-       updated_at_ms = excluded.updated_at_ms`,
-  ).bind(
-    clientIdHash,
-    productId,
-    purchaseToken,
-    state,
-    plan.scanLimit,
-    periodEndMs,
-    now,
-    now,
-  ).run();
-
-  if (purchase.acknowledgementState === "ACKNOWLEDGEMENT_STATE_PENDING") {
-    await acknowledgeGoogleSubscription(env, productId, purchaseToken);
   }
 }
 
-async function getGoogleSubscription(env, purchaseToken) {
+export function validateGoogleProductPurchase(purchase, productId) {
+  const state = purchase?.purchaseStateContext?.purchaseState;
+  if (state === "PENDING") {
+    throw new MonetizationError(
+      409,
+      "purchase_pending",
+      "Google Play reports that this purchase is still pending.",
+    );
+  }
+  if (state !== "PURCHASED") {
+    throw new MonetizationError(
+      402,
+      "purchase_canceled",
+      "Google Play reports that this purchase is not active.",
+    );
+  }
+  const items = Array.isArray(purchase.productLineItem)
+    ? purchase.productLineItem
+    : [];
+  if (items.length !== 1 || items[0].productId !== productId) {
+    throw new MonetizationError(
+      400,
+      "product_mismatch",
+      "The purchase does not match the selected MassLens scan pack.",
+    );
+  }
+  const details = items[0].productOfferDetails || {};
+  const quantity = details.quantity ?? 1;
+  if (!Number.isInteger(quantity) || quantity !== 1) {
+    throw new MonetizationError(
+      400,
+      "unsupported_quantity",
+      "MassLens scan packs must be purchased one at a time.",
+    );
+  }
+  const consumptionState = details.consumptionState;
+  if (![
+    "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
+    "CONSUMPTION_STATE_CONSUMED",
+  ].includes(consumptionState)) {
+    throw new MonetizationError(
+      400,
+      "invalid_consumption_state",
+      "Google Play returned an invalid purchase state.",
+    );
+  }
+  const purchaseTimeMs = Date.parse(purchase.purchaseCompletionTime || "");
+  if (!Number.isFinite(purchaseTimeMs)) {
+    throw new MonetizationError(
+      400,
+      "invalid_purchase_time",
+      "Google Play did not return a valid purchase time.",
+    );
+  }
+  return {
+    consumptionState,
+    externalAccountId: purchase.obfuscatedExternalAccountId || "",
+    orderId: typeof purchase.orderId === "string" ? purchase.orderId : null,
+    purchaseTimeMs,
+  };
+}
+
+async function getGoogleProductPurchase(env, purchaseToken) {
   const packageName = env.GOOGLE_PLAY_PACKAGE_NAME || "com.lilai.aivirtual";
   const token = await getGoogleAccessToken(env);
   const response = await fetch(
     `https://androidpublisher.googleapis.com/androidpublisher/v3/` +
       `applications/${encodeURIComponent(packageName)}/purchases/` +
-      `subscriptionsv2/tokens/${encodeURIComponent(purchaseToken)}`,
+      `productsv2/tokens/${encodeURIComponent(purchaseToken)}`,
     {headers: {Authorization: `Bearer ${token}`}},
   );
   const payload = await response.json().catch(() => ({}));
@@ -355,33 +384,38 @@ async function getGoogleSubscription(env, purchaseToken) {
   return payload;
 }
 
-async function acknowledgeGoogleSubscription(env, productId, purchaseToken) {
+async function consumeGoogleProduct(env, productId, purchaseToken) {
   const packageName = env.GOOGLE_PLAY_PACKAGE_NAME || "com.lilai.aivirtual";
   const token = await getGoogleAccessToken(env);
   const response = await fetch(
     `https://androidpublisher.googleapis.com/androidpublisher/v3/` +
       `applications/${encodeURIComponent(packageName)}/purchases/` +
-      `subscriptions/${encodeURIComponent(productId)}/tokens/` +
-      `${encodeURIComponent(purchaseToken)}:acknowledge`,
+      `products/${encodeURIComponent(productId)}/tokens/` +
+      `${encodeURIComponent(purchaseToken)}:consume`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: "{}",
+      headers: {Authorization: `Bearer ${token}`},
     },
   );
-  if (!response.ok) {
-    console.error("Google Play acknowledgement failed", {
-      status: response.status,
-    });
-    throw new MonetizationError(
-      502,
-      "play_acknowledgement_failed",
-      "The purchase was verified but could not be acknowledged.",
-    );
-  }
+  if (response.ok) return;
+
+  // A retry can race a previous request that consumed successfully but died
+  // before updating D1. Confirm that state before treating it as a failure.
+  const refreshed = await getGoogleProductPurchase(env, purchaseToken);
+  const item = (refreshed.productLineItem || []).find(
+    (candidate) => candidate.productId === productId,
+  );
+  if (
+    item?.productOfferDetails?.consumptionState ===
+    "CONSUMPTION_STATE_CONSUMED"
+  ) return;
+
+  console.error("Google Play consumption failed", {status: response.status});
+  throw new MonetizationError(
+    502,
+    "play_consumption_failed",
+    "The purchase was verified but could not be finalized.",
+  );
 }
 
 async function getGoogleAccessToken(env) {
@@ -631,8 +665,8 @@ async function readSmallJson(request) {
 }
 
 function readProductId(value) {
-  if (typeof value !== "string" || !plans.has(value)) {
-    throw new MonetizationError(400, "invalid_product", "Unknown plan.");
+  if (typeof value !== "string" || !scanPacks.has(value)) {
+    throw new MonetizationError(400, "invalid_product", "Unknown scan pack.");
   }
   return value;
 }

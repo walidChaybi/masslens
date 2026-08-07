@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../../measurements/domain/measurement.dart';
 import '../domain/estimate_repository.dart';
+import '../domain/measured_dimensions.dart';
 
 class DemoEstimateRepository implements EstimateRepository {
   const DemoEstimateRepository({
@@ -34,11 +35,13 @@ class DemoEstimateRepository implements EstimateRepository {
       _ => 1.0,
     };
     final estimate = preset.grams * variation * fillFactor * materialFactor;
+    final measured = request.measuredDimensions;
     final hasContext =
         request.material != 'Unknown' ||
         request.fillState != 'Unknown' ||
         request.referenceObject != 'None' ||
         request.knownDimension != null ||
+        measured != null ||
         request.secondaryImagePath != null;
     final confidence = hasContext
         ? ConfidenceLevel.medium
@@ -49,6 +52,7 @@ class DemoEstimateRepository implements EstimateRepository {
       preset.dimensions,
       dimensionVariation,
       request.knownDimension,
+      measured,
     );
 
     return Measurement(
@@ -72,6 +76,8 @@ class DemoEstimateRepository implements EstimateRepository {
         if (request.knownDimension case final knownDimension?)
           '${knownDimension.axis} supplied as ${knownDimension.value} '
               '${knownDimension.unit}',
+        if (measured != null)
+          '${measured.formatSummary()} measured with ${measured.sourceLabel}',
         request.referenceObject == 'None'
             ? 'No physical scale reference'
             : '${request.referenceObject} visible as scale reference',
@@ -113,12 +119,14 @@ class DemoEstimateRepository implements EstimateRepository {
     DimensionsMm base,
     double variation,
     KnownDimensionInput? knownDimension,
+    MeasuredDimensions? measured,
   ) {
     final varied = DimensionsMm(
       width: base.width * variation,
       height: base.height * variation,
       depth: base.depth * variation,
     );
+    if (measured != null) return measured.mergeWith(varied);
     if (knownDimension == null) return varied;
 
     final current = switch (knownDimension.axis) {
