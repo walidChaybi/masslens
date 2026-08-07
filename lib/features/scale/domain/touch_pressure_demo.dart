@@ -5,6 +5,10 @@
 abstract final class TouchPressureDemo {
   static const double maximumDemoGrams = 500;
 
+  /// Fallback press strength used when the device reports no touch pressure,
+  /// so the demo still visibly "weighs" the touch.
+  static const double simulatedPressStrength = 0.55;
+
   static double normalize({
     required double pressure,
     required double minimum,

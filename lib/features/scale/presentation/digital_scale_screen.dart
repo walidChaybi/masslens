@@ -134,11 +134,17 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
 
   void _updateTouchPressure(PointerEvent event) {
     if (_mode != _ScaleMode.touchDemo) return;
-    final pressure = TouchPressureDemo.normalize(
+    final normalized = TouchPressureDemo.normalize(
       pressure: event.pressure,
       minimum: event.pressureMin,
       maximum: event.pressureMax,
     );
+    // Most phones report no touch pressure at all, which would leave the demo
+    // stuck at zero — fall back to a simulated press so the scale visibly
+    // "weighs" the touch.
+    final pressure = normalized > 0
+        ? normalized
+        : TouchPressureDemo.simulatedPressStrength;
     setState(() {
       _fingerDown = true;
       _touchTargetPressure = pressure;
@@ -425,18 +431,21 @@ class _ScaleReadout extends StatelessWidget {
               .max(100.0, math.min(200.0, (height - displayHeight) * 0.50))
               .toDouble();
 
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Touch area — the top gray zone where users press.
-              Listener(
-                key: const Key('scale_touch_surface'),
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: isDemo ? onPointerDown : null,
-                onPointerMove: isDemo ? onPointerMove : null,
-                onPointerUp: isDemo ? (_) => onPointerUp() : null,
-                onPointerCancel: isDemo ? (_) => onPointerCancel() : null,
-                child: SizedBox(
+          // The whole readout area acts as the weighing surface: pressing
+          // anywhere on it (including the LCD) registers a touch, like
+          // placing an object on the phone.
+          return Listener(
+            key: const Key('scale_touch_surface'),
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: isDemo ? onPointerDown : null,
+            onPointerMove: isDemo ? onPointerMove : null,
+            onPointerUp: isDemo ? (_) => onPointerUp() : null,
+            onPointerCancel: isDemo ? (_) => onPointerCancel() : null,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Touch area — the top gray zone where users press.
+                SizedBox(
                   width: double.infinity,
                   height: touchAreaHeight,
                   child: Center(
@@ -455,29 +464,29 @@ class _ScaleReadout extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              // Rectangular LCD-style digital display.
-              _DigitalDisplay(
-                width: displayWidth,
-                height: displayHeight,
-                value: value,
-                unit: unit,
-                normalizedPressure: normalizedPressure,
-                fingerDown: fingerDown,
-                bluetoothConnected: bluetoothConnected,
-              ),
-              const SizedBox(height: 14),
-              Text(
-                status,
-                style: TextStyle(
-                  color: AppColors.ink.withValues(alpha: 0.62),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.15,
+                const SizedBox(height: 12),
+                // Rectangular LCD-style digital display.
+                _DigitalDisplay(
+                  width: displayWidth,
+                  height: displayHeight,
+                  value: value,
+                  unit: unit,
+                  normalizedPressure: normalizedPressure,
+                  fingerDown: fingerDown,
+                  bluetoothConnected: bluetoothConnected,
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Text(
+                  status,
+                  style: TextStyle(
+                    color: AppColors.ink.withValues(alpha: 0.62),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.15,
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
