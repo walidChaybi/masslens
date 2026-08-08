@@ -161,16 +161,68 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
     setState(() {
       _fingerDown = false;
       _touchTargetPressure = 0;
-      _displayedTouchPressure = 0;
+    });
+    final releaseStart = _displayedTouchPressure;
+    const tick = Duration(milliseconds: 25);
+    var elapsedMs = 0;
+    _pressureTimer = Timer.periodic(tick, (timer) {
+      if (!mounted || _fingerDown) {
+        timer.cancel();
+        return;
+      }
+      elapsedMs += tick.inMilliseconds;
+      final progress = (elapsedMs / 300).clamp(0.0, 1.0);
+      final eased = 1 - math.pow(1 - progress, 3).toDouble();
+      setState(() => _displayedTouchPressure = releaseStart * (1 - eased));
+      if (progress >= 1) {
+        timer.cancel();
+        setState(() => _displayedTouchPressure = 0);
+      }
     });
   }
 
   void _startPressureRamp() {
     if (_pressureTimer?.isActive ?? false) return;
-    _pressureTimer = Timer(const Duration(milliseconds: 800), () {
-      if (!mounted || !_fingerDown) return;
+    // A real consumer scale needs time to load, overshoot, and settle. Keep the
+    // curve deterministic so the simulator is believable and testable.
+    const tick = Duration(milliseconds: 50);
+    final startPressure = _displayedTouchPressure;
+    var elapsedMs = 0;
+    _pressureTimer = Timer.periodic(tick, (timer) {
+      if (!mounted || !_fingerDown) {
+        timer.cancel();
+        return;
+      }
+      elapsedMs += tick.inMilliseconds;
       setState(() {
-        _displayedTouchPressure = _touchTargetPressure;
+        final seconds = elapsedMs / 1000;
+        if (seconds >= 2.35) {
+          _displayedTouchPressure = _touchTargetPressure;
+          timer.cancel();
+          return;
+        }
+        final target = _touchTargetPressure;
+        if (seconds <= 1.45) {
+          final t = (seconds / 1.45).clamp(0.0, 1.0);
+          final smoothStep = t * t * (3 - 2 * t);
+          _displayedTouchPressure =
+              startPressure + (target - startPressure) * smoothStep;
+          return;
+        }
+        final settlingTime = seconds - 1.45;
+        final overshoot =
+            target *
+            0.018 *
+            math.exp(-3.4 * settlingTime) *
+            math.sin(10.5 * settlingTime);
+        final resolutionJitter =
+            target *
+            0.00025 *
+            math.sin(elapsedMs / tick.inMilliseconds * 2.1) *
+            (1 - settlingTime / 0.9).clamp(0.0, 1.0);
+        _displayedTouchPressure = (target + overshoot + resolutionJitter)
+            .clamp(0.0, target * 1.02)
+            .toDouble();
       });
     });
   }
@@ -178,16 +230,6 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
   void _tareScale(double rawGrams) {
     if (rawGrams <= 0) return;
     setState(() => _tareOffsetGrams = rawGrams);
-  }
-
-  void _zeroWeight() {
-    _pressureTimer?.cancel();
-    setState(() {
-      _fingerDown = false;
-      _touchTargetPressure = 0;
-      _displayedTouchPressure = 0;
-      _tareOffsetGrams = 0;
-    });
   }
 
   void _activateTouchMode() {
@@ -288,10 +330,8 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
                         ? 'UNIT'
                         : 'LB/OZ',
                     tareEnabled: rawGrams > 0,
-                    zeroEnabled: _displayedTouchPressure > 0 || rawGrams > 0,
                     onUnit: _toggleUnits,
                     onTare: () => _tareScale(rawGrams),
-                    onZero: _zeroWeight,
                   ),
                 ),
                 Padding(
@@ -303,6 +343,8 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
                   ),
                   child: NativeAdCard(
                     enabled: controller.monetization.canRequestNativeAds,
+                    placement: 'scale_first_screen',
+                    onPaidEvent: controller.monetization.reportPaidAd,
                   ),
                 ),
               ],
@@ -406,14 +448,14 @@ class _ScaleReadout extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDemo = mode == _ScaleMode.touchDemo;
     final status = isDemo
-        ? 'DEMO · NOT A MEASUREMENT'
+        ? 'SIMULATOR · NOT A MEASUREMENT'
         : bluetoothConnected
         ? 'LIVE · BLUETOOTH SCALE'
         : 'BLUETOOTH · NOT CONNECTED';
 
     return Semantics(
       label: isDemo
-          ? 'Touch pressure demo, not a physical measurement'
+          ? 'Touch scale simulator, not a physical measurement'
           : bluetoothConnected
           ? 'Live Bluetooth scale reading'
           : 'Bluetooth scale disconnected',
@@ -738,18 +780,14 @@ class _ScaleBottomControls extends StatelessWidget {
   const _ScaleBottomControls({
     required this.unitLabel,
     required this.tareEnabled,
-    required this.zeroEnabled,
     required this.onUnit,
     required this.onTare,
-    required this.onZero,
   });
 
   final String unitLabel;
   final bool tareEnabled;
-  final bool zeroEnabled;
   final VoidCallback onUnit;
   final VoidCallback onTare;
-  final VoidCallback onZero;
 
   @override
   Widget build(BuildContext context) {
@@ -761,12 +799,6 @@ class _ScaleBottomControls extends StatelessWidget {
           label: unitLabel,
           size: 80,
           onPressed: onUnit,
-        ),
-        _RoundScaleButton(
-          key: const Key('scale_zero_button'),
-          label: 'ZERO',
-          size: 80,
-          onPressed: zeroEnabled ? onZero : null,
         ),
         _RoundScaleButton(
           key: const Key('scale_tare_button'),

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "ceramic-mug-01",
+    "images": ["eval/private_dataset/ceramic-mug-01.jpg"],
+    "category": "Household",
+    "trueWeightGrams": 356,
+    "hasDimensions": true,
+    "context": {
+      "material": "Glass/Ceramic",
+      "fillState": "Empty",
+      "referenceObject": "None",
+      "measuredDimensions": {
+        "widthMm": 86,
+        "heightMm": 104,
+        "depthMm": 86,
+        "method": "photo_reference",
+        "referenceLabel": "Standard card"
+      }
+    }
+  }
+]

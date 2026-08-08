@@ -3,7 +3,7 @@
 /// This is intentionally kept separate from physical scale readings: touch
 /// pressure is device-dependent and cannot be calibrated into mass.
 abstract final class TouchPressureDemo {
-  static const double maximumDemoGrams = 500;
+  static const double maximumDemoGrams = 2000;
 
   /// Fallback press strength used when the device reports no touch pressure,
   /// so the demo still visibly "weighs" the touch.

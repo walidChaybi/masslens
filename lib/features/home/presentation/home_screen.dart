@@ -6,7 +6,9 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
-import '../../monetization/presentation/paywall_sheet.dart';
+import '../../monetization/presentation/access_card.dart';
+import '../../monetization/presentation/native_ad_card.dart';
+import '../../monetization/presentation/rewarded_scan_sheet.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -51,7 +53,7 @@ class HomeScreen extends StatelessWidget {
               ),
               InkWell(
                 borderRadius: BorderRadius.circular(8),
-                onTap: () => showMassLensPaywall(context),
+                onTap: () => showRewardedScanSheet(context),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -72,6 +74,19 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _HomeCapturePanel(onMeasure: onMeasure, onGallery: onGallery),
+          const SizedBox(height: 14),
+          AccessCard(
+            access: access,
+            rewardedAdReady: controller.monetization.rewardedAdReady,
+            onManage: () => showRewardedScanSheet(context),
+            onRewardedAd: () => showRewardedScanSheet(context),
+          ),
+          const SizedBox(height: 14),
+          NativeAdCard(
+            enabled: controller.monetization.canRequestNativeAds,
+            placement: 'ai_home',
+            onPaidEvent: controller.monetization.reportPaidAd,
+          ),
           if (recent != null) ...[
             const SizedBox(height: 30),
             Row(

@@ -17,25 +17,47 @@ class MonetizationApi {
     return AccessStatus.fromJson(payload);
   }
 
-  Future<AccessStatus> verifyPurchase({
+  Future<void> reportAdRevenue({
     required String clientId,
-    required String productId,
-    required String purchaseToken,
+    required String placement,
+    required double valueMicros,
+    required String precision,
+    required String currencyCode,
   }) async {
-    final payload = await _request(
-      'POST',
-      '/billing/verify',
-      clientId: clientId,
-      body: {'productId': productId, 'purchaseToken': purchaseToken},
-    );
-    return AccessStatus.fromJson(payload);
+    final client = HttpClient()..connectionTimeout = timeout;
+    try {
+      final request = await client
+          .postUrl(_endpoint('/metrics/ad-revenue'))
+          .timeout(timeout);
+      request.headers
+        ..contentType = ContentType.json
+        ..set('X-MassLens-Client-ID', clientId);
+      request.write(
+        jsonEncode({
+          'placement': placement,
+          'valueMicros': valueMicros,
+          'precision': precision,
+          'currencyCode': currencyCode,
+        }),
+      );
+      final response = await request.close().timeout(timeout);
+      await response.drain<void>().timeout(timeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw MonetizationApiException(
+          'Ad metrics request failed.',
+          statusCode: response.statusCode,
+        );
+      }
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Uri _endpoint(String path) {
     final configured = Uri.tryParse(apiUrl.trim());
     if (configured == null || !configured.hasAuthority) {
       throw const MonetizationApiException(
-        'The MassLens billing service is not configured.',
+        'The MassLens access service is not configured.',
       );
     }
     return configured.replace(path: path, query: null, fragment: null);
@@ -65,7 +87,7 @@ class MonetizationApi {
       final decoded = jsonDecode(text);
       if (decoded is! Map) {
         throw const MonetizationApiException(
-          'The billing service returned invalid data.',
+          'The access service returned invalid data.',
         );
       }
       final map = Map<String, Object?>.from(decoded);
@@ -73,7 +95,7 @@ class MonetizationApi {
         final error = map['error'];
         final message = error is Map && error['message'] is String
             ? error['message'] as String
-            : 'The billing request failed.';
+            : 'The access request failed.';
         throw MonetizationApiException(
           message,
           statusCode: response.statusCode,
@@ -83,7 +105,7 @@ class MonetizationApi {
     } on MonetizationApiException {
       rethrow;
     } on Object catch (error) {
-      throw MonetizationApiException('Could not reach billing: $error');
+      throw MonetizationApiException('Could not reach scan access: $error');
     } finally {
       client.close(force: true);
     }

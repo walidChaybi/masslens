@@ -133,7 +133,7 @@ class MeasurementSummary extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            StatusPill(label: measurement.isDemo ? 'Demo' : 'AI estimate'),
+            const StatusPill(label: 'AI estimate'),
           ],
         ),
         const SizedBox(height: 16),

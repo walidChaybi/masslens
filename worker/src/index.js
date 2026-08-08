@@ -1,6 +1,10 @@
 import {
+  completeScan,
+  enforceDailyAiCostLimit,
   handleMonetizationRoute,
   MonetizationError,
+  readRequestId,
+  recordAiUsage,
   refundScan,
   reserveScan,
 } from "./monetization.js";
@@ -77,6 +81,14 @@ async function routeRequest(request, env) {
     return jsonResponse({ok: true});
   }
 
+  if (request.method === "GET" && url.pathname === "/ready") {
+    const errors = productionConfigurationErrors(env);
+    return jsonResponse(
+      {ok: errors.length === 0, errors, model: env.OPENAI_MODEL || null},
+      errors.length === 0 ? 200 : 503,
+    );
+  }
+
   const monetizationResponse = await handleMonetizationRoute(
     request,
     env,
@@ -97,6 +109,7 @@ async function routeRequest(request, env) {
   }
 
   const clientId = readClientId(request);
+  const requestId = readRequestId(request);
   await enforceRateLimits(request, env, clientId);
   const data = await readRequestJson(request);
   // Category and structure are retained as optional legacy hints so older app
@@ -130,10 +143,22 @@ async function routeRequest(request, env) {
   const measuredDimensions = readMeasuredDimensions(data.measuredDimensions);
   const images = readImages(data);
   const clientIdHash = await hashIdentifier(clientId);
-  const reservation = await reserveScan(env, clientIdHash);
+  const reservation = await reserveScan(env, clientIdHash, requestId);
+  if (reservation.kind === "replay") {
+    try {
+      return jsonResponse(JSON.parse(reservation.resultJson));
+    } catch {
+      throw new ApiError(
+        502,
+        "cached_result_invalid",
+        "The saved AI result could not be recovered.",
+      );
+    }
+  }
 
   try {
-    const estimate = await requestOpenAi(env, {
+    await enforceDailyAiCostLimit(env);
+    const result = await requestOpenAi(env, {
       category,
       structure,
       material,
@@ -144,11 +169,40 @@ async function routeRequest(request, env) {
       images,
       safetyIdentifier: clientIdHash,
     });
-    return jsonResponse(estimate);
+    await completeScan(env, clientIdHash, reservation, result.estimate);
+    try {
+      await recordAiUsage(env, result.usage);
+    } catch (error) {
+      console.error("AI usage metric write failed", {
+        name: error instanceof Error ? error.name : "UnknownError",
+      });
+    }
+    return jsonResponse(result.estimate, 200, {
+      "X-MassLens-AI-Model": result.usage.model,
+      "X-MassLens-Input-Tokens": String(result.usage.inputTokens),
+      "X-MassLens-Output-Tokens": String(result.usage.outputTokens),
+    });
   } catch (error) {
     await refundScan(env, clientIdHash, reservation);
     throw error;
   }
+}
+
+function productionConfigurationErrors(env) {
+  const errors = [];
+  if (!env.OPENAI_API_KEY) errors.push("OPENAI_API_KEY is missing");
+  if (!env.DB) errors.push("D1 database binding is missing");
+  if (env.SCAN_ACCESS_ENFORCED !== "true") {
+    errors.push("SCAN_ACCESS_ENFORCED must be true");
+  }
+  const rewardedId = String(env.ADMOB_REWARDED_AD_UNIT_ID || "");
+  if (!rewardedId || rewardedId.includes("3940256099942544")) {
+    errors.push("a live rewarded AdMob unit is required");
+  }
+  if ((env.OPENAI_MODEL || "") !== "gpt-5-nano") {
+    errors.push("OPENAI_MODEL must be gpt-5-nano for this release");
+  }
+  return errors;
 }
 
 function readClientId(request) {
@@ -385,10 +439,11 @@ async function requestOpenAi(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-5.4-mini",
-      reasoning: {effort: env.OPENAI_REASONING_EFFORT || "medium"},
+      model: env.OPENAI_MODEL || "gpt-5-nano",
+      reasoning: {effort: env.OPENAI_REASONING_EFFORT || "minimal"},
       safety_identifier: safetyIdentifier,
       store: false,
+      max_output_tokens: Number(env.OPENAI_MAX_OUTPUT_TOKENS || 800),
       text: {
         verbosity: "low",
         format: responseFormat,
@@ -425,7 +480,7 @@ async function requestOpenAi(
                 type: "input_image",
                 image_url:
                   `data:${image.mimeType};base64,${image.imageBase64}`,
-                detail: "high",
+                detail: "low",
               },
             ]),
           ],
@@ -464,7 +519,14 @@ async function requestOpenAi(
     );
   }
 
-  return extractStructuredPayload(decoded);
+  return {
+    estimate: extractStructuredPayload(decoded),
+    usage: {
+      model: env.OPENAI_MODEL || "gpt-5-nano",
+      inputTokens: Number(decoded.usage?.input_tokens || 0),
+      outputTokens: Number(decoded.usage?.output_tokens || 0),
+    },
+  };
 }
 
 function extractStructuredPayload(response) {
@@ -625,13 +687,14 @@ async function hashIdentifier(value) {
   ).join("");
 }
 
-function jsonResponse(payload, status = 200) {
+function jsonResponse(payload, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
       "Cache-Control": "no-store",
       "Content-Type": "application/json; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
+      ...extraHeaders,
     },
   });
 }

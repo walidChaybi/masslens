@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,11 +13,13 @@ class AppController extends ChangeNotifier {
     List<Measurement> measurements = const [],
     bool onboardingComplete = false,
     UnitSystem unitSystem = UnitSystem.metric,
+    DateTime? previousBackgroundedAt,
     MonetizationController? monetizationController,
   }) : _measurementStore = measurementStore,
        _measurements = List<Measurement>.from(measurements),
        _onboardingComplete = onboardingComplete,
        _unitSystem = unitSystem,
+       _previousBackgroundedAt = previousBackgroundedAt,
        monetization =
            monetizationController ?? MonetizationController.disabled() {
     monetization.addListener(notifyListeners);
@@ -23,12 +27,14 @@ class AppController extends ChangeNotifier {
 
   static const _onboardingKey = 'mass_lens.onboarding_complete';
   static const _unitKey = 'mass_lens.unit_system';
+  static const _backgroundedAtKey = 'mass_lens.backgrounded_at_ms';
 
   final MeasurementStore _measurementStore;
   final MonetizationController monetization;
   final List<Measurement> _measurements;
   bool _onboardingComplete;
   UnitSystem _unitSystem;
+  DateTime? _previousBackgroundedAt;
 
   List<Measurement> get measurements => List.unmodifiable(_measurements);
   bool get onboardingComplete => _onboardingComplete;
@@ -39,12 +45,19 @@ class AppController extends ChangeNotifier {
   }) async {
     var onboardingComplete = false;
     var unitSystem = UnitSystem.metric;
+    DateTime? previousBackgroundedAt;
     try {
       final preferences = await SharedPreferences.getInstance();
       onboardingComplete = preferences.getBool(_onboardingKey) ?? false;
       unitSystem = UnitSystem.values.byName(
         preferences.getString(_unitKey) ?? UnitSystem.metric.name,
       );
+      final backgroundedAtMs = preferences.getInt(_backgroundedAtKey);
+      if (backgroundedAtMs != null) {
+        previousBackgroundedAt = DateTime.fromMillisecondsSinceEpoch(
+          backgroundedAtMs,
+        );
+      }
     } on Object {
       // Defaults keep the app operational if preferences are unavailable.
     }
@@ -54,15 +67,32 @@ class AppController extends ChangeNotifier {
       measurements: await store.load(),
       onboardingComplete: onboardingComplete,
       unitSystem: unitSystem,
+      previousBackgroundedAt: previousBackgroundedAt,
       monetizationController: MonetizationController.create(),
     );
   }
 
-  Future<void> initializeMonetization({bool showAppOpenAdOnStart = false}) =>
-      monetization.initialize(showAppOpenAdOnStart: showAppOpenAdOnStart);
+  Future<void> initializeMonetization() => monetization.initialize();
 
-  Future<void> showAppOpenAdIfAvailable() =>
-      monetization.showAppOpenAdIfAvailable();
+  Future<void> handleAppResumed(Duration backgroundTime) =>
+      monetization.handleAppResumed(backgroundTime);
+
+  Duration? takePreviousBackgroundDuration() {
+    final previous = _previousBackgroundedAt;
+    _previousBackgroundedAt = null;
+    if (previous == null) return null;
+    final duration = DateTime.now().difference(previous);
+    return duration.isNegative ? Duration.zero : duration;
+  }
+
+  Future<void> recordBackgrounded(DateTime time) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(_backgroundedAtKey, time.millisecondsSinceEpoch);
+    } on Object {
+      // Resume ads are optional if lifecycle persistence is unavailable.
+    }
+  }
 
   Future<void> completeOnboarding() async {
     _onboardingComplete = true;
@@ -73,6 +103,7 @@ class AppController extends ChangeNotifier {
     } on Object {
       // The current session can continue even if persistence fails.
     }
+    unawaited(monetization.initialize());
   }
 
   Future<void> setUnitSystem(UnitSystem value) async {

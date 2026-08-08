@@ -10,21 +10,47 @@ class MeasurementStore {
   const MeasurementStore();
 
   static const _historyKey = 'mass_lens.measurement_history.v1';
+  static const _demoMigrationKey = 'mass_lens.ai_demo_history_removed.v1';
 
   Future<List<Measurement>> load() async {
     try {
       final preferences = await SharedPreferences.getInstance();
       final encoded = preferences.getString(_historyKey);
-      if (encoded == null || encoded.isEmpty) return [];
+      final demoMigrationComplete =
+          preferences.getBool(_demoMigrationKey) ?? false;
+      if (encoded == null || encoded.isEmpty) {
+        if (!demoMigrationComplete) {
+          await preferences.setBool(_demoMigrationKey, true);
+        }
+        return [];
+      }
 
       final decoded = jsonDecode(encoded) as List<dynamic>;
-      return decoded
-          .map(
-            (item) =>
-                Measurement.fromJson(Map<String, Object?>.from(item as Map)),
-          )
-          .toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final genuine = <Measurement>[];
+      final oldDemoMeasurements = <Measurement>[];
+      for (final item in decoded) {
+        final json = Map<String, Object?>.from(item as Map);
+        final measurement = Measurement.fromJson(json);
+        // Historic demo records were explicitly marked. Missing flags came
+        // from early demo-only releases, so remove those during this upgrade.
+        if (!demoMigrationComplete && (json['isDemo'] as bool? ?? true)) {
+          oldDemoMeasurements.add(measurement);
+        } else {
+          genuine.add(measurement);
+        }
+      }
+      if (!demoMigrationComplete) {
+        await preferences.setString(
+          _historyKey,
+          jsonEncode(genuine.map((item) => item.toJson()).toList()),
+        );
+        await preferences.setBool(_demoMigrationKey, true);
+        for (final measurement in oldDemoMeasurements) {
+          await deleteImage(measurement);
+        }
+      }
+      genuine.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return genuine;
     } on Object {
       return [];
     }

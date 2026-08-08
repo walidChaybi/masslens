@@ -1,184 +1,71 @@
-# MassLens monetization setup
+# Ads-only production setup
 
-MassLens uses direct Google Play Billing for two repurchasable, one-time scan
-packs. There are no subscriptions, renewals, or recurring charges. The Worker
-verifies each purchase, grants credits exactly once in D1, and consumes the
-Google Play transaction so the same pack can be bought again. RevenueCat is not
-used.
+MassLens has one lifetime starter scan and verified rewarded scans. Historical
+billing tables stay inert for safe migration; any real old purchase balance is
+preserved as ad-free `legacyScans` until used. No Play Billing dependency or
+purchase endpoint remains.
 
-Production remains deliberately safe until setup is complete:
-
-- `BILLING_ENFORCED` is `false`, so the live scanner is not quota-blocked.
-- `ADMOB_ENABLED` defaults to `false`.
-- the real AdMob App ID is configured, but ad requests still use Google's
-  official test IDs by default.
-- no Google or OpenAI private key is stored in the Flutter application.
-- purchased credits are currently tied to the app installation; do not enable
-  live paid packs until durable user accounts are added or that limitation is
-  explicitly accepted and disclosed.
-
-## 1. Create the Play one-time products
-
-In the existing Play Console listing for `com.lilai.aivirtual`, open
-**Monetize with Play → Products → One-time products** and create these exact,
-immutable product IDs:
-
-| Product ID | Display name | Credits | Proposed launch price |
-| --- | --- | ---: | ---: |
-| `masslens_100_scans` | MassLens Basic — 100 scans | 100 | $4.99 / €5.99 |
-| `masslens_500_scans` | MassLens Max — 500 scans | 500 | $19.99 / €23.99 |
-
-For each product, create one purchase option with ID `standard`:
-
-- purchase type: **Buy**;
-- product classification: **Service**;
-- quantity and multi-purchase limits: **off**;
-- regional availability and price: configured, then **Activate**;
-- backwards compatibility: enabled for the standard Buy option if Play shows
-  the setting.
-
-The app reads localized prices directly from Google Play. The Max pack is about
-20% cheaper per scan than buying five Basic packs. Purchased scans do not reset
-or expire.
-
-Use `testers-community@googlegroups.com` for the closed test track. For
-**Settings → License testing**, use only private, controlled Google accounts.
-Adding the community group there would let every group member make no-charge
-license-test purchases.
-
-## 2. Give the Worker Play verification access
-
-1. In Google Cloud, enable **Google Play Android Developer API**.
-2. Create a dedicated service account, for example
-   `masslens-play-verifier`.
-3. Add its email as a Play Console user for the MassLens app.
-4. Grant **View financial data, orders, and cancellation survey responses**
-   and **Manage orders and subscriptions**. Google uses the latter permission
-   name for purchase-management APIs even though MassLens has no subscription.
-5. Create and download its JSON key. Do not add that JSON file to this repo.
-6. Store the entire JSON as one encrypted Worker secret:
+## Worker and D1
 
 ```bash
 cd worker
-npx wrangler secret put GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
-```
-
-The Worker checks Google Play's `ProductPurchaseV2` state, product ID, quantity,
-purchase token, and obfuscated MassLens owner. It atomically grants the server
-allowlisted 100 or 500 credits, then consumes the Play transaction. Duplicate
-callbacks and concurrent retries cannot grant the same token twice.
-
-## 3. Apply the D1 credit-ledger migration
-
-The D1 database is already configured in `worker/wrangler.jsonc`. Refresh
-Wrangler login first if D1 returns authentication code `10000`:
-
-```bash
-cd worker
+npm install
 npx wrangler login
-```
-
-Apply all checked-in migrations and verify the Worker:
-
-```bash
 npx wrangler d1 migrations apply masslens-billing --remote
+npx wrangler secret put OPENAI_API_KEY
 npm run check
+npx wrangler deploy
+curl -f https://masslens-api.masslens.workers.dev/ready
 ```
 
-Migration `0002_consumable_credits.sql` adds the persistent credit wallet,
-purchase-token ledger, idempotent grant trigger, and void/refund debt handling.
-The old subscription table from migration `0001` is intentionally preserved so
-deployed data is not destructively removed.
+`/ready` fails unless the OpenAI secret, D1 binding, enforced wallet,
+`gpt-5-nano`, and live rewarded unit are configured. Migration 0003 creates the
+ads wallet, idempotent request/result cache, and daily metrics without deleting
+old ledgers. The default AI cost ceiling is $5/day
+(`MAX_DAILY_AI_COST_MICROS=5000000`); tune it in Worker variables.
 
-Keep `BILLING_ENFORCED` set to `false` during license testing. Once both products
-verify, consume successfully, can be repurchased, and return the correct wallet
-balance from `/access`, change it to `true` and deploy again.
+## AdMob
 
-## 4. Configure refunds and purchase notifications
+Create/verify four Android units:
 
-Before production, enable Google Play Real-time Developer Notifications for
-one-time products and route authenticated Pub/Sub pushes to a secure Worker
-endpoint. Handle `ONE_TIME_PRODUCT_CANCELED` and voided-purchase notifications,
-then reconcile periodically with the Voided Purchases API. The D1 schema can
-record a void and subtract the full grant, including a negative balance when
-refunded credits were already used.
+- native, used on scale, AI home, and after history result two;
+- rewarded with reward amount `1`, reward item `scan`, and SSV callback
+  `https://masslens-api.masslens.workers.dev/admob/reward`;
+- interstitial, shown after every second completed scan only after result close;
+- app-open, eligible only after four hours in background and after onboarding.
 
-This notification endpoint and authenticated account recovery remain release
-blockers; `BILLING_ENFORCED` must stay off until they are complete.
-
-## 5. Create AdMob units
-
-MassLens uses only these launch formats:
-
-- Native: `ca-app-pub-7681170430097585/1035038854`;
-- Rewarded, reward amount `1`, reward item `scan`:
-  `ca-app-pub-7681170430097585/3756662851`.
-
-Interstitial, Banner, App Open, and Rewarded Interstitial are disabled.
-
-For the Rewarded unit, enable server-side verification and set:
-
-```text
-https://masslens-api.masslens.workers.dev/admob/reward
-```
-
-The Worker verifies Google's signature, timestamp, ad unit, transaction ID, and
-installation ID. Duplicate reward callbacks cannot add multiple scans.
-
-The non-secret AdMob App ID is in `android/gradle.properties`:
-
-```properties
-ADMOB_APP_ID=ca-app-pub-7681170430097585~3976154706
-```
-
-## 6. Build a real-ads test release
-
-MassLens will update the existing `com.lilai.aivirtual` / VirtuAI Play listing.
-Before building the upload AAB, change the build number in `pubspec.yaml` from
-the current `+2` to a number strictly greater than the listing's highest
-existing version code. The exact existing number still needs to be copied from
-Play Console.
-
-Keep Google's test IDs enabled until ad layouts and consent are verified:
-
-```bash
-flutter run \
-  --dart-define=ESTIMATE_ENGINE=cloudflare \
-  --dart-define=MASSLENS_API_URL=https://masslens-api.masslens.workers.dev/estimate \
-  --dart-define=ADMOB_ENABLED=true
-```
-
-For the eventual production build, explicitly disable test IDs:
+Debug builds use Google's test IDs. The release app fails fast if ads are
+disabled, test IDs are enabled, or any live unit is missing. Build production:
 
 ```bash
 flutter build appbundle --release \
-  --dart-define=ESTIMATE_ENGINE=cloudflare \
   --dart-define=MASSLENS_API_URL=https://masslens-api.masslens.workers.dev/estimate \
   --dart-define=ADMOB_ENABLED=true \
   --dart-define=ADMOB_USE_TEST_IDS=false \
   --dart-define=ADMOB_NATIVE_AD_UNIT_ID=ca-app-pub-7681170430097585/1035038854 \
-  --dart-define=ADMOB_REWARDED_AD_UNIT_ID=ca-app-pub-7681170430097585/3756662851
+  --dart-define=ADMOB_REWARDED_AD_UNIT_ID=ca-app-pub-7681170430097585/3756662851 \
+  --dart-define=ADMOB_INTERSTITIAL_AD_UNIT_ID=REPLACE_WITH_LIVE_ID \
+  --dart-define=ADMOB_APP_OPEN_AD_UNIT_ID=ca-app-pub-7681170430097585/3116075891
 ```
 
-Never publish a release with Google's test ad IDs. Ads are disabled while the
-user has purchased credits and can resume when that paid balance reaches zero.
+Never use live ads during development. Test EEA consent and privacy choices,
+reward SSV/deduplication, unavailable inventory, every placement, interstitial
+cadence/cooldown, and four-hour app-open suppression on physical devices.
 
-## 7. Final test matrix
+## Seven-day margin check
 
-- New installation receives the free scan allowance.
-- After free and bonus scans are exhausted, a scan opens the pack sheet.
-- Rewarded ad adds exactly one scan, including after a duplicate callback.
-- Basic grants exactly 100 credits; Max grants exactly 500.
-- Buying Basic twice yields 200 credits; Basic plus Max yields 600.
-- Submitting the same token twice grants once; another installation cannot
-  claim it.
-- Pending, canceled, mismatched, multi-quantity, and consumed unknown purchases
-  grant nothing.
-- Kill the app before verification, after the D1 grant, and before consumption;
-  each retry recovers without credit loss or duplication.
-- Each product is purchasable again after Google confirms consumption.
-- Free scans are spent first, then rewarded scans, then purchased credits.
-- Purchased credits do not reset when the free allowance resets.
-- Refund and chargeback notifications void the grant exactly once.
-- Test EEA consent and **Ad privacy choices** in Settings.
-- Confirm no customer-facing UI contains renewal, subscription, or `/mo` copy.
+Paid-event revenue and AI cost are stored in micro-USD. Query D1 weekly:
+
+```sql
+SELECT metric, SUM(event_count) AS events,
+       SUM(value_micros) / 1000000.0 AS usd
+FROM daily_metrics
+WHERE day >= date('now', '-6 days')
+  AND (metric IN ('ai_cost', 'scan_completed', 'scan_refunded')
+       OR (metric = 'ad_revenue' AND dimension LIKE 'rewarded:%'))
+GROUP BY metric;
+```
+
+Target rewarded-ad revenue per completed scan at or above 2× direct OpenAI
+cost. Do not claim profitability until real fill rate, eCPM, consent rate,
+latency, and the private model evaluation are measured.

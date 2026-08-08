@@ -1,87 +1,127 @@
-class AccessStatus {
-  const AccessStatus({
-    required this.freeScanLimit,
-    required this.freeScansUsed,
-    required this.bonusCredits,
-    required this.purchasedCredits,
-    required this.creditDebt,
-    required this.remainingScans,
-    required this.hasPaidCredits,
-    required this.adsEnabled,
-    required this.billingEnforced,
-    required this.isAuthoritative,
-    this.freeResetsAt,
+class AdPolicy {
+  const AdPolicy({
+    this.interstitialEvery = 2,
+    this.interstitialCooldownSeconds = 180,
+    this.appOpenCooldownSeconds = 14400,
   });
 
-  const AccessStatus.fallback()
-    : freeScanLimit = 3,
-      freeScansUsed = 0,
-      bonusCredits = 0,
-      purchasedCredits = 0,
-      creditDebt = 0,
-      remainingScans = 3,
-      hasPaidCredits = false,
-      adsEnabled = true,
-      billingEnforced = false,
-      isAuthoritative = false,
-      freeResetsAt = null;
+  factory AdPolicy.fromJson(Map<String, Object?> json) => AdPolicy(
+    interstitialEvery: _boundedInt(json['interstitialEvery'], 1, 100, 2),
+    interstitialCooldownSeconds: _boundedInt(
+      json['interstitialCooldownSeconds'],
+      30,
+      86400,
+      180,
+    ),
+    appOpenCooldownSeconds: _boundedInt(
+      json['appOpenCooldownSeconds'],
+      300,
+      86400,
+      14400,
+    ),
+  );
 
-  factory AccessStatus.fromJson(Map<String, Object?> json) {
-    return AccessStatus(
-      freeScanLimit: (json['scanLimit'] as num?)?.toInt() ?? 3,
-      freeScansUsed: (json['scansUsed'] as num?)?.toInt() ?? 0,
-      bonusCredits: (json['bonusCredits'] as num?)?.toInt() ?? 0,
-      purchasedCredits: (json['purchasedCredits'] as num?)?.toInt() ?? 0,
-      creditDebt: (json['creditDebt'] as num?)?.toInt() ?? 0,
-      remainingScans: (json['remainingScans'] as num?)?.toInt() ?? 0,
-      hasPaidCredits: json['isPaid'] as bool? ?? false,
-      adsEnabled: json['adsEnabled'] as bool? ?? false,
-      billingEnforced: json['billingEnforced'] as bool? ?? false,
-      isAuthoritative: true,
-      freeResetsAt: DateTime.tryParse(json['periodEndsAt'] as String? ?? ''),
-    );
-  }
+  final int interstitialEvery;
+  final int interstitialCooldownSeconds;
+  final int appOpenCooldownSeconds;
 
-  final int freeScanLimit;
-  final int freeScansUsed;
-  final int bonusCredits;
-  final int purchasedCredits;
-  final int creditDebt;
-  final int remainingScans;
-  final bool hasPaidCredits;
-  final bool adsEnabled;
-  final bool billingEnforced;
-  final bool isAuthoritative;
-  final DateTime? freeResetsAt;
+  bool shouldShowInterstitial({
+    required int completedScanCount,
+    required DateTime now,
+    DateTime? lastShownAt,
+  }) =>
+      completedScanCount > 0 &&
+      completedScanCount % interstitialEvery == 0 &&
+      (lastShownAt == null ||
+          now.difference(lastShownAt) >=
+              Duration(seconds: interstitialCooldownSeconds));
 
-  int get freeScansRemaining =>
-      (freeScanLimit - freeScansUsed).clamp(0, freeScanLimit);
-
-  String get balanceName => hasPaidCredits ? 'Scan credits' : 'Free';
-
-  /// If the access service is temporarily unreachable, the Worker remains the
-  /// final authority. We do not lock an otherwise valid customer out locally.
-  bool get canScan =>
-      !isAuthoritative || !billingEnforced || remainingScans > 0;
-
-  String get usageLabel {
-    if (!billingEnforced) return 'Billing preview';
-    return '$remainingScans scan${remainingScans == 1 ? '' : 's'} left';
+  bool shouldShowAppOpen({
+    required Duration backgroundTime,
+    required DateTime now,
+    DateTime? lastShownAt,
+  }) {
+    final cooldown = Duration(seconds: appOpenCooldownSeconds);
+    return backgroundTime >= cooldown &&
+        (lastShownAt == null || now.difference(lastShownAt) >= cooldown);
   }
 }
 
-class ScanPackDefinition {
-  const ScanPackDefinition({
-    required this.productId,
-    required this.name,
-    required this.scanCredits,
-    required this.subtitle,
-    this.recommended = false,
+int _boundedInt(Object? value, int minimum, int maximum, int fallback) =>
+    value is num ? value.toInt().clamp(minimum, maximum) : fallback;
+
+class AccessStatus {
+  const AccessStatus({
+    required this.starterScansRemaining,
+    required this.rewardedScans,
+    required this.legacyScans,
+    required this.remainingScans,
+    required this.rewardBalanceCap,
+    required this.scanAccessEnforced,
+    required this.adsEnabled,
+    required this.isAuthoritative,
+    required this.analysisModel,
+    required this.adPolicy,
   });
 
-  final String productId;
-  final String name;
-  final int scanCredits;
-  final String subtitle;
-  final bool recommended;
+  const AccessStatus.fallback()
+    : starterScansRemaining = 1,
+      rewardedScans = 0,
+      legacyScans = 0,
+      remainingScans = 1,
+      rewardBalanceCap = 3,
+      scanAccessEnforced = false,
+      adsEnabled = false,
+      isAuthoritative = false,
+      analysisModel = 'gpt-5-nano',
+      adPolicy = const AdPolicy();
+
+  factory AccessStatus.fromJson(Map<String, Object?> json) {
+    final policy = json['adPolicy'];
+    return AccessStatus(
+      starterScansRemaining:
+          (json['starterScansRemaining'] as num?)?.toInt() ?? 0,
+      rewardedScans: (json['rewardedScans'] as num?)?.toInt() ?? 0,
+      legacyScans: (json['legacyScans'] as num?)?.toInt() ?? 0,
+      remainingScans: (json['remainingScans'] as num?)?.toInt() ?? 0,
+      rewardBalanceCap: (json['rewardBalanceCap'] as num?)?.toInt() ?? 3,
+      scanAccessEnforced: json['scanAccessEnforced'] as bool? ?? false,
+      adsEnabled: json['adsEnabled'] as bool? ?? false,
+      isAuthoritative: true,
+      analysisModel: json['analysisModel'] as String? ?? 'gpt-5-nano',
+      adPolicy: policy is Map
+          ? AdPolicy.fromJson(Map<String, Object?>.from(policy))
+          : const AdPolicy(),
+    );
+  }
+
+  final int starterScansRemaining;
+  final int rewardedScans;
+  final int legacyScans;
+  final int remainingScans;
+  final int rewardBalanceCap;
+  final bool scanAccessEnforced;
+  final bool adsEnabled;
+  final bool isAuthoritative;
+  final String analysisModel;
+  final AdPolicy adPolicy;
+
+  bool get canScan =>
+      !isAuthoritative || !scanAccessEnforced || remainingScans > 0;
+  bool get canEarnReward => rewardedScans < rewardBalanceCap;
+
+  String get usageLabel {
+    if (!isAuthoritative) return 'Checking scans…';
+    if (!scanAccessEnforced) return 'Access preview';
+    return '$remainingScans scan${remainingScans == 1 ? '' : 's'} left';
+  }
+
+  String get breakdownLabel {
+    final parts = <String>[
+      if (starterScansRemaining > 0) '$starterScansRemaining starter',
+      if (rewardedScans > 0) '$rewardedScans rewarded',
+      if (legacyScans > 0) '$legacyScans legacy',
+    ];
+    return parts.isEmpty ? 'No scans available' : parts.join(' · ');
+  }
 }

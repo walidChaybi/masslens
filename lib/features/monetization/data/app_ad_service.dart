@@ -2,48 +2,64 @@ import 'dart:async';
 
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../domain/access_status.dart';
 import 'monetization_config.dart';
 
+typedef PaidAdReporter =
+    void Function(
+      String placement,
+      double valueMicros,
+      PrecisionType precision,
+      String currencyCode,
+    );
+
 class AppAdService {
-  AppAdService();
+  AppAdService({this.onPaidEvent});
+
+  final PaidAdReporter? onPaidEvent;
 
   bool _initialized = false;
-  bool _adsAllowedForPlan = false;
+  bool _adsAllowed = false;
   bool _canRequestAds = false;
   bool _privacyOptionsRequired = false;
   bool _appOpenLoading = false;
   bool _appOpenShowing = false;
-  bool _appOpenShowPending = false;
+  bool _interstitialLoading = false;
+  bool _interstitialShowing = false;
   RewardedAd? _rewarded;
   AppOpenAd? _appOpenAd;
+  InterstitialAd? _interstitial;
   DateTime? _appOpenLoadedAt;
+  DateTime? _lastAppOpenShownAt;
+  DateTime? _lastInterstitialShownAt;
+  Completer<void>? _appOpenLoadWaiter;
+  AdPolicy _policy = const AdPolicy();
 
   bool get canRequestAds =>
       AdMobConfig.hasAnyConfiguration &&
-      _adsAllowedForPlan &&
+      _adsAllowed &&
       (_canRequestAds || AdMobConfig.useTestIds);
   bool get canRequestNativeAds =>
       canRequestAds && AdMobConfig.hasNativeConfiguration;
-  bool get canRequestAppOpenAds =>
-      canRequestAds && AdMobConfig.hasAppOpenConfiguration;
   bool get rewardedReady =>
       canRequestAds &&
       AdMobConfig.hasRewardedConfiguration &&
       _rewarded != null;
   bool get privacyOptionsRequired => _privacyOptionsRequired;
 
-  Future<void> updatePlan({required bool adsAllowed}) async {
-    _adsAllowedForPlan = adsAllowed;
+  Future<void> updatePlan({
+    required bool adsAllowed,
+    required AdPolicy policy,
+  }) async {
+    _adsAllowed = adsAllowed;
+    _policy = policy;
     if (!adsAllowed) {
       _disposeLoadedAds();
       return;
     }
     if (!AdMobConfig.hasAnyConfiguration) return;
     if (!_initialized) await _initialize();
-    if (canRequestAds) {
-      _loadRewarded();
-      _loadAppOpen();
-    }
+    if (canRequestAds) _preloadAll();
   }
 
   Future<void> _initialize() async {
@@ -57,7 +73,6 @@ class AppAdService {
         if (!consentFinished.isCompleted) consentFinished.complete();
       },
       (_) {
-        // Cached consent can still legally allow requests when the update fails.
         if (!consentFinished.isCompleted) consentFinished.complete();
       },
     );
@@ -76,12 +91,17 @@ class AppAdService {
     if (!_privacyOptionsRequired) return;
     await ConsentForm.showPrivacyOptionsForm((_) {});
     _canRequestAds = await ConsentInformation.instance.canRequestAds();
-    if (_canRequestAds) {
-      _loadRewarded();
-      _loadAppOpen();
+    if (canRequestAds) {
+      _preloadAll();
     } else {
       _disposeLoadedAds();
     }
+  }
+
+  void _preloadAll() {
+    _loadRewarded();
+    _loadInterstitial();
+    _loadAppOpen();
   }
 
   void _loadRewarded() {
@@ -100,11 +120,39 @@ class AppAdService {
     );
   }
 
+  void _loadInterstitial() {
+    if (!canRequestAds ||
+        !AdMobConfig.hasInterstitialConfiguration ||
+        _interstitial != null ||
+        _interstitialLoading) {
+      return;
+    }
+    _interstitialLoading = true;
+    InterstitialAd.load(
+      adUnitId: AdMobConfig.interstitialAdUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialLoading = false;
+          _interstitial = ad;
+        },
+        onAdFailedToLoad: (_) {
+          _interstitialLoading = false;
+          _interstitial = null;
+        },
+      ),
+    );
+  }
+
   void _loadAppOpen() {
-    if (!canRequestAppOpenAds || _appOpenAd != null || _appOpenLoading) {
+    if (!canRequestAds ||
+        !AdMobConfig.hasAppOpenConfiguration ||
+        _appOpenAd != null ||
+        _appOpenLoading) {
       return;
     }
     _appOpenLoading = true;
+    _appOpenLoadWaiter = Completer<void>();
     AppOpenAd.load(
       adUnitId: AdMobConfig.appOpenAdUnitId,
       request: const AdRequest(),
@@ -113,66 +161,102 @@ class AppAdService {
           _appOpenLoading = false;
           _appOpenAd = ad;
           _appOpenLoadedAt = DateTime.now();
-          if (_appOpenShowPending) unawaited(showAppOpenIfAvailable());
+          _appOpenLoadWaiter?.complete();
+          _appOpenLoadWaiter = null;
         },
         onAdFailedToLoad: (_) {
           _appOpenLoading = false;
-          _appOpenShowPending = false;
           _appOpenAd = null;
           _appOpenLoadedAt = null;
+          _appOpenLoadWaiter?.complete();
+          _appOpenLoadWaiter = null;
         },
       ),
     );
   }
 
-  bool get _appOpenFresh {
-    final loadedAt = _appOpenLoadedAt;
-    if (loadedAt == null) return false;
-    return DateTime.now().difference(loadedAt) < const Duration(hours: 4);
+  Future<bool> showInterstitialAfterScan(int completedScanCount) async {
+    if (!canRequestAds || _interstitialShowing) return false;
+    if (!_policy.shouldShowInterstitial(
+      completedScanCount: completedScanCount,
+      now: DateTime.now(),
+      lastShownAt: _lastInterstitialShownAt,
+    )) {
+      return false;
+    }
+    final ad = _interstitial;
+    if (ad == null) {
+      _loadInterstitial();
+      return false;
+    }
+    _interstitial = null;
+    _interstitialShowing = true;
+    ad.onPaidEvent = (ad, value, precision, currency) {
+      onPaidEvent?.call('interstitial', value, precision, currency);
+    };
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) => _finishInterstitial(ad),
+      onAdFailedToShowFullScreenContent: (ad, _) => _finishInterstitial(ad),
+    );
+    await ad.show();
+    _lastInterstitialShownAt = DateTime.now();
+    return true;
   }
 
-  DateTime? _lastAppOpenDismissedAt;
+  void _finishInterstitial(InterstitialAd ad) {
+    ad.dispose();
+    _interstitialShowing = false;
+    _loadInterstitial();
+  }
 
-  Future<void> showAppOpenIfAvailable() async {
-    if (!canRequestAppOpenAds || _appOpenShowing) return;
+  bool get _appOpenFresh {
+    final loadedAt = _appOpenLoadedAt;
+    return loadedAt != null &&
+        DateTime.now().difference(loadedAt) < const Duration(hours: 4);
+  }
 
-    // Prevent infinite loops when returning from the ad itself,
-    // and prevent spamming if the user quickly switches apps.
-    if (_lastAppOpenDismissedAt != null &&
-        DateTime.now().difference(_lastAppOpenDismissedAt!) <
-            const Duration(seconds: 15)) {
-      return;
+  Future<bool> showAppOpenAfterLongBackground(Duration backgroundTime) async {
+    if (!canRequestAds || _appOpenShowing) return false;
+    if (!_policy.shouldShowAppOpen(
+      backgroundTime: backgroundTime,
+      now: DateTime.now(),
+      lastShownAt: _lastAppOpenShownAt,
+    )) {
+      return false;
     }
-
-    if (_appOpenAd == null || !_appOpenFresh) {
-      _appOpenShowPending = true;
-      _appOpenAd?.dispose();
+    var ad = _appOpenAd;
+    if (ad == null || !_appOpenFresh) {
+      ad?.dispose();
       _appOpenAd = null;
       _appOpenLoadedAt = null;
       _loadAppOpen();
-      return;
+      try {
+        await _appOpenLoadWaiter?.future.timeout(const Duration(seconds: 2));
+      } on TimeoutException {
+        return false;
+      }
+      ad = _appOpenAd;
+      if (ad == null || !_appOpenFresh) return false;
     }
-
-    final ad = _appOpenAd!;
     _appOpenAd = null;
     _appOpenLoadedAt = null;
-    _appOpenShowPending = false;
     _appOpenShowing = true;
+    ad.onPaidEvent = (ad, value, precision, currency) {
+      onPaidEvent?.call('app_open', value, precision, currency);
+    };
     ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _appOpenShowing = false;
-        _lastAppOpenDismissedAt = DateTime.now();
-        _loadAppOpen();
-      },
-      onAdFailedToShowFullScreenContent: (ad, _) {
-        ad.dispose();
-        _appOpenShowing = false;
-        _lastAppOpenDismissedAt = DateTime.now();
-        _loadAppOpen();
-      },
+      onAdDismissedFullScreenContent: (ad) => _finishAppOpen(ad),
+      onAdFailedToShowFullScreenContent: (ad, _) => _finishAppOpen(ad),
     );
     await ad.show();
+    _lastAppOpenShownAt = DateTime.now();
+    return true;
+  }
+
+  void _finishAppOpen(AppOpenAd ad) {
+    ad.dispose();
+    _appOpenShowing = false;
+    _loadAppOpen();
   }
 
   Future<bool> showRewarded({required String clientId}) async {
@@ -185,36 +269,45 @@ class AppAdService {
     await ad.setServerSideOptions(
       ServerSideVerificationOptions(userId: clientId),
     );
-    final earned = Completer<bool>();
+    ad.onPaidEvent = (ad, value, precision, currency) {
+      onPaidEvent?.call('rewarded', value, precision, currency);
+    };
+    final dismissed = Completer<bool>();
+    var didEarn = false;
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
-        if (!earned.isCompleted) earned.complete(false);
+        if (!dismissed.isCompleted) dismissed.complete(didEarn);
         _loadRewarded();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose();
-        if (!earned.isCompleted) earned.complete(false);
+        if (!dismissed.isCompleted) dismissed.complete(false);
         _loadRewarded();
       },
     );
     await ad.show(
       onUserEarnedReward: (_, _) {
-        if (!earned.isCompleted) earned.complete(true);
+        didEarn = true;
       },
     );
-    return earned.future;
+    return dismissed.future;
   }
 
   void _disposeLoadedAds() {
     _rewarded?.dispose();
     _rewarded = null;
+    _interstitial?.dispose();
+    _interstitial = null;
+    _interstitialLoading = false;
+    _interstitialShowing = false;
     _appOpenAd?.dispose();
     _appOpenAd = null;
     _appOpenLoadedAt = null;
     _appOpenLoading = false;
     _appOpenShowing = false;
-    _appOpenShowPending = false;
+    _appOpenLoadWaiter?.complete();
+    _appOpenLoadWaiter = null;
   }
 
   void dispose() => _disposeLoadedAds();

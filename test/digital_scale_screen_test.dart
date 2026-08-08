@@ -30,15 +30,20 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('250'), findsNothing);
+    expect(find.text('1.000'), findsNothing);
 
     await tester.pump(const Duration(milliseconds: 900));
-    expect(find.text('250'), findsOneWidget);
+    expect(find.text('1.000'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(find.text('1.000'), findsOneWidget);
 
     await tester.sendEventToBinding(
       PointerUpEvent(pointer: 1, position: position),
     );
     await tester.pump();
+    expect(find.text('0.0'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('0.0'), findsOneWidget);
   });
 

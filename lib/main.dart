@@ -1,13 +1,13 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app/app_controller.dart';
 import 'app/mass_lens_app.dart';
+import 'features/monetization/data/monetization_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MonetizationConfig.validateProduction();
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -23,5 +23,4 @@ Future<void> main() async {
 
   final controller = await AppController.bootstrap();
   runApp(MassLensApp(controller: controller));
-  unawaited(controller.initializeMonetization(showAppOpenAdOnStart: true));
 }

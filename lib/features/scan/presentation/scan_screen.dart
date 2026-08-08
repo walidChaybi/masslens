@@ -7,10 +7,11 @@ import 'package:flutter/material.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../measurements/domain/measurement.dart';
-import '../../monetization/presentation/paywall_sheet.dart';
+import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../data/cloudflare_estimate_repository.dart';
 import '../data/estimate_repository_factory.dart';
 import '../data/photo_picker.dart';
+import '../data/scan_image_processor.dart';
 import '../domain/estimate_repository.dart';
 import '../domain/measurement_capture.dart';
 import '../domain/measured_dimensions.dart';
@@ -77,6 +78,7 @@ class _ScanScreenState extends State<ScanScreen> {
   Timer? _analysisTimer;
   Measurement? _result;
   String? _error;
+  String? _requestId;
   bool _saved = false;
 
   @override
@@ -106,6 +108,7 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() {
       _isPicking = true;
       _error = null;
+      _requestId = null;
     });
     try {
       final capture = await widget.measurementLauncher.launch(context);
@@ -162,7 +165,10 @@ class _ScanScreenState extends State<ScanScreen> {
     if (imagePath == null || !File(imagePath).existsSync()) return;
     final measured = await launchPhotoMeasurement(context, imagePath);
     if (mounted && measured != null) {
-      setState(() => _measuredDimensions = measured);
+      setState(() {
+        _measuredDimensions = measured;
+        _requestId = null;
+      });
     }
   }
 
@@ -172,7 +178,10 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       final path = await widget.photoPicker.pick(source);
       if (mounted && path != null) {
-        setState(() => _secondaryImagePath = path);
+        setState(() {
+          _secondaryImagePath = path;
+          _requestId = null;
+        });
       }
     } on Object {
       if (mounted) {
@@ -217,6 +226,40 @@ class _ScanScreenState extends State<ScanScreen> {
       setState(() => _error = 'Enter a dimension greater than zero.');
       return;
     }
+    if (widget.estimateRepository is CloudflareEstimateRepository) {
+      try {
+        final processor = const ScanImageProcessor();
+        final warnings = <ScanImageWarning>[
+          ...await processor.inspect(imagePath),
+          if (_secondaryImagePath case final secondary?)
+            ...await processor.inspect(secondary),
+        ];
+        if (!mounted) return;
+        if (warnings.isNotEmpty) {
+          final useAnyway = await _showScanCoach(warnings.toSet().toList());
+          if (!mounted || !useAnyway) {
+            if (mounted && !useAnyway) unawaited(_captureMeasured());
+            return;
+          }
+        }
+      } on ScanImageException catch (error) {
+        if (mounted) setState(() => _error = error.message);
+        return;
+      }
+    }
+
+    final monetization = AppScope.of(context).monetization;
+    final isIdempotentRetry = _requestId != null;
+    await monetization.refreshAccess();
+    if (!mounted) return;
+    if (!monetization.access.canScan && !isIdempotentRetry) {
+      final added = await showRewardedScanSheet(context);
+      if (!mounted || !added) return;
+      await monetization.refreshAccess();
+      if (!mounted || !monetization.access.canScan) return;
+    }
+
+    _requestId ??= ScanRequestId.create();
     final run = ++_analysisRun;
     setState(() {
       _isAnalyzing = true;
@@ -228,6 +271,7 @@ class _ScanScreenState extends State<ScanScreen> {
       var result = await widget.estimateRepository.analyze(
         EstimateRequest(
           imagePath: imagePath,
+          requestId: _requestId!,
           secondaryImagePath: _secondaryImagePath,
           material: _material,
           fillState: _fillState,
@@ -254,6 +298,7 @@ class _ScanScreenState extends State<ScanScreen> {
         _result = result;
         _isAnalyzing = false;
         _analysisStep = 3;
+        _requestId = null;
       });
       unawaited(AppScope.of(context).monetization.refreshAccess());
     } on CloudflareEstimateException catch (error) {
@@ -267,7 +312,10 @@ class _ScanScreenState extends State<ScanScreen> {
       });
       if (error.isScanLimitReached) {
         await AppScope.of(context).monetization.refreshAccess();
-        if (mounted) await showMassLensPaywall(context);
+        if (mounted) {
+          final added = await showRewardedScanSheet(context);
+          if (added && mounted) unawaited(_analyze());
+        }
       }
     } on Object {
       if (mounted && run == _analysisRun) {
@@ -279,6 +327,36 @@ class _ScanScreenState extends State<ScanScreen> {
       }
     }
   }
+
+  Future<bool> _showScanCoach(List<ScanImageWarning> warnings) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Scan Coach'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final warning in warnings) ...[
+                Text('• ${warning.message}'),
+                const SizedBox(height: 8),
+              ],
+              const Text('No scan is used until you continue to analysis.'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Retake'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Use anyway'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 
   void _startProgress(int run) {
     _analysisTimer?.cancel();
@@ -326,6 +404,7 @@ class _ScanScreenState extends State<ScanScreen> {
       _result = null;
       _error = null;
       _saved = false;
+      _requestId = null;
     });
   }
 
@@ -337,7 +416,10 @@ class _ScanScreenState extends State<ScanScreen> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
           void update(VoidCallback change) {
-            setState(change);
+            setState(() {
+              change();
+              _requestId = null;
+            });
             setSheetState(() {});
           }
 
@@ -418,6 +500,7 @@ class _ScanScreenState extends State<ScanScreen> {
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
+                            onChanged: (_) => _requestId = null,
                             decoration: InputDecoration(
                               suffixText: _dimensionUnit,
                             ),

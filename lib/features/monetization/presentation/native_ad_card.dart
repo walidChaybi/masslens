@@ -3,11 +3,19 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../data/monetization_config.dart';
+import '../data/app_ad_service.dart';
 
 class NativeAdCard extends StatefulWidget {
-  const NativeAdCard({required this.enabled, super.key});
+  const NativeAdCard({
+    required this.enabled,
+    required this.placement,
+    this.onPaidEvent,
+    super.key,
+  });
 
   final bool enabled;
+  final String placement;
+  final PaidAdReporter? onPaidEvent;
 
   @override
   State<NativeAdCard> createState() => _NativeAdCardState();
@@ -61,6 +69,14 @@ class _NativeAdCardState extends State<NativeAdCard>
               }
             });
           }
+        },
+        onPaidEvent: (ad, value, precision, currency) {
+          widget.onPaidEvent?.call(
+            widget.placement,
+            value,
+            precision,
+            currency,
+          );
         },
       ),
       nativeTemplateStyle: NativeTemplateStyle(

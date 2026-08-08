@@ -2,9 +2,8 @@ import '../../measurements/domain/measurement.dart';
 
 Measurement measurementFromAiEstimatePayload(
   Map<String, Object?> payload,
-  String imagePath, {
-  required bool isDemo,
-}) {
+  String imagePath,
+) {
   final dimensionsPayload = payload['dimensions_mm'];
   if (dimensionsPayload is! Map) {
     throw const AiEstimatePayloadException(
@@ -33,7 +32,6 @@ Measurement measurementFromAiEstimatePayload(
       depth: _number(dimensions, 'depth'),
     ),
     assumptions: _stringList(payload, 'assumptions'),
-    isDemo: isDemo,
   );
 }
 

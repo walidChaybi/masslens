@@ -27,7 +27,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
-    expect(find.text('DEMO · NOT A MEASUREMENT'), findsOneWidget);
+    expect(find.text('SIMULATOR · NOT A MEASUREMENT'), findsOneWidget);
     expect(find.byKey(const Key('scale_touch_surface')), findsOneWidget);
     expect(find.byKey(const Key('shell_scan_button')), findsNothing);
   });
@@ -56,7 +56,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pumpAndSettle();
     expect(find.text('PREFERENCES AND PRIVACY'), findsOneWidget);
-    expect(find.text('Local demo'), findsOneWidget);
+    expect(find.text('Secure cloud AI'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('open_navigation')));
     await tester.pumpAndSettle();
@@ -66,7 +66,7 @@ void main() {
     expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
   });
 
-  testWidgets('scan pack sheet contains only one-time Basic and Max products', (
+  testWidgets('scan access sheet is rewarded-only with no purchase products', (
     tester,
   ) async {
     final controller = AppController(
@@ -79,15 +79,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Free'), 300);
-    await tester.tap(find.text('Free'));
+    await tester.scrollUntilVisible(find.text('Earn AI scans'), 300);
+    await tester.tap(find.text('Earn AI scans'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Add scans when\nyou need them'), findsOneWidget);
-    expect(find.text('100 scans · One-time pack'), findsOneWidget);
-    expect(find.text('500 scans · Save about 20% per scan'), findsOneWidget);
-    expect(find.text('OR SUBSCRIBE'), findsNothing);
-    expect(find.textContaining('/mo'), findsNothing);
+    expect(find.text('Watch one ad.\nGet one scan.'), findsOneWidget);
+    expect(find.textContaining('No subscription'), findsOneWidget);
+    expect(find.textContaining('100 scans'), findsNothing);
+    expect(find.textContaining('500 scans'), findsNothing);
+    expect(find.textContaining('One-time pack'), findsNothing);
+    expect(find.text('Buy scans'), findsNothing);
   });
 
   testWidgets('photo flow analyzes and saves an estimate', (tester) async {

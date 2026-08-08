@@ -1,27 +1,25 @@
+import 'package:flutter/foundation.dart';
+
 import '../../scan/data/estimate_repository_factory.dart';
-import '../domain/access_status.dart';
 
 abstract final class MonetizationConfig {
-  static const packs = <ScanPackDefinition>[
-    ScanPackDefinition(
-      productId: 'masslens_100_scans',
-      name: 'Basic',
-      scanCredits: 100,
-      subtitle: 'One-time pack',
-    ),
-    ScanPackDefinition(
-      productId: 'masslens_500_scans',
-      name: 'Max',
-      scanCredits: 500,
-      subtitle: 'Save about 20% per scan',
-      recommended: true,
-    ),
-  ];
-
   static String get apiUrl => EstimateEngineConfig.cloudflareApiUrl;
   static bool get backendConfigured => apiUrl.trim().isNotEmpty;
-  static Set<String> get productIds =>
-      packs.map((pack) => pack.productId).toSet();
+
+  static void validateProduction() {
+    if (!kReleaseMode) return;
+    if (!backendConfigured) {
+      throw StateError('MASSLENS_API_URL is required for release builds.');
+    }
+    if (!AdMobConfig.enabled ||
+        AdMobConfig.useTestIds ||
+        !AdMobConfig.productionConfigurationValid) {
+      throw StateError(
+        'Release builds require enabled production AdMob IDs for native, '
+        'rewarded, interstitial, and app-open ads.',
+      );
+    }
+  }
 }
 
 abstract final class AdMobConfig {
@@ -48,10 +46,14 @@ abstract final class AdMobConfig {
     'ADMOB_APP_OPEN_AD_UNIT_ID',
     defaultValue: 'ca-app-pub-7681170430097585/3116075891',
   );
+  static const _interstitialProduction = String.fromEnvironment(
+    'ADMOB_INTERSTITIAL_AD_UNIT_ID',
+  );
 
   static const _nativeTest = 'ca-app-pub-3940256099942544/2247696110';
   static const _rewardedTest = 'ca-app-pub-3940256099942544/5224354917';
   static const _appOpenTest = 'ca-app-pub-3940256099942544/9257395921';
+  static const _interstitialTest = 'ca-app-pub-3940256099942544/1033173712';
 
   static String get nativeAdUnitId =>
       useTestIds ? _nativeTest : _nativeProduction;
@@ -59,6 +61,8 @@ abstract final class AdMobConfig {
       useTestIds ? _rewardedTest : _rewardedProduction;
   static String get appOpenAdUnitId =>
       useTestIds ? _appOpenTest : _appOpenProduction;
+  static String get interstitialAdUnitId =>
+      useTestIds ? _interstitialTest : _interstitialProduction;
 
   static bool get hasNativeConfiguration =>
       enabled && nativeAdUnitId.isNotEmpty;
@@ -66,8 +70,19 @@ abstract final class AdMobConfig {
       enabled && rewardedAdUnitId.isNotEmpty;
   static bool get hasAppOpenConfiguration =>
       enabled && appOpenAdUnitId.isNotEmpty;
+  static bool get hasInterstitialConfiguration =>
+      enabled && interstitialAdUnitId.isNotEmpty;
   static bool get hasAnyConfiguration =>
       hasNativeConfiguration ||
       hasRewardedConfiguration ||
-      hasAppOpenConfiguration;
+      hasAppOpenConfiguration ||
+      hasInterstitialConfiguration;
+
+  static bool get productionConfigurationValid =>
+      !enabled ||
+      useTestIds ||
+      (nativeAdUnitId.isNotEmpty &&
+          rewardedAdUnitId.isNotEmpty &&
+          appOpenAdUnitId.isNotEmpty &&
+          interstitialAdUnitId.isNotEmpty);
 }

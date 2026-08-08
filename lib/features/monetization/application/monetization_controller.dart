@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/installation_id_store.dart';
 import '../data/app_ad_service.dart';
@@ -18,13 +18,23 @@ class MonetizationController extends ChangeNotifier {
   }) : _api = api,
        _adService = adService;
 
-  factory MonetizationController.create() => MonetizationController._(
-    enabled: MonetizationConfig.backendConfigured,
-    api: MonetizationConfig.backendConfigured
+  factory MonetizationController.create() {
+    final api = MonetizationConfig.backendConfigured
         ? MonetizationApi(apiUrl: MonetizationConfig.apiUrl)
-        : null,
-    adService: AppAdService(),
-  );
+        : null;
+    late MonetizationController controller;
+    final adService = AppAdService(
+      onPaidEvent: (placement, value, precision, currency) {
+        controller.reportPaidAd(placement, value, precision, currency);
+      },
+    );
+    controller = MonetizationController._(
+      enabled: api != null,
+      api: api,
+      adService: adService,
+    );
+    return controller;
+  }
 
   factory MonetizationController.disabled() => MonetizationController._(
     enabled: false,
@@ -32,235 +42,149 @@ class MonetizationController extends ChangeNotifier {
     adService: AppAdService(),
   );
 
+  static const _completedScanCountKey =
+      'mass_lens.completed_scan_count_for_ads';
+
   final bool enabled;
   final MonetizationApi? _api;
   final AppAdService _adService;
-  final InAppPurchase _store = InAppPurchase.instance;
-  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
   AccessStatus _access = const AccessStatus.fallback();
-  Map<String, ProductDetails> _products = const {};
   String _clientId = '';
   String? _message;
   bool _initialized = false;
   bool _loading = false;
-  bool _purchasePending = false;
-  bool _storeAvailable = false;
+  int _completedScanCount = 0;
 
   AccessStatus get access => _access;
-  List<ScanPackDefinition> get packs => MonetizationConfig.packs;
   String? get message => _message;
   bool get loading => _loading;
-  bool get purchasePending => _purchasePending;
-  bool get storeAvailable => _storeAvailable;
-  bool get canRequestAds =>
+  bool get canRequestAds => _adService.canRequestAds && _access.adsEnabled;
+  bool get canRequestNativeAds =>
       _adService.canRequestNativeAds && _access.adsEnabled;
-  bool get canRequestNativeAds => _adService.canRequestNativeAds;
   bool get rewardedAdReady => _adService.rewardedReady;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
 
-  String? priceFor(String productId) => _products[productId]?.price;
-
-  Future<void> initialize({bool showAppOpenAdOnStart = false}) async {
+  Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-
     if (!enabled) {
-      // Local testing mode without backend
-      await _adService.updatePlan(adsAllowed: true);
-      if (showAppOpenAdOnStart) {
-        unawaited(_adService.showAppOpenIfAvailable());
-      }
       notifyListeners();
       return;
     }
 
     _clientId = await InstallationIdStore.getOrCreate();
-    _purchaseSubscription = _store.purchaseStream.listen(
-      _handlePurchases,
-      onError: (Object error) {
-        _message = 'Google Play Billing error: $error';
-        _purchasePending = false;
-        notifyListeners();
-      },
-    );
-    await Future.wait([refreshAccess(), _loadProducts()]);
-    if (showAppOpenAdOnStart) {
-      unawaited(_adService.showAppOpenIfAvailable());
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      _completedScanCount = preferences.getInt(_completedScanCountKey) ?? 0;
+    } on Object {
+      // Ad cadence can safely restart if local preferences are unavailable.
     }
-    if (_storeAvailable) await _recoverUnfinishedPurchases();
+    await refreshAccess();
   }
 
   Future<void> refreshAccess() async {
     if (!enabled || _clientId.isEmpty || _api == null) return;
+    _loading = true;
+    notifyListeners();
     try {
       final access = await _api.getAccess(_clientId);
       _access = access;
       _message = null;
-      notifyListeners();
-      await _adService.updatePlan(adsAllowed: access.adsEnabled);
-      notifyListeners();
-    } on Object catch (error) {
-      // Keep the last known access. The Worker still enforces every scan.
-      _message = 'Could not refresh scan credits: $error';
-      notifyListeners();
-    }
-  }
-
-  Future<void> _loadProducts() async {
-    if (!Platform.isAndroid) return;
-    try {
-      _storeAvailable = await _store.isAvailable();
-      if (!_storeAvailable) {
-        _message = 'Google Play Billing is unavailable on this device.';
-        notifyListeners();
-        return;
-      }
-      final response = await _store.queryProductDetails(
-        MonetizationConfig.productIds,
+      await _adService.updatePlan(
+        adsAllowed: access.adsEnabled,
+        policy: access.adPolicy,
       );
-      _products = {
-        for (final product in response.productDetails) product.id: product,
-      };
-      if (response.error case final error?) {
-        _message = error.message;
-      } else if (response.notFoundIDs.isNotEmpty) {
-        _message = 'Scan packs are not active in Google Play yet.';
-      }
     } on Object catch (error) {
-      _storeAvailable = false;
-      _message = 'Could not load Google Play scan packs: $error';
-    }
-    notifyListeners();
-  }
-
-  Future<void> purchase(String productId) async {
-    final product = _products[productId];
-    if (!_storeAvailable || product == null) {
-      _message = 'This scan pack is not available in Google Play yet.';
-      notifyListeners();
-      return;
-    }
-    _purchasePending = true;
-    _message = null;
-    notifyListeners();
-    final purchaseParam = PurchaseParam(
-      productDetails: product,
-      // This random, non-PII identifier lets the Worker verify ownership.
-      applicationUserName: _clientId,
-    );
-    // The Worker must verify, grant, and consume before Play can sell this
-    // product again. Auto-consumption would run before server verification.
-    final started = await _store.buyConsumable(
-      purchaseParam: purchaseParam,
-      autoConsume: false,
-    );
-    if (!started) {
-      _purchasePending = false;
-      _message = 'Google Play could not start the purchase.';
-      notifyListeners();
-    }
-  }
-
-  Future<void> _recoverUnfinishedPurchases() async {
-    _loading = true;
-    notifyListeners();
-    try {
-      await _store.restorePurchases(applicationUserName: _clientId);
-    } on Object catch (error) {
-      _message = 'Could not recover an unfinished Play purchase: $error';
+      // The Worker remains the authority; stale data never grants an AI scan.
+      _message = 'Could not refresh scan access: $error';
     } finally {
       _loading = false;
       notifyListeners();
     }
   }
 
-  Future<void> _handlePurchases(List<PurchaseDetails> purchases) async {
-    for (final purchase in purchases) {
-      if (!MonetizationConfig.productIds.contains(purchase.productID)) {
-        continue;
-      }
-      switch (purchase.status) {
-        case PurchaseStatus.pending:
-          _purchasePending = true;
-          _message = 'Purchase pending in Google Play.';
-        case PurchaseStatus.purchased:
-        case PurchaseStatus.restored:
-          await _verifyAndFinish(purchase);
-        case PurchaseStatus.error:
-          _purchasePending = false;
-          _message = purchase.error?.message ?? 'The purchase failed.';
-        case PurchaseStatus.canceled:
-          _purchasePending = false;
-          _message = 'Purchase canceled.';
-      }
-    }
-    notifyListeners();
-  }
-
-  Future<void> _verifyAndFinish(PurchaseDetails purchase) async {
-    if (_api == null) return;
-    try {
-      // On Android this server verification value is the Google purchase token.
-      final token = purchase.verificationData.serverVerificationData;
-      if (token.isEmpty) throw StateError('Google did not return a token.');
-      _access = await _api.verifyPurchase(
-        clientId: _clientId,
-        productId: purchase.productID,
-        purchaseToken: token,
-      );
-      // The Worker consumes the verified one-time product. Consumption also
-      // acknowledges it, so completePurchase must not race that server call.
-      _purchasePending = false;
-      final pack = MonetizationConfig.packs.firstWhere(
-        (candidate) => candidate.productId == purchase.productID,
-      );
-      _message = '${pack.scanCredits} scans added.';
-      await _adService.updatePlan(adsAllowed: _access.adsEnabled);
-    } on Object catch (error) {
-      // Never acknowledge or grant a purchase that the Worker did not verify.
-      _purchasePending = false;
-      _message = 'Purchase verification failed: $error';
-    }
-  }
-
   Future<void> onScanCompleted() async {
+    _completedScanCount += 1;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(_completedScanCountKey, _completedScanCount);
+    } on Object {
+      // Continue with this session's cadence if persistence is unavailable.
+    }
+    await _adService.showInterstitialAfterScan(_completedScanCount);
     await refreshAccess();
   }
 
   Future<bool> watchAdForScan() async {
-    if (!_access.adsEnabled) return false;
+    if (!_access.adsEnabled) {
+      _message = 'Ads are unavailable. Your existing scans are still safe.';
+      notifyListeners();
+      return false;
+    }
+    if (!_access.canEarnReward) {
+      _message =
+          'You can hold up to ${_access.rewardBalanceCap} rewarded scans.';
+      notifyListeners();
+      return false;
+    }
     final earned = await _adService.showRewarded(clientId: _clientId);
     if (!earned) {
-      _message = 'A rewarded ad is not ready yet. Try again shortly.';
+      _message = 'A rewarded ad is not ready. Try again shortly.';
       notifyListeners();
       return false;
     }
 
     _message = 'Reward earned. Confirming it securely…';
     notifyListeners();
-    final previousRemaining = _access.remainingScans;
+    final previousRewarded = _access.rewardedScans;
     for (final delay in const [1, 2, 4, 6]) {
       await Future<void>.delayed(Duration(seconds: delay));
       await refreshAccess();
-      if (_access.remainingScans > previousRemaining) {
-        _message = 'One bonus scan was added.';
+      if (_access.rewardedScans > previousRewarded) {
+        _message = 'One scan was added.';
         notifyListeners();
         return true;
       }
     }
-    _message = 'Your reward is still processing. Pull to refresh shortly.';
+    _message = 'Your verified reward is still processing. Try refresh shortly.';
     notifyListeners();
     return false;
+  }
+
+  Future<void> handleAppResumed(Duration backgroundTime) async {
+    if (backgroundTime <
+        Duration(seconds: _access.adPolicy.appOpenCooldownSeconds)) {
+      return;
+    }
+    await _adService.showAppOpenAfterLongBackground(backgroundTime);
+  }
+
+  void reportPaidAd(
+    String placement,
+    double valueMicros,
+    PrecisionType precision,
+    String currencyCode,
+  ) {
+    final api = _api;
+    if (api == null || _clientId.isEmpty) return;
+    unawaited(
+      api
+          .reportAdRevenue(
+            clientId: _clientId,
+            placement: placement,
+            valueMicros: valueMicros,
+            precision: precision.name,
+            currencyCode: currencyCode,
+          )
+          .onError((_, _) {}),
+    );
   }
 
   Future<void> showPrivacyOptions() async {
     await _adService.showPrivacyOptions();
     notifyListeners();
   }
-
-  Future<void> showAppOpenAdIfAvailable() =>
-      _adService.showAppOpenIfAvailable();
 
   void clearMessage() {
     _message = null;
@@ -269,7 +193,6 @@ class MonetizationController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _purchaseSubscription?.cancel();
     _adService.dispose();
     super.dispose();
   }

@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
 import 'package:mass_lens/features/measurements/domain/measurement.dart';
-import 'package:mass_lens/features/scan/data/demo_estimate_repository.dart';
-import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
 import 'package:mass_lens/features/scan/domain/measured_dimensions.dart';
 import 'package:mass_lens/features/scan/presentation/capture/photo_measure_screen.dart';
 
@@ -102,46 +100,19 @@ void main() {
     );
   });
 
-  test(
-    'demo repository adopts traced dimensions and raises confidence',
-    () async {
-      const repository = DemoEstimateRepository(analysisDelay: Duration.zero);
-      final result = await repository.analyze(
-        const EstimateRequest(
-          imagePath: '/tmp/non-existent.jpg',
-          measuredDimensions: MeasuredDimensions(
-            widthMm: 200,
-            heightMm: 100,
-            depthMm: 50,
-            referenceLabel: 'Standard card',
-          ),
-        ),
-      );
-
-      expect(result.confidence, ConfidenceLevel.medium);
-      expect(result.dimensions.width, 200);
-      expect(result.dimensions.height, 100);
-      expect(result.dimensions.depth, 50);
-      expect(
-        result.assumptions,
-        contains(
-          '20.0 × 10.0 × 5.0 cm measured with Photo reference · Standard card',
-        ),
-      );
-
-      final noDepth = await repository.analyze(
-        const EstimateRequest(
-          imagePath: '/tmp/non-existent.jpg',
-          measuredDimensions: MeasuredDimensions(
-            widthMm: 200,
-            heightMm: 100,
-            referenceLabel: 'Standard card',
-          ),
-        ),
-      );
-      expect(noDepth.dimensions.depth, greaterThan(0));
-    },
-  );
+  test('traced dimensions preserve measured axes and inferred depth', () {
+    const measured = MeasuredDimensions(
+      widthMm: 200,
+      heightMm: 100,
+      referenceLabel: 'Standard card',
+    );
+    final merged = measured.mergeWith(
+      const DimensionsMm(width: 180, height: 90, depth: 50),
+    );
+    expect(merged.width, 200);
+    expect(merged.height, 100);
+    expect(merged.depth, 50);
+  });
 
   testWidgets('trace reference, width, and height to produce a measurement', (
     tester,

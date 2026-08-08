@@ -2,11 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import worker from "../src/index.js";
-import {
-  MonetizationError,
-  scanPackCredits,
-  validateGoogleProductPurchase,
-} from "../src/monetization.js";
+import {accessPayload} from "../src/monetization.js";
 
 const env = {
   OPENAI_API_KEY: "test-key",
@@ -24,6 +20,17 @@ test("health endpoint is available without secrets or input", async () => {
   assert.deepEqual(await response.json(), {ok: true});
 });
 
+test("readiness fails closed when production secrets are missing", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/ready"),
+    {},
+  );
+  assert.equal(response.status, 503);
+  const readiness = await response.json();
+  assert.equal(readiness.ok, false);
+  assert.ok(readiness.errors.includes("OPENAI_API_KEY is missing"));
+});
+
 test("unknown routes return JSON 404", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/missing"),
@@ -34,37 +41,39 @@ test("unknown routes return JSON 404", async () => {
   assert.equal((await response.json()).error.code, "not_found");
 });
 
-test("access endpoint is safe before billing enforcement is enabled", async () => {
+test("access endpoint exposes the ads-only starter wallet contract", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/access", {
       headers: {"X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx"},
     }),
-    {...env, BILLING_ENFORCED: "false"},
+    {...env, SCAN_ACCESS_ENFORCED: "false"},
   );
 
   assert.equal(response.status, 200);
   const access = await response.json();
-  assert.equal(access.planId, "free");
-  assert.equal(access.scanLimit, 3);
-  assert.equal(access.purchasedCredits, 0);
-  assert.equal(access.creditDebt, 0);
-  assert.equal(access.billingEnforced, false);
+  assert.equal(access.starterScansRemaining, 1);
+  assert.equal(access.rewardedScans, 0);
+  assert.equal(access.legacyScans, 0);
+  assert.equal(access.remainingScans, 1);
+  assert.equal(access.rewardBalanceCap, 3);
+  assert.equal(access.scanAccessEnforced, false);
   assert.equal(access.adsEnabled, false);
+  assert.equal(access.analysisModel, "gpt-5-nano");
 });
 
-test("billing cannot be enforced without D1 storage", async () => {
+test("scan access cannot be enforced without D1 storage", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/access", {
       headers: {"X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx"},
     }),
-    {...env, BILLING_ENFORCED: "true"},
+    {...env, SCAN_ACCESS_ENFORCED: "true"},
   );
 
   assert.equal(response.status, 503);
-  assert.equal((await response.json()).error.code, "billing_not_configured");
+  assert.equal((await response.json()).error.code, "access_not_configured");
 });
 
-test("billing rejects product IDs that are not owned by MassLens", async () => {
+test("removed billing routes return 404", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/billing/verify", {
       method: "POST",
@@ -80,110 +89,19 @@ test("billing rejects product IDs that are not owned by MassLens", async () => {
     env,
   );
 
-  assert.equal(response.status, 400);
-  assert.equal((await response.json()).error.code, "invalid_product");
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error.code, "not_found");
 });
 
-test("billing catalog contains only the 100 and 500 scan packs", () => {
-  assert.deepEqual(scanPackCredits, {
-    masslens_100_scans: 100,
-    masslens_500_scans: 500,
+test("wallet payload preserves legacy balance as ad-free access", () => {
+  const access = accessPayload({
+    starterUsed: 1,
+    rewardedScans: 2,
+    legacyScans: 7,
+    scanAccessEnforced: true,
   });
-});
-
-test("billing rejects retired subscription product IDs", async () => {
-  const response = await worker.fetch(
-    new Request("https://masslens.example/billing/verify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
-      },
-      body: JSON.stringify({
-        productId: "masslens_100_monthly",
-        purchaseToken: "abcdefghijklmnopqrstuvwxyz123456",
-      }),
-    }),
-    env,
-  );
-
-  assert.equal(response.status, 400);
-  assert.equal((await response.json()).error.code, "invalid_product");
-});
-
-test("one-time purchase validation accepts one matching unconsumed item", () => {
-  const result = validateGoogleProductPurchase(
-    {
-      purchaseStateContext: {purchaseState: "PURCHASED"},
-      productLineItem: [
-        {
-          productId: "masslens_100_scans",
-          productOfferDetails: {
-            quantity: 1,
-            consumptionState: "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
-          },
-        },
-      ],
-      purchaseCompletionTime: "2026-08-05T12:00:00Z",
-      obfuscatedExternalAccountId: "abcdefghijklmnopqrstuvwx",
-      orderId: "GPA.1234-5678-9012-34567",
-    },
-    "masslens_100_scans",
-  );
-
-  assert.equal(result.purchaseTimeMs, Date.parse("2026-08-05T12:00:00Z"));
-  assert.equal(result.externalAccountId, "abcdefghijklmnopqrstuvwx");
-  assert.equal(result.orderId, "GPA.1234-5678-9012-34567");
-});
-
-test("one-time purchase validation rejects pending, mismatched, and bulk items", () => {
-  const base = {
-    purchaseStateContext: {purchaseState: "PURCHASED"},
-    productLineItem: [
-      {
-        productId: "masslens_500_scans",
-        productOfferDetails: {
-          quantity: 1,
-          consumptionState: "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
-        },
-      },
-    ],
-    purchaseCompletionTime: "2026-08-05T12:00:00Z",
-    obfuscatedExternalAccountId: "abcdefghijklmnopqrstuvwx",
-  };
-
-  assert.throws(
-    () => validateGoogleProductPurchase(
-      {...base, purchaseStateContext: {purchaseState: "PENDING"}},
-      "masslens_500_scans",
-    ),
-    (error) => error instanceof MonetizationError &&
-      error.code === "purchase_pending",
-  );
-  assert.throws(
-    () => validateGoogleProductPurchase(base, "masslens_100_scans"),
-    (error) => error instanceof MonetizationError &&
-      error.code === "product_mismatch",
-  );
-  assert.throws(
-    () => validateGoogleProductPurchase(
-      {
-        ...base,
-        productLineItem: [
-          {
-            ...base.productLineItem[0],
-            productOfferDetails: {
-              ...base.productLineItem[0].productOfferDetails,
-              quantity: 2,
-            },
-          },
-        ],
-      },
-      "masslens_500_scans",
-    ),
-    (error) => error instanceof MonetizationError &&
-      error.code === "unsupported_quantity",
-  );
+  assert.equal(access.remainingScans, 9);
+  assert.equal(access.adsEnabled, false);
 });
 
 test("estimate endpoint requires an installation identifier", async () => {
@@ -198,6 +116,22 @@ test("estimate endpoint requires an installation identifier", async () => {
 
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "invalid_client_id");
+});
+
+test("estimate endpoint requires an idempotency identifier", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/estimate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+      },
+      body: "{}",
+    }),
+    env,
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "invalid_request_id");
 });
 
 test("one or two views are proxied without exposing the client identifier", async () => {
@@ -219,8 +153,10 @@ test("one or two views are proxied without exposing the client identifier", asyn
   globalThis.fetch = async (url, options) => {
     assert.equal(url, "https://api.openai.com/v1/responses");
     const body = JSON.parse(options.body);
-    assert.equal(body.model, "gpt-5.4-mini");
+    assert.equal(body.model, "gpt-5-nano");
     assert.equal(body.store, false);
+    assert.equal(body.reasoning.effort, "minimal");
+    assert.equal(body.max_output_tokens, 800);
     assert.match(body.safety_identifier, /^[a-f0-9]{64}$/);
     assert.equal(body.safety_identifier.includes(clientId), false);
     const imageParts = body.input[1].content.filter(
@@ -231,7 +167,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
     ).text;
     seenImageCounts.push(imageParts.length);
     seenPrompts.push(prompt);
-    assert.ok(imageParts.every((part) => part.detail === "high"));
+    assert.ok(imageParts.every((part) => part.detail === "low"));
     return new Response(
       JSON.stringify({
         output: [{content: [{text: JSON.stringify(estimate)}]}],
@@ -247,6 +183,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
         headers: {
           "Content-Type": "application/json",
           "X-MassLens-Client-ID": clientId,
+          "X-MassLens-Request-ID": "request_identifier_000001",
         },
         body: JSON.stringify({
           imageBase64: "aW1hZ2U=",
@@ -267,6 +204,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
         headers: {
           "Content-Type": "application/json",
           "X-MassLens-Client-ID": clientId,
+          "X-MassLens-Request-ID": "request_identifier_000002",
         },
         body: JSON.stringify({
           images: [
@@ -312,6 +250,7 @@ test("estimate endpoint rejects invalid measured dimensions", async () => {
       headers: {
         "Content-Type": "application/json",
         "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+        "X-MassLens-Request-ID": "request_identifier_000003",
       },
       body: JSON.stringify({
         images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
@@ -344,6 +283,7 @@ test("measured dimension validation enforces shape, bounds, and methods", async 
         headers: {
           "Content-Type": "application/json",
           "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+          "X-MassLens-Request-ID": `request_identifier_invalid_${invalidValues.indexOf(measuredDimensions)}`,
         },
         body: JSON.stringify({
           images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
@@ -365,6 +305,7 @@ test("estimate endpoint rejects an invalid known dimension", async () => {
       headers: {
         "Content-Type": "application/json",
         "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+        "X-MassLens-Request-ID": "request_identifier_000004",
       },
       body: JSON.stringify({
         images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
@@ -385,6 +326,7 @@ test("estimate endpoint rejects more than two views", async () => {
       headers: {
         "Content-Type": "application/json",
         "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+        "X-MassLens-Request-ID": "request_identifier_000005",
       },
       body: JSON.stringify({
         images: [

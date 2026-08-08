@@ -6,7 +6,6 @@ import '../../../core/widgets/app_components.dart';
 import '../../guide/presentation/guide_screen.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../home/presentation/home_screen.dart';
-import '../../monetization/presentation/paywall_sheet.dart';
 import '../../scale/presentation/digital_scale_screen.dart';
 import '../../scan/presentation/scan_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -36,12 +35,6 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _openScan({bool startWithGallery = false}) async {
     final monetization = AppScope.of(context).monetization;
-    await monetization.refreshAccess();
-    if (!mounted) return;
-    if (!monetization.access.canScan) {
-      await showMassLensPaywall(context);
-      if (!mounted || !monetization.access.canScan) return;
-    }
     final completed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => ScanScreen(startWithGallery: startWithGallery),
@@ -146,8 +139,8 @@ class _AppShellState extends State<AppShell> {
           Padding(
             padding: EdgeInsets.fromLTRB(28, 24, 28, 20),
             child: Text(
-              'Bluetooth readings are measurements. Touch mode and AI scans '
-              'are clearly labeled demonstrations or estimates.',
+              'Bluetooth readings are measurements. Touch mode is a simulator; '
+              'AI scans are real visual estimates.',
               style: TextStyle(
                 color: AppColors.inkMuted,
                 fontSize: 11.5,

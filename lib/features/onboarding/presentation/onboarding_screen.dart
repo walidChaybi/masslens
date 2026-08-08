@@ -36,9 +36,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       eyebrow: 'Private first',
       title: 'Your objects stay\nyours.',
       description:
-          'This MVP analyzes locally with a demo engine. Saved photos remain '
-          'in the app’s private storage on your device.',
+          'Photos are stripped of metadata and sent securely for real AI '
+          'analysis. Saved history remains private on your device.',
       icon: Icons.lock_outline_rounded,
+    ),
+    _OnboardingData(
+      eyebrow: 'Ads fund every scan',
+      title: 'No subscription.\nNo scan packs.',
+      description:
+          'Your first AI scan is included. After that, one verified rewarded '
+          'ad earns one real AI scan.',
+      icon: Icons.play_circle_outline_rounded,
     ),
   ];
 

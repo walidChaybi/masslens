@@ -37,6 +37,7 @@ migrate_working_dir/
 !*.example
 worker/node_modules/
 .wrangler/
+eval/private_dataset/
 
 # Symbolication related
 app.*.symbols

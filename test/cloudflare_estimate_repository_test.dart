@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image_library;
 import 'package:mass_lens/features/scan/data/cloudflare_estimate_repository.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
 import 'package:mass_lens/features/scan/domain/measured_dimensions.dart';
@@ -13,7 +14,9 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final directory = await Directory.systemTemp.createTemp('masslens-test-');
     final image = File('${directory.path}/object.jpg');
-    await image.writeAsBytes(const [0xFF, 0xD8, 0xFF, 0xD9]);
+    await image.writeAsBytes(
+      image_library.encodeJpg(image_library.Image(width: 320, height: 320)),
+    );
     final received = Completer<Map<String, Object?>>();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
@@ -42,6 +45,7 @@ void main() {
       await repository.analyze(
         EstimateRequest(
           imagePath: image.path,
+          requestId: 'request_identifier_flutter_test',
           measuredDimensions: const MeasuredDimensions(
             widthMm: 320,
             heightMm: 210,

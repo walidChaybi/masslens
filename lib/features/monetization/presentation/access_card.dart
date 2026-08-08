@@ -19,9 +19,9 @@ class AccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = access.freeScanLimit <= 0
-        ? 0.0
-        : (access.freeScansUsed / access.freeScanLimit).clamp(0.0, 1.0);
+    final balanceCapacity = access.rewardBalanceCap + 1;
+    final progress = (access.remainingScans / balanceCapacity).clamp(0.0, 1.0);
+    final canEarn = access.adsEnabled && access.canEarnReward;
     return Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
@@ -39,76 +39,69 @@ class AccessCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: access.hasPaidCredits
+                  color: access.remainingScans > 0
                       ? AppColors.lime
                       : Colors.white12,
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: Text(
-                  access.balanceName,
+                  access.remainingScans > 0 ? 'READY' : 'EARN A SCAN',
                   style: TextStyle(
-                    color: access.hasPaidCredits ? AppColors.ink : Colors.white,
+                    color: access.remainingScans > 0
+                        ? AppColors.ink
+                        : Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              const Spacer(),
-              TextButton(
+              const SizedBox(width: 8),
+              IconButton(
                 onPressed: onManage,
-                style: TextButton.styleFrom(foregroundColor: AppColors.lime),
-                child: const Text('Buy scans'),
+                tooltip: 'How scan access works',
+                color: AppColors.lime,
+                icon: const Icon(Icons.info_outline_rounded),
               ),
             ],
           ),
           Text(
-            access.billingEnforced
-                ? '${access.remainingScans} scans remaining'
-                : 'Plans ready for setup',
+            access.usageLabel,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 21,
               fontWeight: FontWeight.w800,
             ),
           ),
+          const SizedBox(height: 5),
+          Text(
+            access.breakdownLabel,
+            style: const TextStyle(color: Colors.white60, fontSize: 11.5),
+          ),
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: LinearProgressIndicator(
               minHeight: 7,
-              value: access.billingEnforced ? progress : 0,
+              value: progress,
               backgroundColor: Colors.white12,
               valueColor: const AlwaysStoppedAnimation(AppColors.lime),
             ),
           ),
-          if (access.billingEnforced) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${access.freeScansRemaining} free · '
-              '${access.bonusCredits} bonus · '
-              '${access.purchasedCredits} purchased',
-              style: const TextStyle(color: Colors.white60, fontSize: 11.5),
-            ),
-          ],
-          if (!access.hasPaidCredits &&
-              access.billingEnforced &&
-              access.remainingScans <= 0) ...[
+          if (canEarn) ...[
             const SizedBox(height: 12),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Need one more scan?',
-                    style: TextStyle(color: Colors.white70, fontSize: 12.5),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                key: const Key('access_watch_ad'),
+                onPressed: rewardedAdReady ? onRewardedAd : onManage,
+                icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+                label: Text(
+                  rewardedAdReady
+                      ? 'Watch an ad · Get 1 scan'
+                      : 'Rewarded ad is loading',
                 ),
-                TextButton.icon(
-                  onPressed: rewardedAdReady ? onRewardedAd : null,
-                  icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                  label: Text(rewardedAdReady ? 'Watch ad' : 'Ad loading'),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.lime),
-                ),
-              ],
+                style: TextButton.styleFrom(foregroundColor: AppColors.lime),
+              ),
             ),
           ],
         ],

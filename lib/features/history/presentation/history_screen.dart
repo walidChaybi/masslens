@@ -4,6 +4,7 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
+import '../../monetization/presentation/native_ad_card.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({required this.onScan, super.key});
@@ -106,18 +107,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   )
                 else
-                  for (final measurement in visible) ...[
+                  for (var index = 0; index < visible.length; index++) ...[
                     MeasurementCard(
-                      measurement: measurement,
+                      measurement: visible[index],
                       unitSystem: controller.unitSystem,
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) =>
-                              MeasurementDetailScreen(measurement: measurement),
+                          builder: (_) => MeasurementDetailScreen(
+                            measurement: visible[index],
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(height: 11),
+                    if (index == 1) ...[
+                      NativeAdCard(
+                        enabled: controller.monetization.canRequestNativeAds,
+                        placement: 'history_after_second',
+                        onPaidEvent: controller.monetization.reportPaidAd,
+                      ),
+                      const SizedBox(height: 11),
+                    ],
                   ],
               ],
             ),

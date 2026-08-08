@@ -4,7 +4,7 @@ import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../measurements/domain/measurement.dart';
-import '../../monetization/presentation/paywall_sheet.dart';
+import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../../scan/data/estimate_repository_factory.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -137,13 +137,12 @@ class SettingsScreen extends StatelessWidget {
           _SettingsCard(
             children: [
               _ActionRow(
-                icon: monetization.access.hasPaidCredits
-                    ? Icons.workspace_premium_rounded
-                    : Icons.auto_awesome_rounded,
-                title: monetization.access.balanceName,
-                subtitle: monetization.access.usageLabel,
+                icon: Icons.play_circle_outline_rounded,
+                title: 'Earn AI scans',
+                subtitle:
+                    '${monetization.access.usageLabel} · watch one ad for one scan',
                 color: AppColors.ink,
-                onTap: () => showMassLensPaywall(context),
+                onTap: () => showRewardedScanSheet(context),
               ),
             ],
           ),
@@ -205,8 +204,8 @@ class SettingsScreen extends StatelessWidget {
                 padding: EdgeInsets.all(17),
                 child: Text(
                   'A compatible Bluetooth scale provides physical readings. '
-                  'Touch mode is an interactive demo and AI scans are visual '
-                  'estimates. Never use MassLens for medical dosing, legal '
+                  'Touch mode is an interactive simulator and AI scans are '
+                  'real visual estimates. Never use MassLens for medical dosing, legal '
                   'trade, or other safety-critical decisions.',
                   style: TextStyle(
                     color: AppColors.inkMuted,

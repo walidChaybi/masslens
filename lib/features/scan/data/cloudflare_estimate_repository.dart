@@ -5,15 +5,18 @@ import '../../../core/services/installation_id_store.dart';
 import '../../measurements/domain/measurement.dart';
 import '../domain/estimate_repository.dart';
 import 'ai_estimate_payload.dart';
+import 'scan_image_processor.dart';
 
 class CloudflareEstimateRepository implements EstimateRepository {
   CloudflareEstimateRepository({
     required this.apiUrl,
     this.timeout = const Duration(seconds: 60),
+    this.imageProcessor = const ScanImageProcessor(),
   });
 
   final String apiUrl;
   final Duration timeout;
+  final ScanImageProcessor imageProcessor;
 
   @override
   Future<Measurement> analyze(EstimateRequest request) async {
@@ -21,32 +24,32 @@ class CloudflareEstimateRepository implements EstimateRepository {
     final imagePaths = [request.imagePath, ?request.secondaryImagePath];
     final images = <Map<String, String>>[];
     for (final imagePath in imagePaths) {
-      final imageFile = File(imagePath);
-      if (!await imageFile.exists()) {
-        throw CloudflareEstimateException('Image not found: $imagePath');
-      }
+      final prepared = await imageProcessor.prepare(imagePath);
       images.add({
-        'imageBase64': base64Encode(await imageFile.readAsBytes()),
-        'mimeType': mimeTypeForImagePath(imagePath),
+        'imageBase64': base64Encode(prepared.bytes),
+        'mimeType': prepared.mimeType,
       });
     }
 
-    final payload = await _postJson(uri, {
-      'images': images,
-      'material': request.material,
-      'fillState': request.fillState,
-      'referenceObject': request.referenceObject,
-      if (request.knownDimension case final knownDimension?)
-        'knownDimension': knownDimension.toJson(),
-      if (request.measuredDimensions case final measuredDimensions?)
-        'measuredDimensions': measuredDimensions.toJson(),
-    }, clientId: await InstallationIdStore.getOrCreate());
-
-    return measurementFromAiEstimatePayload(
-      payload,
-      request.imagePath,
-      isDemo: false,
+    final payload = await _postJson(
+      uri,
+      {
+        'images': images,
+        'material': request.material,
+        'fillState': request.fillState,
+        'referenceObject': request.referenceObject,
+        if (request.knownDimension case final knownDimension?)
+          'knownDimension': knownDimension.toJson(),
+        if (request.measuredDimensions case final measuredDimensions?)
+          'measuredDimensions': measuredDimensions.toJson(),
+      },
+      clientId: await InstallationIdStore.getOrCreate(),
+      requestId: request.requestId.isEmpty
+          ? ScanRequestId.create()
+          : request.requestId,
     );
+
+    return measurementFromAiEstimatePayload(payload, request.imagePath);
   }
 
   Uri _validatedApiUri() {
@@ -72,13 +75,15 @@ class CloudflareEstimateRepository implements EstimateRepository {
     Uri uri,
     Map<String, Object?> body, {
     required String clientId,
+    required String requestId,
   }) async {
     final client = HttpClient()..connectionTimeout = timeout;
     try {
       final request = await client.postUrl(uri).timeout(timeout);
       request.headers
         ..set(HttpHeaders.contentTypeHeader, ContentType.json.mimeType)
-        ..set('X-MassLens-Client-ID', clientId);
+        ..set('X-MassLens-Client-ID', clientId)
+        ..set('X-MassLens-Request-ID', requestId);
       request.write(jsonEncode(body));
 
       final response = await request.close().timeout(timeout);

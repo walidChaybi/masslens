@@ -41,7 +41,6 @@ class Measurement {
     required this.confidence,
     required this.dimensions,
     required this.assumptions,
-    this.isDemo = true,
   });
 
   final String id;
@@ -55,7 +54,6 @@ class Measurement {
   final ConfidenceLevel confidence;
   final DimensionsMm dimensions;
   final List<String> assumptions;
-  final bool isDemo;
 
   Measurement copyWith({
     String? imagePath,
@@ -74,7 +72,6 @@ class Measurement {
       confidence: confidence,
       dimensions: dimensions ?? this.dimensions,
       assumptions: assumptions ?? this.assumptions,
-      isDemo: isDemo,
     );
   }
 
@@ -90,7 +87,6 @@ class Measurement {
     'confidence': confidence.name,
     'dimensions': dimensions.toJson(),
     'assumptions': assumptions,
-    'isDemo': isDemo,
   };
 
   factory Measurement.fromJson(Map<String, Object?> json) {
@@ -108,7 +104,6 @@ class Measurement {
         Map<String, Object?>.from(json['dimensions']! as Map),
       ),
       assumptions: List<String>.from(json['assumptions']! as List),
-      isDemo: json['isDemo'] as bool? ?? true,
     );
   }
 }
