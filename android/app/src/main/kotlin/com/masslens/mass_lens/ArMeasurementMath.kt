@@ -1,5 +1,6 @@
 package com.masslens.mass_lens
 
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 enum class MeasureAxis(val label: String) {
@@ -10,11 +11,66 @@ enum class MeasureAxis(val label: String) {
 
 object ArMeasurementMath {
     fun distanceMillimeters(first: FloatArray, second: FloatArray): Double {
-        require(first.size >= 3 && second.size >= 3)
-        val dx = (second[0] - first[0]).toDouble()
-        val dy = (second[1] - first[1]).toDouble()
-        val dz = (second[2] - first[2]).toDouble()
+        val (dx, dy, dz) = deltas(first, second)
         return sqrt(dx * dx + dy * dy + dz * dz) * 1000.0
+    }
+
+    /**
+     * Measures only the world-space component that belongs to the requested
+     * axis. ARCore keeps Y aligned with gravity, so height ignores small
+     * horizontal targeting errors while length/depth ignore vertical drift.
+     */
+    fun axisDistanceMillimeters(
+        axis: MeasureAxis,
+        first: FloatArray,
+        second: FloatArray,
+    ): Double {
+        val (dx, dy, dz) = deltas(first, second)
+        return when (axis) {
+            MeasureAxis.HEIGHT -> abs(dy)
+            MeasureAxis.WIDTH,
+            MeasureAxis.DEPTH,
+            -> sqrt(dx * dx + dz * dz)
+        } * 1000.0
+    }
+
+    fun alignmentRatio(
+        axis: MeasureAxis,
+        first: FloatArray,
+        second: FloatArray,
+    ): Double {
+        val fullDistance = distanceMillimeters(first, second)
+        if (fullDistance <= 0.0) return 0.0
+        return axisDistanceMillimeters(axis, first, second) / fullDistance
+    }
+
+    /** Returns the component-wise median when every sample is close to it. */
+    fun stableTranslation(
+        samples: List<FloatArray>,
+        maxSpreadMillimeters: Double,
+    ): FloatArray? {
+        require(maxSpreadMillimeters > 0.0 && maxSpreadMillimeters.isFinite())
+        if (samples.isEmpty() || samples.any { it.size < 3 }) return null
+        val median = FloatArray(3) { axis ->
+            samples.map { it[axis] }.sorted()[samples.size / 2]
+        }
+        return median.takeIf { center ->
+            samples.all {
+                distanceMillimeters(it, center) <= maxSpreadMillimeters
+            }
+        }
+    }
+
+    private fun deltas(
+        first: FloatArray,
+        second: FloatArray,
+    ): Triple<Double, Double, Double> {
+        require(first.size >= 3 && second.size >= 3)
+        return Triple(
+            (second[0] - first[0]).toDouble(),
+            (second[1] - first[1]).toDouble(),
+            (second[2] - first[2]).toDouble(),
+        )
     }
 }
 

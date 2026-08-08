@@ -8,6 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 abstract final class InstallationIdStore {
   static const _preferenceKey = 'masslens_api_installation_id';
 
+  /// Distinguishes an upgraded installation from a genuinely fresh install
+  /// without creating a new identifier as a side effect.
+  static bool hasExisting(SharedPreferences preferences) {
+    final existing = preferences.getString(_preferenceKey);
+    return existing != null && existing.isNotEmpty;
+  }
+
   static Future<String> getOrCreate() async {
     final preferences = await SharedPreferences.getInstance();
     final existing = preferences.getString(_preferenceKey);

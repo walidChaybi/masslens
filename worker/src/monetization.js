@@ -1,5 +1,6 @@
 const clientIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 const requestIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
+const lifetimeStarterScans = 3;
 const rewardBalanceCap = 3;
 const resultTtlMs = 24 * 60 * 60 * 1000;
 const pendingTtlMs = 2 * 60 * 1000;
@@ -97,9 +98,9 @@ export async function reserveScan(env, clientIdHash, requestId) {
   let kind;
   const starter = await db.prepare(
     `UPDATE ad_scan_wallets
-        SET starter_used = 1, updated_at_ms = ?
-      WHERE client_id_hash = ? AND starter_used = 0`,
-  ).bind(now, clientIdHash).run();
+        SET starter_used = starter_used + 1, updated_at_ms = ?
+      WHERE client_id_hash = ? AND starter_used < ?`,
+  ).bind(now, clientIdHash, lifetimeStarterScans).run();
   if (changedRows(starter) === 1) {
     kind = "starter";
   } else {
@@ -180,7 +181,7 @@ export async function refundScan(env, clientIdHash, reservation) {
   if (reservation.kind === "starter") {
     await env.DB.prepare(
       `UPDATE ad_scan_wallets
-          SET starter_used = 0, updated_at_ms = ?
+          SET starter_used = MAX(0, starter_used - 1), updated_at_ms = ?
         WHERE client_id_hash = ?`,
     ).bind(now, clientIdHash).run();
   } else if (reservation.kind === "rewarded") {
@@ -288,7 +289,10 @@ export function accessPayload({
   scanAccessEnforced = false,
   env = {},
 } = {}) {
-  const starterScansRemaining = starterUsed > 0 ? 0 : 1;
+  const starterScansRemaining = Math.max(
+    0,
+    lifetimeStarterScans - Math.max(0, Number(starterUsed || 0)),
+  );
   const remainingScans =
     starterScansRemaining + rewardedScans + legacyScans;
   return {

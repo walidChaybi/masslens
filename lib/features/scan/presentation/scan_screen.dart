@@ -226,7 +226,9 @@ class _ScanScreenState extends State<ScanScreen> {
       setState(() => _error = 'Enter a dimension greater than zero.');
       return;
     }
-    if (widget.estimateRepository is CloudflareEstimateRepository) {
+    final isProductionCloudScan =
+        widget.estimateRepository is CloudflareEstimateRepository;
+    if (isProductionCloudScan) {
       try {
         final processor = const ScanImageProcessor();
         final warnings = <ScanImageWarning>[
@@ -248,15 +250,38 @@ class _ScanScreenState extends State<ScanScreen> {
       }
     }
 
-    final monetization = AppScope.of(context).monetization;
     final isIdempotentRetry = _requestId != null;
-    await monetization.refreshAccess();
-    if (!mounted) return;
-    if (!monetization.access.canScan && !isIdempotentRetry) {
-      final added = await showRewardedScanSheet(context);
-      if (!mounted || !added) return;
+    if (isProductionCloudScan) {
+      final monetization = AppScope.of(context).monetization;
       await monetization.refreshAccess();
-      if (!mounted || !monetization.access.canScan) return;
+      if (!mounted) return;
+
+      final accessUnavailable =
+          monetization.message != null ||
+          !monetization.access.isAuthoritative ||
+          !monetization.access.scanAccessEnforced;
+      if (accessUnavailable) {
+        setState(() {
+          _error =
+              'Scan access could not be verified. Check the connection and '
+              'try again; no scan was used.';
+        });
+        return;
+      }
+
+      // A retry with the same request ID may replay a completed result whose
+      // credit has already been consumed, so only a fresh request needs a
+      // positive wallet balance here.
+      if (!monetization.access.canScan && !isIdempotentRetry) {
+        final added = await showRewardedScanSheet(context);
+        if (!mounted || !added) return;
+        await monetization.refreshAccess();
+        if (!mounted ||
+            monetization.message != null ||
+            !monetization.access.canScan) {
+          return;
+        }
+      }
     }
 
     _requestId ??= ScanRequestId.create();
@@ -300,7 +325,7 @@ class _ScanScreenState extends State<ScanScreen> {
         _analysisStep = 3;
         _requestId = null;
       });
-      unawaited(AppScope.of(context).monetization.refreshAccess());
+      unawaited(AppScope.of(context).monetization.onScanCompleted());
     } on CloudflareEstimateException catch (error) {
       if (!mounted || run != _analysisRun) return;
       setState(() {
@@ -591,43 +616,47 @@ class _ScanScreenState extends State<ScanScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        child: _result != null
-            ? _ResultView(
-                key: const ValueKey('result'),
-                measurement: _result!,
-                unitSystem: AppScope.of(context).unitSystem,
-                saved: _saved,
-                onSave: _save,
-                onReset: _reset,
-              )
-            : _isAnalyzing
-            ? _AnalysisView(
-                key: const ValueKey('analysis'),
-                imagePath: _imagePath!,
-                step: _analysisStep,
-              )
-            : _imagePath == null
-            ? _CaptureView(
-                key: const ValueKey('capture'),
-                busy: _isPicking,
-                error: _error,
-                onMeasure: _captureMeasured,
-                onGallery: _captureFromGallery,
-              )
-            : _ReviewView(
-                key: const ValueKey('review'),
-                imagePath: _imagePath!,
-                secondImagePath: _secondaryImagePath,
-                measured: _measuredDimensions,
-                error: _error,
-                onEditMeasurement: _editMeasurement,
-                onClearMeasurement: () =>
-                    setState(() => _measuredDimensions = null),
-                onDetails: _showDetails,
-                onAnalyze: _analyze,
-              ),
+      body: SafeArea(
+        top: false,
+        maintainBottomViewPadding: true,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: _result != null
+              ? _ResultView(
+                  key: const ValueKey('result'),
+                  measurement: _result!,
+                  unitSystem: AppScope.of(context).unitSystem,
+                  saved: _saved,
+                  onSave: _save,
+                  onReset: _reset,
+                )
+              : _isAnalyzing
+              ? _AnalysisView(
+                  key: const ValueKey('analysis'),
+                  imagePath: _imagePath!,
+                  step: _analysisStep,
+                )
+              : _imagePath == null
+              ? _CaptureView(
+                  key: const ValueKey('capture'),
+                  busy: _isPicking,
+                  error: _error,
+                  onMeasure: _captureMeasured,
+                  onGallery: _captureFromGallery,
+                )
+              : _ReviewView(
+                  key: const ValueKey('review'),
+                  imagePath: _imagePath!,
+                  secondImagePath: _secondaryImagePath,
+                  measured: _measuredDimensions,
+                  error: _error,
+                  onEditMeasurement: _editMeasurement,
+                  onClearMeasurement: () =>
+                      setState(() => _measuredDimensions = null),
+                  onDetails: _showDetails,
+                  onAnalyze: _analyze,
+                ),
+        ),
       ),
     );
   }

@@ -27,6 +27,7 @@ class MonetizationController extends ChangeNotifier {
       onPaidEvent: (placement, value, precision, currency) {
         controller.reportPaidAd(placement, value, precision, currency);
       },
+      onStateChanged: () => controller._notifyAdStateChanged(),
     );
     controller = MonetizationController._(
       enabled: api != null,
@@ -55,6 +56,7 @@ class MonetizationController extends ChangeNotifier {
   bool _initialized = false;
   bool _loading = false;
   int _completedScanCount = 0;
+  int? _pendingInterstitialScanCount;
 
   AccessStatus get access => _access;
   String? get message => _message;
@@ -64,6 +66,11 @@ class MonetizationController extends ChangeNotifier {
       _adService.canRequestNativeAds && _access.adsEnabled;
   bool get rewardedAdReady => _adService.rewardedReady;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
+
+  void _notifyAdStateChanged() {
+    if (!hasListeners) return;
+    notifyListeners();
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -106,14 +113,26 @@ class MonetizationController extends ChangeNotifier {
 
   Future<void> onScanCompleted() async {
     _completedScanCount += 1;
+    if (_completedScanCount % _access.adPolicy.interstitialEvery == 0) {
+      _pendingInterstitialScanCount = _completedScanCount;
+    }
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setInt(_completedScanCountKey, _completedScanCount);
     } on Object {
       // Continue with this session's cadence if persistence is unavailable.
     }
-    await _adService.showInterstitialAfterScan(_completedScanCount);
     await refreshAccess();
+  }
+
+  /// Full-screen ads wait until the user closes the result, which is the
+  /// natural transition back to app content. Multiple scans started from the
+  /// same result route are still counted individually.
+  Future<void> onResultScreenClosed() async {
+    final qualifyingCount = _pendingInterstitialScanCount;
+    if (qualifyingCount == null) return;
+    final shown = await _adService.showInterstitialAfterScan(qualifyingCount);
+    if (shown) _pendingInterstitialScanCount = null;
   }
 
   Future<bool> watchAdForScan() async {

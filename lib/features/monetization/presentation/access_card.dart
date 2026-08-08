@@ -19,92 +19,86 @@ class AccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final balanceCapacity = access.rewardBalanceCap + 1;
-    final progress = (access.remainingScans / balanceCapacity).clamp(0.0, 1.0);
     final canEarn = access.adsEnabled && access.canEarnReward;
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.ink,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final balanceText = access.isAuthoritative
+        ? '${access.remainingScans} scan${access.remainingScans == 1 ? '' : 's'} available'
+        : 'Loading scan balance…';
+    return Material(
+      key: const Key('compact_access_card'),
+      color: AppColors.ink,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onManage,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: AppColors.lime,
+                  shape: BoxShape.circle,
                 ),
-                decoration: BoxDecoration(
-                  color: access.remainingScans > 0
-                      ? AppColors.lime
-                      : Colors.white12,
-                  borderRadius: BorderRadius.circular(99),
+                child: const Icon(
+                  Icons.center_focus_strong_rounded,
+                  color: AppColors.ink,
+                  size: 20,
                 ),
-                child: Text(
-                  access.remainingScans > 0 ? 'READY' : 'EARN A SCAN',
-                  style: TextStyle(
-                    color: access.remainingScans > 0
-                        ? AppColors.ink
-                        : Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      balanceText,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      access.isAuthoritative
+                          ? access.breakdownLabel
+                          : '3 starter scans, then watch an ad',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton(
-                onPressed: onManage,
-                tooltip: 'How scan access works',
-                color: AppColors.lime,
-                icon: const Icon(Icons.info_outline_rounded),
-              ),
+              if (canEarn)
+                FilledButton.icon(
+                  key: const Key('access_watch_ad'),
+                  onPressed: rewardedAdReady ? onRewardedAd : onManage,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 38),
+                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    backgroundColor: AppColors.lime,
+                    foregroundColor: AppColors.ink,
+                    textStyle: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text('Get +1'),
+                )
+              else
+                const Icon(Icons.chevron_right_rounded, color: Colors.white54),
             ],
           ),
-          Text(
-            access.usageLabel,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 21,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            access.breakdownLabel,
-            style: const TextStyle(color: Colors.white60, fontSize: 11.5),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              minHeight: 7,
-              value: progress,
-              backgroundColor: Colors.white12,
-              valueColor: const AlwaysStoppedAnimation(AppColors.lime),
-            ),
-          ),
-          if (canEarn) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                key: const Key('access_watch_ad'),
-                onPressed: rewardedAdReady ? onRewardedAd : onManage,
-                icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                label: Text(
-                  rewardedAdReady
-                      ? 'Watch an ad · Get 1 scan'
-                      : 'Rewarded ad is loading',
-                ),
-                style: TextButton.styleFrom(foregroundColor: AppColors.lime),
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

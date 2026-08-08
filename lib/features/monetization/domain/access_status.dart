@@ -65,10 +65,10 @@ class AccessStatus {
   });
 
   const AccessStatus.fallback()
-    : starterScansRemaining = 1,
+    : starterScansRemaining = 3,
       rewardedScans = 0,
       legacyScans = 0,
-      remainingScans = 1,
+      remainingScans = 3,
       rewardBalanceCap = 3,
       scanAccessEnforced = false,
       adsEnabled = false,
@@ -106,12 +106,14 @@ class AccessStatus {
   final String analysisModel;
   final AdPolicy adPolicy;
 
+  /// AI access fails closed until the production Worker confirms both the
+  /// enforced wallet contract and a positive balance.
   bool get canScan =>
-      !isAuthoritative || !scanAccessEnforced || remainingScans > 0;
+      isAuthoritative && scanAccessEnforced && remainingScans > 0;
   bool get canEarnReward => rewardedScans < rewardBalanceCap;
 
   String get usageLabel {
-    if (!isAuthoritative) return 'Checking scans…';
+    if (!isAuthoritative) return 'Loading scan balance…';
     if (!scanAccessEnforced) return 'Access preview';
     return '$remainingScans scan${remainingScans == 1 ? '' : 's'} left';
   }

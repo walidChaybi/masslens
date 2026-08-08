@@ -14,11 +14,13 @@ typedef PaidAdReporter =
     );
 
 class AppAdService {
-  AppAdService({this.onPaidEvent});
+  AppAdService({this.onPaidEvent, this.onStateChanged});
 
   final PaidAdReporter? onPaidEvent;
+  final void Function()? onStateChanged;
 
   bool _initialized = false;
+  bool _disposed = false;
   bool _adsAllowed = false;
   bool _canRequestAds = false;
   bool _privacyOptionsRequired = false;
@@ -26,6 +28,7 @@ class AppAdService {
   bool _appOpenShowing = false;
   bool _interstitialLoading = false;
   bool _interstitialShowing = false;
+  bool _rewardedLoading = false;
   RewardedAd? _rewarded;
   AppOpenAd? _appOpenAd;
   InterstitialAd? _interstitial;
@@ -84,6 +87,11 @@ class AppAdService {
         PrivacyOptionsRequirementStatus.required;
     if (_canRequestAds || AdMobConfig.useTestIds) {
       await MobileAds.instance.initialize();
+      if (AdMobConfig.testDeviceIds.isNotEmpty) {
+        await MobileAds.instance.updateRequestConfiguration(
+          RequestConfiguration(testDeviceIds: AdMobConfig.testDeviceIds),
+        );
+      }
     }
   }
 
@@ -105,17 +113,33 @@ class AppAdService {
   }
 
   void _loadRewarded() {
-    if (!canRequestAds ||
+    if (_disposed ||
+        !canRequestAds ||
         !AdMobConfig.hasRewardedConfiguration ||
-        _rewarded != null) {
+        _rewarded != null ||
+        _rewardedLoading) {
       return;
     }
+    _rewardedLoading = true;
     RewardedAd.load(
       adUnitId: AdMobConfig.rewardedAdUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) => _rewarded = ad,
-        onAdFailedToLoad: (_) => _rewarded = null,
+        onAdLoaded: (ad) {
+          _rewardedLoading = false;
+          _rewarded = ad;
+          onStateChanged?.call();
+        },
+        onAdFailedToLoad: (_) {
+          _rewardedLoading = false;
+          _rewarded = null;
+          onStateChanged?.call();
+          Future<void>.delayed(const Duration(seconds: 20), () {
+            if (!_disposed && _adsAllowed && _rewarded == null) {
+              _loadRewarded();
+            }
+          });
+        },
       ),
     );
   }
@@ -135,10 +159,12 @@ class AppAdService {
         onAdLoaded: (ad) {
           _interstitialLoading = false;
           _interstitial = ad;
+          onStateChanged?.call();
         },
         onAdFailedToLoad: (_) {
           _interstitialLoading = false;
           _interstitial = null;
+          onStateChanged?.call();
         },
       ),
     );
@@ -163,6 +189,7 @@ class AppAdService {
           _appOpenLoadedAt = DateTime.now();
           _appOpenLoadWaiter?.complete();
           _appOpenLoadWaiter = null;
+          onStateChanged?.call();
         },
         onAdFailedToLoad: (_) {
           _appOpenLoading = false;
@@ -170,6 +197,7 @@ class AppAdService {
           _appOpenLoadedAt = null;
           _appOpenLoadWaiter?.complete();
           _appOpenLoadWaiter = null;
+          onStateChanged?.call();
         },
       ),
     );
@@ -297,6 +325,7 @@ class AppAdService {
   void _disposeLoadedAds() {
     _rewarded?.dispose();
     _rewarded = null;
+    _rewardedLoading = false;
     _interstitial?.dispose();
     _interstitial = null;
     _interstitialLoading = false;
@@ -310,5 +339,8 @@ class AppAdService {
     _appOpenLoadWaiter = null;
   }
 
-  void dispose() => _disposeLoadedAds();
+  void dispose() {
+    _disposed = true;
+    _disposeLoadedAds();
+  }
 }

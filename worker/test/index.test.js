@@ -51,10 +51,10 @@ test("access endpoint exposes the ads-only starter wallet contract", async () =>
 
   assert.equal(response.status, 200);
   const access = await response.json();
-  assert.equal(access.starterScansRemaining, 1);
+  assert.equal(access.starterScansRemaining, 3);
   assert.equal(access.rewardedScans, 0);
   assert.equal(access.legacyScans, 0);
-  assert.equal(access.remainingScans, 1);
+  assert.equal(access.remainingScans, 3);
   assert.equal(access.rewardBalanceCap, 3);
   assert.equal(access.scanAccessEnforced, false);
   assert.equal(access.adsEnabled, false);
@@ -100,7 +100,7 @@ test("wallet payload preserves legacy balance as ad-free access", () => {
     legacyScans: 7,
     scanAccessEnforced: true,
   });
-  assert.equal(access.remainingScans, 9);
+  assert.equal(access.remainingScans, 11);
   assert.equal(access.adsEnabled, false);
 });
 

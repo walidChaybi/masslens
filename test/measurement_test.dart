@@ -42,11 +42,30 @@ void main() {
     expect(EstimateEngineConfig.productionModelLabel, 'gpt-5-nano');
   });
 
-  test('ads-only access has one starter and a rewarded balance cap', () {
+  test('ads-only access has three starters and a rewarded balance cap', () {
     const access = AccessStatus.fallback();
-    expect(access.starterScansRemaining, 1);
+    expect(access.starterScansRemaining, 3);
     expect(access.rewardBalanceCap, 3);
     expect(access.rewardedScans, 0);
+    expect(access.canScan, isFalse);
+
+    final enforced = AccessStatus.fromJson(const {
+      'starterScansRemaining': 3,
+      'rewardedScans': 0,
+      'legacyScans': 0,
+      'remainingScans': 3,
+      'rewardBalanceCap': 3,
+      'scanAccessEnforced': true,
+      'adsEnabled': true,
+    });
+    expect(enforced.canScan, isTrue);
+
+    final preview = AccessStatus.fromJson(const {
+      'remainingScans': 3,
+      'scanAccessEnforced': false,
+      'adsEnabled': false,
+    });
+    expect(preview.canScan, isFalse);
   });
 
   test('server ad policy enforces scan cadence and cooldowns', () {

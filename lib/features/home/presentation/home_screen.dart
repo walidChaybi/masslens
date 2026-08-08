@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
           horizontalPadding,
           28,
           horizontalPadding,
-          32,
+          32 + MediaQuery.viewPaddingOf(context).bottom,
         ),
         children: [
           Row(
@@ -74,21 +74,8 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _HomeCapturePanel(onMeasure: onMeasure, onGallery: onGallery),
-          const SizedBox(height: 14),
-          AccessCard(
-            access: access,
-            rewardedAdReady: controller.monetization.rewardedAdReady,
-            onManage: () => showRewardedScanSheet(context),
-            onRewardedAd: () => showRewardedScanSheet(context),
-          ),
-          const SizedBox(height: 14),
-          NativeAdCard(
-            enabled: controller.monetization.canRequestNativeAds,
-            placement: 'ai_home',
-            onPaidEvent: controller.monetization.reportPaidAd,
-          ),
           if (recent != null) ...[
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
@@ -115,6 +102,20 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 14),
+          NativeAdCard(
+            enabled: controller.monetization.canRequestNativeAds,
+            placement: 'ai_home',
+            height: 100,
+            onPaidEvent: controller.monetization.reportPaidAd,
+          ),
+          const SizedBox(height: 12),
+          AccessCard(
+            access: access,
+            rewardedAdReady: controller.monetization.rewardedAdReady,
+            onManage: () => showRewardedScanSheet(context),
+            onRewardedAd: () => showRewardedScanSheet(context),
+          ),
         ],
       ),
     );

@@ -18,6 +18,16 @@ Future<ui.Image> _fakeImage(String path) async {
   return picture.toImage(400, 300);
 }
 
+Future<ui.Image> _letterboxImage(String path) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  canvas.drawRect(
+    const Rect.fromLTWH(0, 0, 400, 100),
+    ui.Paint()..color = const Color(0xFF8A8F98),
+  );
+  return recorder.endRecording().toImage(400, 100);
+}
+
 void main() {
   test('calibration converts traced pixels to clamped millimeters', () {
     final calibration = MeasureCalibration.fromReference(
@@ -146,7 +156,11 @@ void main() {
     // Reference step: pick the card and trace its long edge.
     await tester.tap(find.byKey(const Key('reference_card')));
     await tester.pumpAndSettle();
-    expect(find.text('Standard card · 85.6 mm'), findsOneWidget);
+    expect(find.text('Trace the card’s long edge'), findsOneWidget);
+    expect(
+      find.text('Keep the reference and object in the same plane'),
+      findsOneWidget,
+    );
 
     final canvas = find.byKey(const Key('measure_canvas'));
     final center = tester.getCenter(canvas);
@@ -169,12 +183,63 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(result, isNotNull);
-    expect(result!.referenceLabel, 'Standard card');
+    expect(result!.referenceLabel, 'Card long edge');
     expect(result!.widthMm, greaterThan(20));
     expect(result!.widthMm, lessThan(85.6));
     expect(result!.heightMm, greaterThan(15));
     expect(result!.heightMm, lessThan(68.4));
     expect(result!.depthMm, isNull);
+  });
+
+  testWidgets('offers explicit long and short payment-card edges', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PhotoMeasureScreen(imagePath: 'fake', decodeImage: _fakeImage),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Card long · 85.60'), findsOneWidget);
+    expect(find.text('Card short · 53.98'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('reference_card_short')));
+    await tester.pump();
+    expect(find.text('Trace the card’s short edge'), findsOneWidget);
+  });
+
+  testWidgets('letterbox touches are clamped to the actual photo', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: PhotoMeasureScreen(
+          imagePath: 'letterbox',
+          decodeImage: _letterboxImage,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('reference_card')));
+    await tester.pump();
+
+    final canvas = find.byKey(const Key('measure_canvas'));
+    final rect = tester.getRect(canvas);
+    await tester.dragFrom(
+      Offset(rect.center.dx, rect.top + 8),
+      const Offset(0, 55),
+    );
+    await tester.pump();
+    final next = tester.widget<FilledButton>(
+      find.byKey(const Key('measure_next_button')),
+    );
+    expect(next.onPressed, isNotNull);
+    await tester.tap(find.byKey(const Key('measure_next_button')));
+    await tester.pump();
+
+    expect(find.text('CALIBRATE'), findsOneWidget);
   });
 
   testWidgets('skipping measurement returns null', (tester) async {

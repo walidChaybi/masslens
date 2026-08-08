@@ -339,11 +339,12 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
                     16,
                     6,
                     16,
-                    MediaQuery.paddingOf(context).bottom + 12,
+                    MediaQuery.viewPaddingOf(context).bottom + 12,
                   ),
                   child: NativeAdCard(
                     enabled: controller.monetization.canRequestNativeAds,
                     placement: 'scale_first_screen',
+                    height: 100,
                     onPaidEvent: controller.monetization.reportPaidAd,
                   ),
                 ),
@@ -353,7 +354,7 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
           Positioned(
             left: 16,
             right: 16,
-            bottom: MediaQuery.paddingOf(context).bottom + 18,
+            bottom: MediaQuery.viewPaddingOf(context).bottom + 18,
             child: AnimatedSlide(
               duration: const Duration(milliseconds: 260),
               curve: Curves.easeOutCubic,

@@ -110,6 +110,7 @@ class _FallbackCameraScreenState extends State<FallbackCameraScreen>
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
+        maintainBottomViewPadding: true,
         child: Stack(
           fit: StackFit.expand,
           children: [

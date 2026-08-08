@@ -40,7 +40,7 @@ class _AppShellState extends State<AppShell> {
         builder: (_) => ScanScreen(startWithGallery: startWithGallery),
       ),
     );
-    if (completed == true) await monetization.onScanCompleted();
+    if (completed == true) await monetization.onResultScreenClosed();
   }
 
   void _selectDestination(_AppDestination destination) {

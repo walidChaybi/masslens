@@ -25,6 +25,7 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.Gravity
@@ -33,6 +34,7 @@ import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -90,6 +92,8 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
     private var capturing = false
     private var hasTracked = false
     private var trackingDeadline = Long.MAX_VALUE
+    private val centerHitSamples = ArrayDeque<CenterHitSample>()
+    private var lastCenterHitSampleAt = 0L
 
     private val quadCoordinates = floatBufferOf(
         -1f, -1f,
@@ -109,8 +113,15 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.BLACK
-        window.decorView.systemUiVisibility =
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        }
         buildInterface()
     }
 
@@ -163,19 +174,17 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
                 marginEnd = dp(58)
             },
         )
-        root.addView(
-            topBar,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP,
-            ).apply { topMargin = dp(22) },
-        )
+        val topBarLayout = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP,
+        ).apply { topMargin = dp(8) }
+        root.addView(topBar, topBarLayout)
 
         val bottomPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(18), dp(14), dp(18), dp(18))
+            setPadding(dp(14), dp(10), dp(14), dp(12))
             background = roundedBackground(Color.argb(175, 8, 13, 20), dp(8).toFloat())
         }
         instructionView = TextView(this).apply {
@@ -193,36 +202,26 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
         )
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, 0)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, 0)
         }
         val undo = roundImageButton(android.R.drawable.ic_menu_revert, "Undo point") {
             surfaceView.queueEvent { undoOnGlThread() }
         }
         addButton = TextView(this).apply {
             text = "+"
-            textSize = 38f
+            textSize = 34f
             gravity = Gravity.CENTER
             setTextColor(Color.rgb(19, 34, 56))
             contentDescription = "Add measurement point"
             isClickable = true
             isFocusable = true
-            background = roundedBackground(LIME, dp(36).toFloat())
+            background = roundedBackground(LIME, dp(32).toFloat())
             setOnClickListener { addRequested.set(true) }
         }
         val reset = roundImageButton(android.R.drawable.ic_menu_delete, "Reset points") {
             surfaceView.queueEvent { resetOnGlThread() }
         }
-        controls.addView(undo, LinearLayout.LayoutParams(dp(48), dp(48)))
-        controls.addView(
-            addButton,
-            LinearLayout.LayoutParams(dp(72), dp(72)).apply {
-                marginStart = dp(30)
-                marginEnd = dp(30)
-            },
-        )
-        controls.addView(reset, LinearLayout.LayoutParams(dp(48), dp(48)))
-        bottomPanel.addView(controls)
         doneButton = Button(this).apply {
             text = "Done"
             textSize = 15f
@@ -238,27 +237,56 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
                 }
             }
         }
-        bottomPanel.addView(
-            doneButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(50),
-            ).apply { topMargin = dp(10) },
-        )
-        root.addView(
-            bottomPanel,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM,
-            ).apply {
-                leftMargin = dp(12)
-                rightMargin = dp(12)
-                bottomMargin = dp(16)
+        controls.addView(undo, LinearLayout.LayoutParams(dp(44), dp(44)))
+        controls.addView(
+            addButton,
+            LinearLayout.LayoutParams(dp(64), dp(64)).apply {
+                marginStart = dp(12)
+                marginEnd = dp(12)
             },
         )
+        controls.addView(reset, LinearLayout.LayoutParams(dp(44), dp(44)))
+        controls.addView(
+            doneButton,
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+                marginStart = dp(14)
+            },
+        )
+        bottomPanel.addView(controls)
+        val bottomPanelLayout = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            Gravity.BOTTOM,
+        ).apply {
+            leftMargin = dp(12)
+            rightMargin = dp(12)
+            bottomMargin = dp(12)
+        }
+        root.addView(bottomPanel, bottomPanelLayout)
         setContentView(root)
-        updateControls(false, false)
+        applySystemBarInsets(root, topBarLayout, bottomPanelLayout)
+        updateControls(false, false, false)
+    }
+
+    private fun applySystemBarInsets(
+        root: View,
+        topBarLayout: FrameLayout.LayoutParams,
+        bottomPanelLayout: FrameLayout.LayoutParams,
+    ) {
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val (topInset, bottomInset) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val systemBars = insets.getInsets(WindowInsets.Type.systemBars())
+                systemBars.top to systemBars.bottom
+            } else {
+                @Suppress("DEPRECATION")
+                (insets.systemWindowInsetTop to insets.systemWindowInsetBottom)
+            }
+            topBarLayout.topMargin = topInset + dp(8)
+            bottomPanelLayout.bottomMargin = bottomInset + dp(12)
+            root.requestLayout()
+            insets
+        }
+        root.requestApplyInsets()
     }
 
     override fun onResume() {
@@ -389,11 +417,17 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
                 return
             }
             val hit = if (tracking) bestCenterHit(frame) else null
-            if (addRequested.getAndSet(false) && hit != null) {
-                placePoint(hit)
+            var stableHit = updateCenterHitSamples(hit)
+            if (addRequested.getAndSet(false)) {
+                if (stableHit == null) {
+                    showTemporaryMessage("Hold steady before placing the point")
+                } else {
+                    placePoint(stableHit)
+                    stableHit = null
+                }
             }
             updateOverlay(frame, hit)
-            updateControls(tracking, hit != null)
+            updateControls(tracking, hit != null, stableHit != null)
             if (captureRequested.getAndSet(false)) captureFrame(frame)
         } catch (_: CameraNotAvailableException) {
             runOnUiThread { finishWithStatus("fallback") }
@@ -413,21 +447,109 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
             ?: hits.firstOrNull { it.trackable is Point && valid(it) }
     }
 
-    private fun placePoint(hit: HitResult) {
+    private fun updateCenterHitSamples(hit: HitResult?): StableCenterHit? {
+        if (hit == null) {
+            clearCenterHitSamples()
+            return null
+        }
+        val kind = when (hit.trackable) {
+            is DepthPoint -> CenterHitKind.DEPTH
+            is Plane -> CenterHitKind.PLANE
+            else -> CenterHitKind.POINT
+        }
+        val previousKind = centerHitSamples.lastOrNull()?.kind
+        if (previousKind != null && previousKind != kind) {
+            clearCenterHitSamples()
+        }
+        val now = SystemClock.uptimeMillis()
+        if (now - lastCenterHitSampleAt >= CENTER_HIT_SAMPLE_INTERVAL_MS) {
+            centerHitSamples.addLast(
+                CenterHitSample(
+                    translation = hit.hitPose.translation.copyOf(),
+                    kind = kind,
+                    timestampMillis = now,
+                ),
+            )
+            lastCenterHitSampleAt = now
+        }
+        while (
+            centerHitSamples.isNotEmpty() &&
+            (
+                centerHitSamples.size > CENTER_HIT_SAMPLE_COUNT ||
+                    now - centerHitSamples.first().timestampMillis > CENTER_HIT_MAX_AGE_MS
+            )
+        ) {
+            centerHitSamples.removeFirst()
+        }
+        if (
+            centerHitSamples.size < CENTER_HIT_SAMPLE_COUNT ||
+            centerHitSamples.last().timestampMillis - centerHitSamples.first().timestampMillis <
+            CENTER_HIT_MIN_DURATION_MS
+        ) {
+            return null
+        }
+        val translation = ArMeasurementMath.stableTranslation(
+            centerHitSamples.map { it.translation },
+            MAX_CENTER_HIT_SPREAD_MM,
+        ) ?: return null
+        if (
+            ArMeasurementMath.distanceMillimeters(
+                translation,
+                hit.hitPose.translation,
+            ) > MAX_CENTER_HIT_SPREAD_MM
+        ) {
+            return null
+        }
+        return StableCenterHit(
+            pose = Pose.makeTranslation(translation[0], translation[1], translation[2]),
+            fromDepth = kind == CenterHitKind.DEPTH,
+        )
+    }
+
+    private fun clearCenterHitSamples() {
+        centerHitSamples.clear()
+        lastCenterHitSampleAt = 0L
+    }
+
+    private fun placePoint(hit: StableCenterHit) {
         if (measurementLines.size >= 3) return
-        val point = PlacedPoint(hit.createAnchor(), hit.trackable is DepthPoint)
+        val activeSession = session ?: return
+        val point = PlacedPoint(activeSession.createAnchor(hit.pose), hit.fromDepth)
         val first = pendingPoint
         if (first == null) {
             pendingPoint = point
+            clearCenterHitSamples()
             runOnUiThread { addButton.performHapticFeedback(HapticFeedbackConstants.CONFIRM) }
             return
         }
-        val millimeters = ArMeasurementMath.distanceMillimeters(
-            first.anchor.pose.translation,
-            point.anchor.pose.translation,
+        val axis = currentAxis()
+        val firstTranslation = first.anchor.pose.translation
+        val secondTranslation = point.anchor.pose.translation
+        val millimeters = ArMeasurementMath.axisDistanceMillimeters(
+            axis,
+            firstTranslation,
+            secondTranslation,
         )
+        val alignment = ArMeasurementMath.alignmentRatio(
+            axis,
+            firstTranslation,
+            secondTranslation,
+        )
+        if (alignment < MIN_AXIS_ALIGNMENT_RATIO) {
+            point.anchor.detach()
+            clearCenterHitSamples()
+            showTemporaryMessage(
+                if (axis == MeasureAxis.HEIGHT) {
+                    "Measure height straight up and down"
+                } else {
+                    "Keep this measurement level"
+                },
+            )
+            return
+        }
         if (millimeters !in MIN_MM..MAX_MM) {
             point.anchor.detach()
+            clearCenterHitSamples()
             showTemporaryMessage("Keep the measurement between 0.5 cm and 5 m")
             return
         }
@@ -435,9 +557,9 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
             axis = measurementState.complete(millimeters),
             first = first,
             second = point,
-            millimeters = millimeters,
         )
         pendingPoint = null
+        clearCenterHitSamples()
         runOnUiThread { addButton.performHapticFeedback(HapticFeedbackConstants.CONFIRM) }
     }
 
@@ -450,6 +572,7 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
             measurementLines.removeLast().detach()
             measurementState.undo()
         }
+        clearCenterHitSamples()
         lastUiState = ""
     }
 
@@ -459,34 +582,47 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
         measurementState.reset()
         pendingPoint?.anchor?.detach()
         pendingPoint = null
+        clearCenterHitSamples()
         lastUiState = ""
     }
 
     private fun currentAxis(): MeasureAxis = measurementState.currentAxis
 
-    private fun updateControls(tracking: Boolean, hitValid: Boolean) {
+    private fun updateControls(
+        tracking: Boolean,
+        hitValid: Boolean,
+        hitStable: Boolean,
+    ) {
         val axis = currentAxis()
         val hasFirst = pendingPoint != null
         val message = if (SystemClock.uptimeMillis() < messageUntil) messageText else null
-        val uiState = "$tracking|$hitValid|$axis|$hasFirst|${measurementLines.size}|$message"
+        val uiState =
+            "$tracking|$hitValid|$hitStable|$axis|$hasFirst|${measurementLines.size}|$message"
         if (uiState == lastUiState) return
         lastUiState = uiState
         runOnUiThread {
             val instruction = message ?: when {
                 !tracking -> "Move your phone slowly"
                 !hitValid -> "Aim at a visible surface"
-                hasFirst -> "Aim at the second point"
-                axis == MeasureAxis.DEPTH -> "Depth is optional"
-                else -> "Aim at the first point"
+                !hitStable -> "Hold steady"
+                hasFirst && axis == MeasureAxis.HEIGHT -> "Place the top point"
+                hasFirst -> "Place the other end"
+                axis == MeasureAxis.WIDTH -> "Place one end of the length"
+                axis == MeasureAxis.HEIGHT -> "Place the bottom point"
+                else -> "Optional: place the front depth point"
             }
             instructionView.text = instruction
             val stepNumber = (measurementState.completedCount + 1).coerceAtMost(3)
-            axisView.text = "${axis.label.uppercase()}  ·  $stepNumber OF 3"
+            axisView.text = if (axis == MeasureAxis.DEPTH) {
+                "DEPTH  ·  OPTIONAL"
+            } else {
+                "${axis.label.uppercase()}  ·  $stepNumber OF 2"
+            }
             addButton.isEnabled =
-                tracking && hitValid && !capturing && measurementLines.size < 3
+                tracking && hitStable && !capturing && measurementLines.size < 3
             addButton.alpha = if (addButton.isEnabled) 1f else 0.45f
             doneButton.isEnabled = measurementState.canFinish && !capturing
-            overlayView.setReticleValid(tracking && hitValid)
+            overlayView.setReticleValid(tracking && hitStable)
         }
     }
 
@@ -512,13 +648,19 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
         val lines = measurementLines.mapNotNull { line ->
             val first = project(line.first.anchor.pose, viewProjection) ?: return@mapNotNull null
             val second = project(line.second.anchor.pose, viewProjection) ?: return@mapNotNull null
-            OverlayLine(first, second, line.displayLabel, false)
+            OverlayLine(
+                first,
+                second,
+                "${line.axis.label} ${formatDistance(line.currentMillimeters)}",
+                false,
+            )
         }
         val pending = pendingPoint?.let { point ->
             val first = project(point.anchor.pose, viewProjection)
             val second = hit?.hitPose?.let { project(it, viewProjection) }
             if (first != null && second != null) {
-                val distance = ArMeasurementMath.distanceMillimeters(
+                val distance = ArMeasurementMath.axisDistanceMillimeters(
+                    currentAxis(),
                     point.anchor.pose.translation,
                     hit.hitPose.translation,
                 )
@@ -551,14 +693,39 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
     }
 
     private fun captureFrame(frame: Frame) {
+        val widthLine = measurementLines.firstOrNull { it.axis == MeasureAxis.WIDTH }
+        val heightLine = measurementLines.firstOrNull { it.axis == MeasureAxis.HEIGHT }
+        val depthLine = measurementLines.firstOrNull { it.axis == MeasureAxis.DEPTH }
+        val width = widthLine?.currentMillimeters
+        val height = heightLine?.currentMillimeters
+        val depth = depthLine?.currentMillimeters
+        val requiredLinesAreValid =
+            widthLine != null &&
+                heightLine != null &&
+                width != null &&
+                height != null &&
+                width in MIN_MM..MAX_MM &&
+                height in MIN_MM..MAX_MM &&
+                widthLine.currentAlignment >= MIN_AXIS_ALIGNMENT_RATIO &&
+                heightLine.currentAlignment >= MIN_AXIS_ALIGNMENT_RATIO
+        val depthIsValid =
+            depthLine == null ||
+                (
+                    depth != null &&
+                        depth in MIN_MM..MAX_MM &&
+                        depthLine.currentAlignment >= MIN_AXIS_ALIGNMENT_RATIO
+                )
+        if (!requiredLinesAreValid || !depthIsValid) {
+            capturing = false
+            showTemporaryMessage("A point moved. Undo that line and measure it again")
+            runOnUiThread { doneButton.text = "Done" }
+            return
+        }
         try {
             frame.acquireCameraImage().use { image ->
                 val jpeg = Yuv420Converter.toJpeg(image, cameraRotationDegrees())
                 val file = File(cacheDir, "masslens-ar-${System.currentTimeMillis()}.jpg")
                 FileOutputStream(file).use { it.write(jpeg) }
-                val width = checkNotNull(measurementState.value(MeasureAxis.WIDTH))
-                val height = checkNotNull(measurementState.value(MeasureAxis.HEIGHT))
-                val depth = measurementState.value(MeasureAxis.DEPTH)
                 val method = if (
                     depthSupported && measurementLines.all { it.usedOnlyDepthPoints }
                 ) {
@@ -570,8 +737,8 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
                     val data = Intent()
                         .putExtra(EXTRA_STATUS, "completed")
                         .putExtra(EXTRA_IMAGE_PATH, file.absolutePath)
-                        .putExtra(EXTRA_WIDTH_MM, width)
-                        .putExtra(EXTRA_HEIGHT_MM, height)
+                        .putExtra(EXTRA_WIDTH_MM, checkNotNull(width))
+                        .putExtra(EXTRA_HEIGHT_MM, checkNotNull(height))
                         .putExtra(EXTRA_METHOD, method)
                     if (depth != null) data.putExtra(EXTRA_DEPTH_MM, depth)
                     setResult(RESULT_OK, data)
@@ -729,6 +896,12 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
         private const val CAMERA_PERMISSION_REQUEST = 913
         private const val MIN_MM = 5.0
         private const val MAX_MM = 5000.0
+        private const val MIN_AXIS_ALIGNMENT_RATIO = 0.80
+        private const val CENTER_HIT_SAMPLE_COUNT = 10
+        private const val CENTER_HIT_SAMPLE_INTERVAL_MS = 30L
+        private const val CENTER_HIT_MIN_DURATION_MS = 240L
+        private const val CENTER_HIT_MAX_AGE_MS = 600L
+        private const val MAX_CENTER_HIT_SPREAD_MM = 12.0
         private const val TRACKING_TIMEOUT_MS = 15_000L
         private const val LIME = 0xFFB9F44A.toInt()
 
@@ -755,14 +928,37 @@ class ArMeasureActivity : Activity(), GLSurfaceView.Renderer {
 
 private data class PlacedPoint(val anchor: Anchor, val fromDepth: Boolean)
 
+private enum class CenterHitKind { DEPTH, PLANE, POINT }
+
+private data class CenterHitSample(
+    val translation: FloatArray,
+    val kind: CenterHitKind,
+    val timestampMillis: Long,
+)
+
+private data class StableCenterHit(
+    val pose: Pose,
+    val fromDepth: Boolean,
+)
+
 private data class MeasurementLine(
     val axis: MeasureAxis,
     val first: PlacedPoint,
     val second: PlacedPoint,
-    val millimeters: Double,
 ) {
     val usedOnlyDepthPoints: Boolean get() = first.fromDepth && second.fromDepth
-    val displayLabel: String get() = "${axis.label} ${formatDistance(millimeters)}"
+    val currentMillimeters: Double
+        get() = ArMeasurementMath.axisDistanceMillimeters(
+            axis,
+            first.anchor.pose.translation,
+            second.anchor.pose.translation,
+        )
+    val currentAlignment: Double
+        get() = ArMeasurementMath.alignmentRatio(
+            axis,
+            first.anchor.pose.translation,
+            second.anchor.pose.translation,
+        )
 
     fun detach() {
         first.anchor.detach()

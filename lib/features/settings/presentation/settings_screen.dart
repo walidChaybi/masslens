@@ -51,7 +51,6 @@ class SettingsScreen extends StatelessWidget {
     final controller = AppScope.of(context);
     final monetization = controller.monetization;
     return SafeArea(
-      bottom: false,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [

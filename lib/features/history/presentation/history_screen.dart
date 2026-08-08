@@ -33,7 +33,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
               .toList();
 
     return SafeArea(
-      bottom: false,
       child: CustomScrollView(
         slivers: [
           SliverPadding(

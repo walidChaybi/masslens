@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
 import 'package:mass_lens/app/mass_lens_app.dart';
+import 'package:mass_lens/core/services/installation_id_store.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
 import 'package:mass_lens/features/home/presentation/home_screen.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
@@ -22,6 +23,7 @@ void main() {
   testWidgets('opens directly on the labeled touch scale', (tester) async {
     final controller = AppController(
       measurementStore: const MeasurementStore(),
+      onboardingComplete: true,
     );
     await tester.pumpWidget(MassLensApp(controller: controller));
     await tester.pump();
@@ -31,6 +33,61 @@ void main() {
     expect(find.byKey(const Key('scale_touch_surface')), findsOneWidget);
     expect(find.byKey(const Key('shell_scan_button')), findsNothing);
   });
+
+  testWidgets('incomplete onboarding is shown once before the app shell', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+    );
+    await tester.pumpWidget(MassLensApp(controller: controller));
+    await tester.pump();
+
+    expect(find.byKey(const Key('onboarding_pages')), findsOneWidget);
+    expect(find.byKey(const Key('digital_scale_screen')), findsNothing);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    expect(controller.onboardingComplete, isTrue);
+    expect(find.byKey(const Key('onboarding_pages')), findsNothing);
+    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+  });
+
+  test(
+    'bootstrap skips restored onboarding for an upgraded installation',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'masslens_api_installation_id': 'legacy_installation_identifier',
+      });
+      final controller = await AppController.bootstrap(
+        store: const _FakeMeasurementStore(),
+      );
+      addTearDown(controller.dispose);
+
+      expect(controller.onboardingComplete, isTrue);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getBool('mass_lens.onboarding_complete'), isTrue);
+    },
+  );
+
+  test(
+    'fresh onboarding remains incomplete after an installation ID is created',
+    () async {
+      final first = await AppController.bootstrap(
+        store: const _FakeMeasurementStore(),
+      );
+      addTearDown(first.dispose);
+      expect(first.onboardingComplete, isFalse);
+
+      await InstallationIdStore.getOrCreate();
+      final relaunched = await AppController.bootstrap(
+        store: const _FakeMeasurementStore(),
+      );
+      addTearDown(relaunched.dispose);
+      expect(relaunched.onboardingComplete, isFalse);
+    },
+  );
 
   testWidgets('left navigation exposes AI scan, history, and settings', (
     tester,

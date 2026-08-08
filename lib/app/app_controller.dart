@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/services/installation_id_store.dart';
 import '../features/measurements/data/measurement_store.dart';
 import '../features/measurements/domain/measurement.dart';
 import '../features/monetization/application/monetization_controller.dart';
@@ -48,7 +49,18 @@ class AppController extends ChangeNotifier {
     DateTime? previousBackgroundedAt;
     try {
       final preferences = await SharedPreferences.getInstance();
-      onboardingComplete = preferences.getBool(_onboardingKey) ?? false;
+      final savedOnboarding = preferences.getBool(_onboardingKey);
+      // Earlier releases always opened AppShell and never wrote the onboarding
+      // preference. An existing installation ID proves this is an upgrade, so
+      // do not unexpectedly trap that user in newly restored onboarding.
+      onboardingComplete =
+          savedOnboarding ?? InstallationIdStore.hasExisting(preferences);
+      if (savedOnboarding == null) {
+        // Persist both outcomes before unconditional monetization startup can
+        // create an installation ID. A fresh user who closes onboarding midway
+        // must still see it on the next launch.
+        await preferences.setBool(_onboardingKey, onboardingComplete);
+      }
       unitSystem = UnitSystem.values.byName(
         preferences.getString(_unitKey) ?? UnitSystem.metric.name,
       );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -9,12 +10,14 @@ class NativeAdCard extends StatefulWidget {
   const NativeAdCard({
     required this.enabled,
     required this.placement,
+    this.height = 100,
     this.onPaidEvent,
     super.key,
   });
 
   final bool enabled;
   final String placement;
+  final double height;
   final PaidAdReporter? onPaidEvent;
 
   @override
@@ -117,17 +120,35 @@ class _NativeAdCardState extends State<NativeAdCard>
   Widget build(BuildContext context) {
     super.build(context); // Required by AutomaticKeepAliveClientMixin.
     if (!widget.enabled || !_loaded || _ad == null || _adError) {
-      return const SizedBox.shrink();
+      if (!widget.enabled || !kDebugMode) return const SizedBox.shrink();
+      return Container(
+        key: Key('native_ad_loading_${widget.placement}'),
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.line),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          _adError ? 'Test ad retrying…' : 'Sponsored · test ad loading…',
+          style: const TextStyle(
+            color: AppColors.inkMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
     }
     return RepaintBoundary(
       child: Semantics(
         label: 'Sponsored content',
         child: Container(
           key: _adKey,
-          height: 108,
+          height: widget.height,
           decoration: BoxDecoration(
             color: AppColors.surface,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.line),
           ),
           clipBehavior: Clip.antiAlias,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/shell/presentation/app_shell.dart';
 import 'app_controller.dart';
 
@@ -18,27 +19,50 @@ class MassLensApp extends StatefulWidget {
 class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
   DateTime? _backgroundedAt;
   bool _checkingResumeAd = false;
+  late bool _onboardingComplete;
 
   @override
   void initState() {
     super.initState();
+    _onboardingComplete = widget.controller.onboardingComplete;
+    widget.controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addObserver(this);
-    if (widget.controller.onboardingComplete &&
-        widget.controller.monetization.enabled) {
-      _checkingResumeAd = true;
+    if (widget.controller.monetization.enabled) {
+      _checkingResumeAd = _onboardingComplete;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_initializeAdsForLaunch());
       });
     }
   }
 
+  @override
+  void didUpdateWidget(covariant MassLensApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.controller, widget.controller)) return;
+    oldWidget.controller.removeListener(_handleControllerChanged);
+    _onboardingComplete = widget.controller.onboardingComplete;
+    widget.controller.addListener(_handleControllerChanged);
+  }
+
+  void _handleControllerChanged() {
+    final complete = widget.controller.onboardingComplete;
+    if (!mounted || complete == _onboardingComplete) return;
+    setState(() => _onboardingComplete = complete);
+  }
+
   Future<void> _initializeAdsForLaunch() async {
-    await widget.controller.initializeMonetization();
-    final backgroundTime = widget.controller.takePreviousBackgroundDuration();
-    if (backgroundTime != null) {
-      await widget.controller.handleAppResumed(backgroundTime);
+    // Balance and consent initialization must also run before onboarding is
+    // complete. Only the full-screen app-open placement is gated by onboarding.
+    final allowLaunchAd = _onboardingComplete;
+    try {
+      await widget.controller.initializeMonetization();
+      final backgroundTime = widget.controller.takePreviousBackgroundDuration();
+      if (allowLaunchAd && backgroundTime != null) {
+        await widget.controller.handleAppResumed(backgroundTime);
+      }
+    } finally {
+      if (mounted) setState(() => _checkingResumeAd = false);
     }
-    if (mounted) setState(() => _checkingResumeAd = false);
   }
 
   @override
@@ -66,6 +90,7 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_handleControllerChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -90,7 +115,7 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
               ),
           ],
         ),
-        home: const AppShell(),
+        home: _onboardingComplete ? const AppShell() : const OnboardingScreen(),
       ),
     );
   }

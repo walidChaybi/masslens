@@ -7,7 +7,7 @@ MassLens is an Android-first Flutter app with three honest modes:
 - real photo analysis through the Cloudflare Worker and OpenAI Responses API.
 
 There is no AI demo, offline fallback result, subscription, or scan pack. A new
-installation receives one lifetime starter scan. After that, one AdMob rewarded
+installation receives three lifetime starter scans. After that, one AdMob rewarded
 ad earns one scan after server-side verification. Provider failures refund the
 reserved scan; the app never fabricates a result.
 

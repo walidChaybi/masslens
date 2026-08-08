@@ -1,19 +1,21 @@
 CREATE TABLE IF NOT EXISTS ad_scan_wallets (
   client_id_hash TEXT PRIMARY KEY,
-  starter_used INTEGER NOT NULL DEFAULT 0 CHECK (starter_used IN (0, 1)),
+  starter_used INTEGER NOT NULL DEFAULT 0 CHECK (
+    starter_used BETWEEN 0 AND 3
+  ),
   rewarded_balance INTEGER NOT NULL DEFAULT 0 CHECK (rewarded_balance >= 0),
   updated_at_ms INTEGER NOT NULL
 );
 
--- Carry forward beta usage without restoring the old monthly reset. Anyone who
--- already spent an included scan has used the one lifetime starter scan, and
--- every previously verified bonus remains available.
+-- Carry forward beta usage without restoring the old monthly reset. Previously
+-- consumed beta scans count against the three lifetime starter scans, while
+-- every verified bonus remains available.
 INSERT OR IGNORE INTO ad_scan_wallets (
   client_id_hash, starter_used, rewarded_balance, updated_at_ms
 )
 SELECT
   client_id_hash,
-  CASE WHEN included_used > 0 THEN 1 ELSE 0 END,
+  MIN(3, MAX(0, included_used)),
   bonus_credits,
   updated_at_ms
 FROM free_usage;
@@ -29,7 +31,11 @@ BEGIN
     NEW.client_id_hash, 0, NEW.reward_amount, NEW.created_at_ms
   )
   ON CONFLICT(client_id_hash) DO UPDATE SET
-    rewarded_balance = ad_scan_wallets.rewarded_balance + NEW.reward_amount,
+    rewarded_balance = CASE
+      WHEN ad_scan_wallets.rewarded_balance < 3
+      THEN MIN(3, ad_scan_wallets.rewarded_balance + NEW.reward_amount)
+      ELSE ad_scan_wallets.rewarded_balance
+    END,
     updated_at_ms = NEW.created_at_ms;
 END;
 

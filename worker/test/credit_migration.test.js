@@ -120,7 +120,7 @@ test("ads-only migration carries bonus scans and preserves legacy credits", () =
   const wallet = db.prepare(
     "SELECT starter_used, rewarded_balance FROM ad_scan_wallets",
   ).get();
-  assert.equal(wallet.starter_used, 1);
+  assert.equal(wallet.starter_used, 2);
   assert.equal(wallet.rewarded_balance, 2);
 
   db.prepare(
@@ -132,6 +132,17 @@ test("ads-only migration carries bonus scans and preserves legacy credits", () =
     `INSERT OR IGNORE INTO ad_rewards (
        transaction_id, client_id_hash, period_key, reward_amount, created_at_ms
      ) VALUES ('transaction-1', 'client-hash', 'lifetime', 1, 201)`,
+  ).run();
+  assert.equal(
+    db.prepare(
+      "SELECT rewarded_balance FROM ad_scan_wallets WHERE client_id_hash = 'client-hash'",
+    ).get().rewarded_balance,
+    3,
+  );
+  db.prepare(
+    `INSERT OR IGNORE INTO ad_rewards (
+       transaction_id, client_id_hash, period_key, reward_amount, created_at_ms
+     ) VALUES ('transaction-2', 'client-hash', 'lifetime', 1, 202)`,
   ).run();
   assert.equal(
     db.prepare(
@@ -187,7 +198,43 @@ test("starter reservation refunds failures and replays completed JSON", async ()
   );
 
   const payload = accessPayload({starterUsed: 1, scanAccessEnforced: true});
-  assert.equal(payload.remainingScans, 0);
+  assert.equal(payload.remainingScans, 2);
+  sqlite.close();
+});
+
+test("exactly three lifetime starter scans are available", async () => {
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(initialMigration);
+  sqlite.exec(creditsMigration);
+  sqlite.exec(adsOnlyMigration);
+  const env = {DB: d1Adapter(sqlite), SCAN_ACCESS_ENFORCED: "true"};
+  const clientHash = "b".repeat(64);
+
+  for (let index = 1; index <= 3; index += 1) {
+    const reservation = await reserveScan(
+      env,
+      clientHash,
+      `starter_request_identifier_${index}`,
+    );
+    assert.equal(reservation.kind, "starter");
+  }
+
+  await assert.rejects(
+    reserveScan(env, clientHash, "starter_request_identifier_4"),
+    (error) => error instanceof MonetizationError &&
+      error.status === 402 &&
+      error.code === "scan_limit_reached",
+  );
+  assert.equal(
+    sqlite.prepare(
+      "SELECT starter_used FROM ad_scan_wallets WHERE client_id_hash = ?",
+    ).get(clientHash).starter_used,
+    3,
+  );
+  assert.equal(
+    accessPayload({starterUsed: 3, scanAccessEnforced: true}).remainingScans,
+    0,
+  );
   sqlite.close();
 });
 

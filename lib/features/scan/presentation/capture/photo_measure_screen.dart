@@ -18,6 +18,8 @@ Future<ui.Image> _decodeImage(String path) async {
 
 enum _MeasureStep { reference, width, height, depth }
 
+enum _DragTarget { start, end, newLine }
+
 class PhotoMeasureScreen extends StatefulWidget {
   const PhotoMeasureScreen({
     required this.imagePath,
@@ -46,6 +48,7 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
   bool _snapEnabled = true;
   double? _widthMm;
   double? _heightMm;
+  _DragTarget? _dragTarget;
 
   @override
   void initState() {
@@ -82,6 +85,7 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
       _step = _MeasureStep.reference;
       _start = null;
       _end = null;
+      _dragTarget = null;
     });
   }
 
@@ -111,16 +115,15 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
 
   Offset _measurementPoint(Offset localPosition, Size canvasSize) {
     final image = _image;
-    final snapper = _snapper;
-    if (!_snapEnabled || image == null || snapper == null) {
-      return localPosition;
-    }
+    if (image == null) return localPosition;
     final destination = _imageDestination(canvasSize, image);
-    final scale = destination.width / image.width;
     final clamped = Offset(
       localPosition.dx.clamp(destination.left, destination.right).toDouble(),
       localPosition.dy.clamp(destination.top, destination.bottom).toDouble(),
     );
+    final snapper = _snapper;
+    if (!_snapEnabled || snapper == null) return clamped;
+    final scale = destination.width / image.width;
     final imagePoint = Offset(
       (clamped.dx - destination.left) / scale,
       (clamped.dy - destination.top) / scale,
@@ -133,6 +136,46 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
       destination.left + snapped.dx * scale,
       destination.top + snapped.dy * scale,
     );
+  }
+
+  void _beginLine(Offset localPosition, Size canvasSize) {
+    final point = _measurementPoint(localPosition, canvasSize);
+    final start = _start;
+    final end = _end;
+    const handleRadius = 38.0;
+    if (start != null && end != null) {
+      final startDistance = (point - start).distance;
+      final endDistance = (point - end).distance;
+      if (math.min(startDistance, endDistance) <= handleRadius) {
+        setState(() {
+          _dragTarget = startDistance <= endDistance
+              ? _DragTarget.start
+              : _DragTarget.end;
+          if (_dragTarget == _DragTarget.start) {
+            _start = point;
+          } else {
+            _end = point;
+          }
+        });
+        return;
+      }
+    }
+    setState(() {
+      _dragTarget = _DragTarget.newLine;
+      _start = point;
+      _end = point;
+    });
+  }
+
+  void _updateLine(Offset localPosition, Size canvasSize) {
+    final point = _measurementPoint(localPosition, canvasSize);
+    setState(() {
+      if (_dragTarget == _DragTarget.start) {
+        _start = point;
+      } else {
+        _end = point;
+      }
+    });
   }
 
   void _next() {
@@ -153,6 +196,7 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
           _step = _MeasureStep.width;
           _start = null;
           _end = null;
+          _dragTarget = null;
           _error = null;
         });
       case _MeasureStep.width:
@@ -161,6 +205,7 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
           _step = _MeasureStep.height;
           _start = null;
           _end = null;
+          _dragTarget = null;
         });
       case _MeasureStep.height:
         _heightMm = _calibration!.toMillimeters(pixels);
@@ -178,6 +223,7 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
       _step = _MeasureStep.depth;
       _start = null;
       _end = null;
+      _dragTarget = null;
     });
   }
 
@@ -194,10 +240,21 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
   }
 
   String get _instruction => switch (_step) {
-    _MeasureStep.reference => 'Trace the known edge',
-    _MeasureStep.width => 'Trace the object width',
-    _MeasureStep.height => 'Trace the object height',
+    _MeasureStep.reference when _referenceLabel == 'Card long edge' =>
+      'Trace the card’s long edge',
+    _MeasureStep.reference when _referenceLabel == 'Card short edge' =>
+      'Trace the card’s short edge',
+    _MeasureStep.reference => 'Trace the exact known edge',
+    _MeasureStep.width => 'Trace the object length',
+    _MeasureStep.height => 'Trace the object height vertically',
     _MeasureStep.depth => 'Trace the object depth',
+  };
+
+  String get _stepLabel => switch (_step) {
+    _MeasureStep.reference => 'CALIBRATE',
+    _MeasureStep.width => '1 / 2  LENGTH',
+    _MeasureStep.height => '2 / 2  HEIGHT',
+    _MeasureStep.depth => 'OPTIONAL  DEPTH',
   };
 
   String get _actionLabel => switch (_step) {
@@ -242,6 +299,7 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
       ),
       body: SafeArea(
         top: false,
+        maintainBottomViewPadding: true,
         child: Column(
           children: [
             Padding(
@@ -253,6 +311,16 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
+                          _stepLabel,
+                          style: const TextStyle(
+                            color: AppColors.lime,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
                           _instruction,
                           style: const TextStyle(
                             color: Colors.white,
@@ -262,7 +330,9 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
                         ),
                         if (_referenceLabel != null)
                           Text(
-                            '$_referenceLabel · ${_referenceMm!.toStringAsFixed(1)} mm',
+                            _step == _MeasureStep.reference
+                                ? 'Keep the reference and object in the same plane'
+                                : '$_referenceLabel · ${_referenceMm!.toStringAsFixed(2)} mm',
                             style: const TextStyle(color: Colors.white60),
                           ),
                       ],
@@ -297,24 +367,17 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
                         behavior: HitTestBehavior.opaque,
                         onPanStart: _referenceMm == null
                             ? null
-                            : (details) {
-                                final point = _measurementPoint(
-                                  details.localPosition,
-                                  canvasSize,
-                                );
-                                setState(() {
-                                  _start = point;
-                                  _end = point;
-                                });
-                              },
+                            : (details) =>
+                                  _beginLine(details.localPosition, canvasSize),
                         onPanUpdate: _referenceMm == null
                             ? null
-                            : (details) => setState(
-                                () => _end = _measurementPoint(
-                                  details.localPosition,
-                                  canvasSize,
-                                ),
+                            : (details) => _updateLine(
+                                details.localPosition,
+                                canvasSize,
                               ),
+                        onPanEnd: _referenceMm == null
+                            ? null
+                            : (_) => _dragTarget = null,
                         child: CustomPaint(
                           painter: _PhotoMeasurePainter(
                             image: _image,
@@ -345,7 +408,8 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
             if (_referenceMm == null)
               _ReferencePicker(
                 customController: _customReferenceController,
-                onCard: () => _selectReference('Standard card', 85.6),
+                onCardLong: () => _selectReference('Card long edge', 85.60),
+                onCardShort: () => _selectReference('Card short edge', 53.98),
                 onCoin: () => _selectReference('€1 coin', 23.25),
                 onCustom: _selectCustomReference,
               ),
@@ -360,30 +424,43 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
             if (_referenceMm != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_step == _MeasureStep.height &&
-                        _lineLength != null) ...[
-                      TextButton(
-                        key: const Key('measure_depth_button'),
-                        onPressed: _measureDepth,
-                        child: const Text(
-                          'Add depth',
-                          style: TextStyle(color: Colors.white70),
-                        ),
+                    if (_lineLength != null) ...[
+                      const Text(
+                        'Drag either dot to fine-tune the edge.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(height: 8),
                     ],
-                    Expanded(
-                      child: FilledButton(
-                        key: const Key('measure_next_button'),
-                        onPressed: _lineLength == null ? null : _next,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.lime,
-                          foregroundColor: AppColors.ink,
+                    Row(
+                      children: [
+                        if (_step == _MeasureStep.height &&
+                            _lineLength != null) ...[
+                          TextButton(
+                            key: const Key('measure_depth_button'),
+                            onPressed: _measureDepth,
+                            child: const Text(
+                              'Add depth',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: FilledButton(
+                            key: const Key('measure_next_button'),
+                            onPressed: _lineLength == null ? null : _next,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.lime,
+                              foregroundColor: AppColors.ink,
+                            ),
+                            child: Text(_actionLabel),
+                          ),
                         ),
-                        child: Text(_actionLabel),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -398,13 +475,15 @@ class _PhotoMeasureScreenState extends State<PhotoMeasureScreen> {
 class _ReferencePicker extends StatelessWidget {
   const _ReferencePicker({
     required this.customController,
-    required this.onCard,
+    required this.onCardLong,
+    required this.onCardShort,
     required this.onCoin,
     required this.onCustom,
   });
 
   final TextEditingController customController;
-  final VoidCallback onCard;
+  final VoidCallback onCardLong;
+  final VoidCallback onCardShort;
   final VoidCallback onCoin;
   final VoidCallback onCustom;
 
@@ -416,37 +495,43 @@ class _ReferencePicker extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Choose the reference beside the object',
+            'Place one reference beside the object',
             style: TextStyle(
               color: Colors.white70,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 10),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  key: const Key('reference_card'),
-                  onPressed: onCard,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white30),
-                  ),
-                  child: const Text('Payment card'),
+              OutlinedButton(
+                key: const Key('reference_card'),
+                onPressed: onCardLong,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white30),
                 ),
+                child: const Text('Card long · 85.60'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton(
-                  key: const Key('reference_coin'),
-                  onPressed: onCoin,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white30),
-                  ),
-                  child: const Text('€1 coin'),
+              OutlinedButton(
+                key: const Key('reference_card_short'),
+                onPressed: onCardShort,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white30),
                 ),
+                child: const Text('Card short · 53.98'),
+              ),
+              OutlinedButton(
+                key: const Key('reference_coin'),
+                onPressed: onCoin,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white30),
+                ),
+                child: const Text('€1 coin · 23.25'),
               ),
             ],
           ),
@@ -495,21 +580,45 @@ class _EdgeSnapper {
   const _EdgeSnapper({
     required this.width,
     required this.height,
+    required this.sourceWidth,
+    required this.sourceHeight,
     required this.luminance,
   });
 
   final int width;
   final int height;
+  final int sourceWidth;
+  final int sourceHeight;
   final Uint8List luminance;
 
   static Future<_EdgeSnapper?> fromImage(ui.Image image) async {
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    const maxSide = 1280;
+    final resizeScale = math.min(
+      1.0,
+      maxSide / math.max(image.width, image.height),
+    );
+    final width = math.max(1, (image.width * resizeScale).round());
+    final height = math.max(1, (image.height * resizeScale).round());
+    ui.Image sampled = image;
+    if (resizeScale < 1) {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+        Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+      sampled = await recorder.endRecording().toImage(width, height);
+    }
+    final bytes = await sampled.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (!identical(sampled, image)) sampled.dispose();
     if (bytes == null) return null;
     final rgba = bytes.buffer.asUint8List(
       bytes.offsetInBytes,
       bytes.lengthInBytes,
     );
-    final luminance = Uint8List(image.width * image.height);
+    final luminance = Uint8List(width * height);
     var source = 0;
     for (var target = 0; target < luminance.length; target++) {
       final r = rgba[source];
@@ -521,17 +630,25 @@ class _EdgeSnapper {
       source += 4;
     }
     return _EdgeSnapper(
-      width: image.width,
-      height: image.height,
+      width: width,
+      height: height,
+      sourceWidth: image.width,
+      sourceHeight: image.height,
       luminance: luminance,
     );
   }
 
   Offset snap(Offset point, {required double radius}) {
     if (width < 3 || height < 3) return point;
-    final centerX = point.dx.round().clamp(1, width - 2).toInt();
-    final centerY = point.dy.round().clamp(1, height - 2).toInt();
-    final searchRadius = radius.round().clamp(2, 34).toInt();
+    final xScale = width / sourceWidth;
+    final yScale = height / sourceHeight;
+    final mapPoint = Offset(point.dx * xScale, point.dy * yScale);
+    final centerX = mapPoint.dx.round().clamp(1, width - 2).toInt();
+    final centerY = mapPoint.dy.round().clamp(1, height - 2).toInt();
+    final searchRadius = (radius * math.min(xScale, yScale))
+        .round()
+        .clamp(2, 34)
+        .toInt();
     final minX = math.max(1, centerX - searchRadius);
     final maxX = math.min(width - 2, centerX + searchRadius);
     final minY = math.max(1, centerY - searchRadius);
@@ -547,8 +664,8 @@ class _EdgeSnapper {
         final gy = (luminance[index + width] - luminance[index - width]).abs();
         final edge = gx + gy;
         if (edge < 30) continue;
-        final dx = x - point.dx;
-        final dy = y - point.dy;
+        final dx = x - mapPoint.dx;
+        final dy = y - mapPoint.dy;
         final score = edge - math.sqrt(dx * dx + dy * dy) * 4.2;
         if (score > bestScore) {
           bestScore = score;
@@ -559,7 +676,7 @@ class _EdgeSnapper {
     }
 
     if (bestScore < 34) return point;
-    return Offset(bestX.toDouble(), bestY.toDouble());
+    return Offset(bestX / xScale, bestY / yScale);
   }
 }
 

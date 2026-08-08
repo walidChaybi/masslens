@@ -44,8 +44,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       eyebrow: 'Ads fund every scan',
       title: 'No subscription.\nNo scan packs.',
       description:
-          'Your first AI scan is included. After that, one verified rewarded '
-          'ad earns one real AI scan.',
+          'Your first three AI scans are included. After that, one verified '
+          'rewarded ad earns one real AI scan.',
       icon: Icons.play_circle_outline_rounded,
     ),
   ];
