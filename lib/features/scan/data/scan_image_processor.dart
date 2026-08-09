@@ -7,6 +7,8 @@ import 'package:image/image.dart' as img;
 
 enum ScanImageWarning { dark, blurry }
 
+enum ScanImageErrorCode { missing, corrupt, tooSmall }
+
 extension ScanImageWarningText on ScanImageWarning {
   String get message => switch (this) {
     ScanImageWarning.dark =>
@@ -33,7 +35,10 @@ class ScanImageProcessor {
   Future<PreparedScanImage> prepare(String path) async {
     final file = File(path);
     if (!await file.exists()) {
-      throw const ScanImageException('The photo could not be found.');
+      throw const ScanImageException(
+        ScanImageErrorCode.missing,
+        'The photo could not be found.',
+      );
     }
     final bytes = await file.readAsBytes();
     try {
@@ -42,6 +47,7 @@ class ScanImageProcessor {
       rethrow;
     } on Object {
       throw const ScanImageException(
+        ScanImageErrorCode.corrupt,
         'This photo is corrupt or unsupported. Retake it as a JPEG image.',
       );
     }
@@ -52,12 +58,14 @@ PreparedScanImage _prepareBytes(Uint8List sourceBytes) {
   var image = img.decodeImage(sourceBytes);
   if (image == null) {
     throw const ScanImageException(
+      ScanImageErrorCode.corrupt,
       'This photo is corrupt or unsupported. Retake it as a JPEG image.',
     );
   }
   image = img.bakeOrientation(image);
   if (image.width < 320 || image.height < 320) {
     throw const ScanImageException(
+      ScanImageErrorCode.tooSmall,
       'This photo is too small. Use an image at least 320 × 320 pixels.',
     );
   }
@@ -131,8 +139,9 @@ List<ScanImageWarning> _qualityWarnings(img.Image image) {
 }
 
 class ScanImageException implements Exception {
-  const ScanImageException(this.message);
+  const ScanImageException(this.code, this.message);
 
+  final ScanImageErrorCode code;
   final String message;
 
   @override

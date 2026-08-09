@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/display_labels.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
 import '../../monetization/presentation/access_card.dart';
 import '../../monetization/presentation/native_ad_card.dart';
@@ -25,6 +27,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final l10n = context.l10n;
     final access = controller.monetization.access;
     final recent = controller.measurements.firstOrNull;
     final horizontalPadding = math.max(
@@ -48,47 +51,60 @@ class HomeScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'AI weight',
+                  l10n.homeAiWeight,
                   style: Theme.of(context).textTheme.headlineLarge,
                 ),
               ),
-              InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () => showRewardedScanSheet(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: canEarnReward ? AppColors.lime : Colors.transparent,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (canEarnReward) ...[
-                        const Icon(
-                          Icons.play_arrow_rounded,
-                          size: 16,
-                          color: AppColors.ink,
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.sizeOf(context).width * 0.44,
+                ),
+                child: InkWell(
+                  key: canEarnReward
+                      ? const Key('home_reward_cta')
+                      : const Key('home_scan_balance'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => showRewardedScanSheet(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: canEarnReward
+                          ? AppColors.lime
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (canEarnReward) ...[
+                          const Icon(
+                            Icons.play_arrow_rounded,
+                            size: 16,
+                            color: AppColors.ink,
+                          ),
+                          const SizedBox(width: 3),
+                        ],
+                        Text(
+                          canEarnReward && access.isAuthoritative
+                              ? l10n.homeScansLeftGetOne(access.remainingScans)
+                              : localizedScanUsage(l10n, access),
+                          key: const Key('scan_balance'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: TextStyle(
+                            color: canEarnReward
+                                ? AppColors.ink
+                                : AppColors.inkMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                        const SizedBox(width: 3),
                       ],
-                      Text(
-                        canEarnReward && access.isAuthoritative
-                            ? '${access.remainingScans} left · Get +1'
-                            : access.usageLabel,
-                        key: const Key('scan_balance'),
-                        style: TextStyle(
-                          color: canEarnReward
-                              ? AppColors.ink
-                              : AppColors.inkMuted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -102,13 +118,13 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Latest estimate',
+                    l10n.homeLatestEstimate,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
                 TextButton(
                   onPressed: onViewHistory,
-                  child: const Text('History'),
+                  child: Text(l10n.homeHistory),
                 ),
               ],
             ),
@@ -152,6 +168,7 @@ class _HomeCapturePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -168,14 +185,14 @@ class _HomeCapturePanel extends StatelessWidget {
             key: const Key('home_scan_button'),
             onPressed: onMeasure,
             icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('Scan object'),
+            label: Text(l10n.homeScanObject),
           ),
           const SizedBox(height: 4),
           TextButton.icon(
             key: const Key('home_gallery_button'),
             onPressed: onGallery,
             icon: const Icon(Icons.photo_library_outlined),
-            label: const Text('Photo'),
+            label: Text(l10n.homePhoto),
           ),
         ],
       ),

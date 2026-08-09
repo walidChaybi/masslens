@@ -93,15 +93,46 @@ test("removed billing routes return 404", async () => {
   assert.equal((await response.json()).error.code, "not_found");
 });
 
-test("wallet payload preserves legacy balance as ad-free access", () => {
-  const access = accessPayload({
-    starterUsed: 1,
-    rewardedScans: 2,
-    legacyScans: 7,
+test("all preserved wallet credits keep the ads-only experience enabled", () => {
+  const starterAndLegacy = accessPayload({
+    starterUsed: 2,
+    legacyScans: 1,
     scanAccessEnforced: true,
   });
-  assert.equal(access.remainingScans, 11);
-  assert.equal(access.adsEnabled, false);
+  assert.equal(starterAndLegacy.starterScansRemaining, 1);
+  assert.equal(starterAndLegacy.remainingScans, 2);
+  assert.equal(starterAndLegacy.adsEnabled, true);
+
+  const legacyAndRewarded = accessPayload({
+    starterUsed: 3,
+    rewardedScans: 2,
+    legacyScans: 1,
+    scanAccessEnforced: true,
+  });
+  assert.equal(legacyAndRewarded.starterScansRemaining, 0);
+  assert.equal(legacyAndRewarded.remainingScans, 3);
+  assert.equal(legacyAndRewarded.adsEnabled, true);
+
+  const rewardedNext = accessPayload({
+    starterUsed: 3,
+    rewardedScans: 2,
+    scanAccessEnforced: true,
+  });
+  assert.equal(rewardedNext.adsEnabled, true);
+
+  const rewardNeeded = accessPayload({
+    starterUsed: 3,
+    scanAccessEnforced: true,
+  });
+  assert.equal(rewardNeeded.remainingScans, 0);
+  assert.equal(rewardNeeded.adsEnabled, true);
+
+  const unenforced = accessPayload({
+    starterUsed: 3,
+    legacyScans: 1,
+    scanAccessEnforced: false,
+  });
+  assert.equal(unenforced.adsEnabled, false);
 });
 
 test("estimate endpoint requires an installation identifier", async () => {

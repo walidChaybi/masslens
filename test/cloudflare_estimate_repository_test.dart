@@ -45,12 +45,13 @@ void main() {
       final repository = CloudflareEstimateRepository(
         apiUrl: 'http://127.0.0.1:${server.port}/estimate',
       );
-      await repository.analyze(
+      final measurement = await repository.analyze(
         EstimateRequest(
           imagePath: image.path,
           secondaryImagePath: sideImage.path,
           requestId: 'request_identifier_flutter_test',
           material: 'Metal',
+          responseLocale: 'fr',
           knownDimension: const KnownDimensionInput(
             axis: 'Length',
             value: 32,
@@ -67,7 +68,9 @@ void main() {
         'unit': 'cm',
       });
       expect(body['material'], 'Metal');
+      expect(body['responseLocale'], 'fr');
       expect((body['images'] as List), hasLength(2));
+      expect(measurement.analysisLocale, 'fr');
     } finally {
       await server.close(force: true);
       await directory.delete(recursive: true);

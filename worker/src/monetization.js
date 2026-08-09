@@ -308,7 +308,10 @@ export function accessPayload({
     remainingScans,
     rewardBalanceCap,
     scanAccessEnforced,
-    adsEnabled: scanAccessEnforced && legacyScans === 0,
+    // Billing was removed before launch. Migrated and support credits still
+    // preserve scan access, but they must not silently disable the ads-only
+    // experience or hide the rewarded path.
+    adsEnabled: scanAccessEnforced,
     analysisModel: env.OPENAI_MODEL || "gpt-5-nano",
     adPolicy: {
       interstitialEvery: readPositiveInteger(env.INTERSTITIAL_EVERY, 2),
@@ -737,6 +740,9 @@ async function recordAdRevenue(request, env, clientIdHash) {
       "history_after_second",
       "rewarded",
       "interstitial",
+      "onboarding_interstitial",
+      "drawer_ai_scan_interstitial",
+      "drawer_digital_scale_interstitial",
       "app_open",
     ].includes(placement) ||
     !/^[A-Z]{3}$/.test(currencyCode) ||

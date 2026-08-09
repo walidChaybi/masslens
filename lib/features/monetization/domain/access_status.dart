@@ -111,19 +111,4 @@ class AccessStatus {
   bool get canScan =>
       isAuthoritative && scanAccessEnforced && remainingScans > 0;
   bool get canEarnReward => rewardedScans < rewardBalanceCap;
-
-  String get usageLabel {
-    if (!isAuthoritative) return 'Loading scan balance…';
-    if (!scanAccessEnforced) return 'Access preview';
-    return '$remainingScans scan${remainingScans == 1 ? '' : 's'} left';
-  }
-
-  String get breakdownLabel {
-    final parts = <String>[
-      if (starterScansRemaining > 0) '$starterScansRemaining starter',
-      if (rewardedScans > 0) '$rewardedScans rewarded',
-      if (legacyScans > 0) '$legacyScans legacy',
-    ];
-    return parts.isEmpty ? 'No scans available' : parts.join(' · ');
-  }
 }

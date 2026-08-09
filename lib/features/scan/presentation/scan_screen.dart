@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/display_labels.dart';
+import '../../../l10n/l10n.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../data/cloudflare_estimate_repository.dart';
@@ -76,6 +78,8 @@ class _ScanScreenState extends State<ScanScreen> {
   String? _error;
   String? _requestId;
   bool _saved = false;
+  bool _routePopAllowed = false;
+  bool _routePopScheduled = false;
 
   @override
   void initState() {
@@ -112,7 +116,7 @@ class _ScanScreenState extends State<ScanScreen> {
       _acceptImage(imagePath);
     } on Object {
       if (mounted) {
-        setState(() => _error = 'The camera could not be opened.');
+        setState(() => _error = context.l10n.scanCameraOpenFailed);
       }
     } finally {
       if (mounted) setState(() => _isPicking = false);
@@ -131,7 +135,7 @@ class _ScanScreenState extends State<ScanScreen> {
       _acceptImage(imagePath);
     } on Object {
       if (mounted) {
-        setState(() => _error = 'The selected photo could not be opened.');
+        setState(() => _error = context.l10n.scanSelectedPhotoOpenFailed);
       }
     } finally {
       if (mounted) setState(() => _isPicking = false);
@@ -161,7 +165,7 @@ class _ScanScreenState extends State<ScanScreen> {
       }
     } on Object {
       if (mounted) {
-        setState(() => _error = 'The second photo could not be opened.');
+        setState(() => _error = context.l10n.scanSecondPhotoOpenFailed);
       }
     } finally {
       if (mounted) setState(() => _isPicking = false);
@@ -198,7 +202,7 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       knownDimension = _knownDimension();
     } on FormatException {
-      setState(() => _error = 'Enter a dimension greater than zero.');
+      setState(() => _error = context.l10n.scanDimensionPositive);
       return;
     }
     final isProductionCloudScan =
@@ -220,7 +224,15 @@ class _ScanScreenState extends State<ScanScreen> {
           }
         }
       } on ScanImageException catch (error) {
-        if (mounted) setState(() => _error = error.message);
+        if (mounted) {
+          setState(() {
+            _error = switch (error.code) {
+              ScanImageErrorCode.missing => context.l10n.scanPhotoMissing,
+              ScanImageErrorCode.corrupt => context.l10n.scanPhotoCorrupt,
+              ScanImageErrorCode.tooSmall => context.l10n.scanPhotoTooSmall,
+            };
+          });
+        }
         return;
       }
     }
@@ -237,9 +249,7 @@ class _ScanScreenState extends State<ScanScreen> {
           !monetization.access.scanAccessEnforced;
       if (accessUnavailable) {
         setState(() {
-          _error =
-              'Scan access could not be verified. Check the connection and '
-              'try again; no scan was used.';
+          _error = context.l10n.scanAccessUnverified;
         });
         return;
       }
@@ -277,6 +287,7 @@ class _ScanScreenState extends State<ScanScreen> {
           fillState: _fillState,
           referenceObject: _referenceObject,
           knownDimension: knownDimension,
+          responseLocale: Localizations.localeOf(context).languageCode,
         ),
       );
       if (!mounted || run != _analysisRun) return;
@@ -294,8 +305,8 @@ class _ScanScreenState extends State<ScanScreen> {
         _analysisTimer?.cancel();
         _isAnalyzing = false;
         _error = error.isScanLimitReached
-            ? 'You have used your available scans.'
-            : error.message;
+            ? context.l10n.scanLimitReached
+            : context.l10n.scanCloudFailure;
       });
       if (error.isScanLimitReached) {
         await AppScope.of(context).monetization.refreshAccess();
@@ -309,7 +320,7 @@ class _ScanScreenState extends State<ScanScreen> {
         setState(() {
           _analysisTimer?.cancel();
           _isAnalyzing = false;
-          _error = 'Analysis stopped. Check the connection and try again.';
+          _error = context.l10n.scanAnalysisStopped;
         });
       }
     }
@@ -319,26 +330,31 @@ class _ScanScreenState extends State<ScanScreen> {
       await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Scan Coach'),
+          title: Text(context.l10n.scanCoachTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (final warning in warnings) ...[
-                Text('• ${warning.message}'),
+                Text(
+                  '• ${switch (warning) {
+                    ScanImageWarning.dark => context.l10n.scanPhotoDarkWarning,
+                    ScanImageWarning.blurry => context.l10n.scanPhotoBlurryWarning,
+                  }}',
+                ),
                 const SizedBox(height: 8),
               ],
-              const Text('No scan is used until you continue to analysis.'),
+              Text(context.l10n.scanCoachNoCredit),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Retake'),
+              child: Text(context.l10n.scanCoachRetake),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Use anyway'),
+              child: Text(context.l10n.scanCoachUseAnyway),
             ),
           ],
         ),
@@ -367,8 +383,8 @@ class _ScanScreenState extends State<ScanScreen> {
     if (!mounted) return;
     setState(() => _saved = true);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Saved to your private history.'),
+      SnackBar(
+        content: Text(context.l10n.scanSavedPrivateHistory),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -394,6 +410,24 @@ class _ScanScreenState extends State<ScanScreen> {
     });
   }
 
+  void _close() {
+    if (_routePopScheduled || _routePopAllowed) return;
+    final completed = _result != null;
+    setState(() {
+      _routePopAllowed = true;
+      _routePopScheduled = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pop<bool>(completed);
+    });
+  }
+
+  void _handleRoutePop(bool didPop, bool? _) {
+    if (didPop || _routePopScheduled) return;
+    _close();
+  }
+
   Future<void> _showDetails() {
     return showModalBottomSheet<void>(
       context: context,
@@ -401,6 +435,7 @@ class _ScanScreenState extends State<ScanScreen> {
       isScrollControlled: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) {
+          final l10n = context.l10n;
           void update(VoidCallback change) {
             setState(() {
               change();
@@ -423,11 +458,11 @@ class _ScanScreenState extends State<ScanScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Optional details',
+                    l10n.scanOptionalDetails,
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 18),
-                  const _SheetLabel('Material'),
+                  _SheetLabel(l10n.scanMaterial),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -436,14 +471,14 @@ class _ScanScreenState extends State<ScanScreen> {
                       for (final item in _materials)
                         ChoiceChip(
                           key: Key('material_$item'),
-                          label: Text(item),
+                          label: Text(localizedMaterial(l10n, item)),
                           selected: _material == item,
                           onSelected: (_) => update(() => _material = item),
                         ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  const _SheetLabel('Fill'),
+                  _SheetLabel(l10n.scanFill),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -452,14 +487,14 @@ class _ScanScreenState extends State<ScanScreen> {
                       for (final item in _fillStates)
                         ChoiceChip(
                           key: Key('fill_state_$item'),
-                          label: Text(item),
+                          label: Text(localizedFillState(l10n, item)),
                           selected: _fillState == item,
                           onSelected: (_) => update(() => _fillState = item),
                         ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  const _SheetLabel('Known size (optional)'),
+                  _SheetLabel(l10n.scanKnownSize),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -468,7 +503,10 @@ class _ScanScreenState extends State<ScanScreen> {
                           initialValue: _dimensionAxis,
                           items: [
                             for (final item in _axes)
-                              DropdownMenuItem(value: item, child: Text(item)),
+                              DropdownMenuItem(
+                                value: item,
+                                child: Text(localizedDimensionAxis(l10n, item)),
+                              ),
                           ],
                           onChanged: (value) => update(
                             () => _dimensionAxis = value ?? _dimensionAxis,
@@ -503,7 +541,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const _SheetLabel('Visible reference'),
+                  _SheetLabel(l10n.scanVisibleReference),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -511,7 +549,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       for (final item in _references)
                         ChoiceChip(
                           key: Key('reference_$item'),
-                          label: Text(item),
+                          label: Text(localizedReferenceObject(l10n, item)),
                           selected: _referenceObject == item,
                           onSelected: (_) =>
                               update(() => _referenceObject = item),
@@ -521,7 +559,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   const SizedBox(height: 20),
                   FilledButton(
                     onPressed: () => Navigator.of(sheetContext).pop(),
-                    child: const Text('Done'),
+                    child: Text(l10n.commonDone),
                   ),
                 ],
               ),
@@ -534,68 +572,73 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final title = _result != null
-        ? 'Estimate'
+        ? l10n.scanEstimate
         : _isAnalyzing
-        ? 'Analyzing'
+        ? l10n.scanAnalyzing
         : _imagePath == null
-        ? 'New estimate'
-        : 'Review';
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Close',
-          onPressed: () => Navigator.of(context).pop(_result != null),
-          icon: const Icon(Icons.close_rounded),
+        ? l10n.scanNewEstimate
+        : l10n.scanReview;
+    return PopScope<bool>(
+      canPop: _routePopAllowed,
+      onPopInvokedWithResult: _handleRoutePop,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            tooltip: l10n.commonClose,
+            onPressed: _close,
+            icon: const Icon(Icons.close_rounded),
+          ),
+          title: Text(title),
+          actions: [
+            if (_imagePath != null && !_isAnalyzing)
+              TextButton(onPressed: _reset, child: Text(l10n.commonStartOver)),
+            const SizedBox(width: 8),
+          ],
         ),
-        title: Text(title),
-        actions: [
-          if (_imagePath != null && !_isAnalyzing)
-            TextButton(onPressed: _reset, child: const Text('Start over')),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        maintainBottomViewPadding: true,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          child: _result != null
-              ? _ResultView(
-                  key: const ValueKey('result'),
-                  measurement: _result!,
-                  unitSystem: AppScope.of(context).unitSystem,
-                  saved: _saved,
-                  onSave: _save,
-                  onReset: _reset,
-                )
-              : _isAnalyzing
-              ? _AnalysisView(
-                  key: const ValueKey('analysis'),
-                  imagePath: _imagePath!,
-                  step: _analysisStep,
-                )
-              : _imagePath == null
-              ? _CaptureView(
-                  key: const ValueKey('capture'),
-                  busy: _isPicking,
-                  error: _error,
-                  onCapture: _capturePhoto,
-                  onGallery: _captureFromGallery,
-                )
-              : _ReviewView(
-                  key: const ValueKey('review'),
-                  imagePath: _imagePath!,
-                  secondImagePath: _secondaryImagePath,
-                  error: _error,
-                  onAddSideView: _showSecondAnglePicker,
-                  onRemoveSideView: () => setState(() {
-                    _secondaryImagePath = null;
-                    _requestId = null;
-                  }),
-                  onDetails: _showDetails,
-                  onAnalyze: _analyze,
-                ),
+        body: SafeArea(
+          top: false,
+          maintainBottomViewPadding: true,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: _result != null
+                ? _ResultView(
+                    key: const ValueKey('result'),
+                    measurement: _result!,
+                    unitSystem: AppScope.of(context).unitSystem,
+                    saved: _saved,
+                    onSave: _save,
+                    onReset: _reset,
+                  )
+                : _isAnalyzing
+                ? _AnalysisView(
+                    key: const ValueKey('analysis'),
+                    imagePath: _imagePath!,
+                    step: _analysisStep,
+                  )
+                : _imagePath == null
+                ? _CaptureView(
+                    key: const ValueKey('capture'),
+                    busy: _isPicking,
+                    error: _error,
+                    onCapture: _capturePhoto,
+                    onGallery: _captureFromGallery,
+                  )
+                : _ReviewView(
+                    key: const ValueKey('review'),
+                    imagePath: _imagePath!,
+                    secondImagePath: _secondaryImagePath,
+                    error: _error,
+                    onAddSideView: _showSecondAnglePicker,
+                    onRemoveSideView: () => setState(() {
+                      _secondaryImagePath = null;
+                      _requestId = null;
+                    }),
+                    onDetails: _showDetails,
+                    onAnalyze: _analyze,
+                  ),
+          ),
         ),
       ),
     );
@@ -618,6 +661,7 @@ class _CaptureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 36, 24, 28),
@@ -632,7 +676,7 @@ class _CaptureView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Photograph an object',
+                    l10n.scanPhotographObject,
                     style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 24),
@@ -652,13 +696,13 @@ class _CaptureView extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.photo_camera_outlined),
-                    label: const Text('Take photo'),
+                    label: Text(l10n.scanTakePhoto),
                   ),
                   TextButton.icon(
                     key: const Key('gallery_button'),
                     onPressed: busy ? null : onGallery,
                     icon: const Icon(Icons.photo_library_outlined),
-                    label: const Text('Choose from gallery'),
+                    label: Text(l10n.scanChooseGallery),
                   ),
                 ],
               ),
@@ -763,6 +807,7 @@ class _ReviewView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final horizontalPadding = math.max(
       20.0,
       (MediaQuery.sizeOf(context).width - 720) / 2,
@@ -771,7 +816,7 @@ class _ReviewView extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 30),
       children: [
         Text(
-          'Confirm the object',
+          l10n.scanConfirmObject,
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         const SizedBox(height: 14),
@@ -813,7 +858,7 @@ class _ReviewView extends StatelessWidget {
                 key: const Key('add_details_button'),
                 onPressed: onDetails,
                 icon: const Icon(Icons.tune_rounded),
-                label: const Text('Details'),
+                label: Text(l10n.scanDetails),
               ),
             ),
             const SizedBox(width: 10),
@@ -822,7 +867,7 @@ class _ReviewView extends StatelessWidget {
                 key: const Key('analyze_button'),
                 onPressed: onAnalyze,
                 icon: const Icon(Icons.auto_awesome_rounded),
-                label: const Text('Estimate'),
+                label: Text(l10n.scanEstimate),
               ),
             ),
           ],
@@ -845,6 +890,7 @@ class _SideViewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -888,14 +934,16 @@ class _SideViewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  imagePath == null ? 'Add side view' : 'Side view added',
+                  imagePath == null
+                      ? l10n.scanAddSideView
+                      : l10n.scanSideViewAdded,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   imagePath == null
-                      ? 'Optional · move 45–90° around the same object'
-                      : 'Another angle helps AI infer shape and volume',
+                      ? l10n.scanSideViewOptional
+                      : l10n.scanSideViewBenefit,
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(fontSize: 11),
@@ -906,12 +954,12 @@ class _SideViewCard extends StatelessWidget {
           TextButton(
             key: const Key('add_second_photo_button'),
             onPressed: onAddOrReplace,
-            child: Text(imagePath == null ? 'Add' : 'Replace'),
+            child: Text(imagePath == null ? l10n.scanAdd : l10n.scanReplace),
           ),
           if (imagePath != null)
             IconButton(
               key: const Key('remove_second_photo_button'),
-              tooltip: 'Remove side view',
+              tooltip: l10n.scanRemoveSideView,
               onPressed: onRemove,
               icon: const Icon(Icons.close_rounded, size: 20),
             ),
@@ -929,7 +977,12 @@ class _AnalysisView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Reading shape', 'Estimating material', 'Building range'];
+    final l10n = context.l10n;
+    final labels = [
+      l10n.scanProgressShape,
+      l10n.scanProgressMaterial,
+      l10n.scanProgressRange,
+    ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
       child: Column(
@@ -982,6 +1035,8 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final localeName = Localizations.localeOf(context).toLanguageTag();
     final horizontalPadding = math.max(
       20.0,
       (MediaQuery.sizeOf(context).width - 720) / 2,
@@ -1017,7 +1072,11 @@ class _ResultView extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          formatWeight(measurement.estimateGrams, unitSystem),
+          formatWeight(
+            measurement.estimateGrams,
+            unitSystem,
+            localeName: localeName,
+          ),
           key: const Key('result_weight'),
           style: const TextStyle(
             color: AppColors.ink,
@@ -1026,9 +1085,9 @@ class _ResultView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'LIKELY RANGE',
-          style: TextStyle(
+        Text(
+          l10n.scanLikelyRange,
+          style: const TextStyle(
             color: AppColors.inkMuted,
             fontSize: 10,
             fontWeight: FontWeight.w800,
@@ -1036,24 +1095,28 @@ class _ResultView extends StatelessWidget {
           ),
         ),
         Text(
-          '${formatWeight(measurement.lowerBoundGrams, unitSystem)} – '
-          '${formatWeight(measurement.upperBoundGrams, unitSystem)}',
+          '${formatWeight(measurement.lowerBoundGrams, unitSystem, localeName: localeName)} – '
+          '${formatWeight(measurement.upperBoundGrams, unitSystem, localeName: localeName)}',
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         const SizedBox(height: 18),
         _ResultFact(
-          label: 'AI visual size · L × W × H',
+          label: l10n.scanAiVisualSize,
           value: formatApproximateDimensions(
             measurement.dimensions,
             unitSystem,
+            localeName: localeName,
           ),
         ),
-        _ResultFact(label: 'Confidence', value: measurement.confidence.name),
+        _ResultFact(
+          label: l10n.scanConfidence,
+          value: localizedConfidence(l10n, measurement.confidence),
+        ),
         const SizedBox(height: 8),
         ExpansionTile(
           tilePadding: EdgeInsets.zero,
           childrenPadding: const EdgeInsets.only(bottom: 12),
-          title: const Text('How this was estimated'),
+          title: Text(l10n.scanHowEstimated),
           children: [
             for (final assumption in measurement.assumptions)
               Padding(
@@ -1071,7 +1134,7 @@ class _ResultView extends StatelessWidget {
             Expanded(
               child: OutlinedButton(
                 onPressed: onReset,
-                child: const Text('Try another'),
+                child: Text(l10n.scanTryAnother),
               ),
             ),
             const SizedBox(width: 10),
@@ -1079,7 +1142,7 @@ class _ResultView extends StatelessWidget {
               child: FilledButton(
                 key: const Key('save_result_button'),
                 onPressed: saved ? null : onSave,
-                child: Text(saved ? 'Saved' : 'Save'),
+                child: Text(saved ? l10n.commonSaved : l10n.commonSave),
               ),
             ),
           ],
@@ -1145,6 +1208,7 @@ class _SecondAngleSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       top: false,
       maintainBottomViewPadding: true,
@@ -1155,27 +1219,26 @@ class _SecondAngleSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Add a side view',
+              l10n.scanSecondViewTitle,
               style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 7),
             Text(
-              'Move 45–90° around the same object and keep the whole object '
-              'visible. This uses the same scan credit.',
+              l10n.scanSecondViewBody,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => Navigator.pop(context, PhotoSource.camera),
               icon: const Icon(Icons.photo_camera_outlined),
-              label: const Text('Take photo'),
+              label: Text(l10n.scanTakePhoto),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
               key: const Key('second_photo_gallery_button'),
               onPressed: () => Navigator.pop(context, PhotoSource.gallery),
               icon: const Icon(Icons.photo_library_outlined),
-              label: const Text('Choose photo'),
+              label: Text(l10n.scanChoosePhoto),
             ),
           ],
         ),

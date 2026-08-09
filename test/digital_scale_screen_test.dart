@@ -5,12 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
+import 'package:mass_lens/features/monetization/application/monetization_controller.dart';
+import 'package:mass_lens/features/monetization/data/app_ad_service.dart';
+import 'package:mass_lens/features/monetization/data/monetization_api.dart';
+import 'package:mass_lens/features/monetization/domain/access_status.dart';
 import 'package:mass_lens/features/scale/domain/scale_device.dart';
 import 'package:mass_lens/features/scale/domain/scale_reader.dart';
 import 'package:mass_lens/features/scale/domain/scale_reading.dart';
 import 'package:mass_lens/features/scale/presentation/digital_scale_screen.dart';
+import 'package:mass_lens/l10n/l10n.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('touch surface visualizes pressure and returns to zero', (
     tester,
   ) async {
@@ -66,17 +76,79 @@ void main() {
     expect(find.text('1.000'), findsOneWidget);
     expect(find.text('kg'), findsOneWidget);
   });
+
+  testWidgets('compact scale keeps reward CTA above the full native ad', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    tester.view.padding = const FakeViewPadding(bottom: 48);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+      tester.view.resetPadding();
+      tester.view.resetViewPadding();
+    });
+    final monetization = MonetizationController.forTesting(
+      api: _AdsEnabledMonetizationApi(),
+      adService: _AdsEnabledAppAdService(),
+    );
+    await monetization.initialize();
+
+    await _pumpScale(
+      tester,
+      _FakeScaleReader(),
+      monetizationController: monetization,
+    );
+
+    final controlsRect = tester.getRect(
+      find.byKey(const Key('scale_unit_button')),
+    );
+    final rewardRect = tester.getRect(
+      find.byKey(const Key('scale_reward_cta')),
+    );
+    final nativeRect = tester.getRect(
+      find.byKey(const Key('native_ad_loading_scale_first_screen')),
+    );
+    final screenRect = tester.getRect(
+      find.byKey(const Key('digital_scale_screen')),
+    );
+    final viewPadding = MediaQuery.viewPaddingOf(
+      tester.element(find.byKey(const Key('digital_scale_screen'))),
+    );
+
+    expect(rewardRect.top, greaterThanOrEqualTo(controlsRect.bottom));
+    expect(nativeRect.top, greaterThanOrEqualTo(rewardRect.bottom));
+    expect(nativeRect.height, 100);
+    expect(nativeRect.width, screenRect.width - 32);
+    expect(
+      nativeRect.bottom,
+      lessThanOrEqualTo(screenRect.bottom - viewPadding.bottom),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('scale_reward_cta')));
+    await tester.pumpAndSettle();
+    expect(find.text('Watch one ad. Get one scan.'), findsOneWidget);
+  });
 }
 
-Future<void> _pumpScale(WidgetTester tester, _FakeScaleReader reader) async {
+Future<void> _pumpScale(
+  WidgetTester tester,
+  _FakeScaleReader reader, {
+  MonetizationController? monetizationController,
+}) async {
   final controller = AppController(
     measurementStore: const MeasurementStore(),
     onboardingComplete: true,
+    monetizationController: monetizationController,
   );
+  addTearDown(controller.dispose);
   await tester.pumpWidget(
     AppScope(
       controller: controller,
       child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: buildAppTheme(),
         home: Scaffold(
           body: DigitalScaleScreen(onOpenAiScan: () {}, reader: reader),
@@ -85,6 +157,44 @@ Future<void> _pumpScale(WidgetTester tester, _FakeScaleReader reader) async {
     ),
   );
   await tester.pump();
+}
+
+final class _AdsEnabledMonetizationApi extends MonetizationApi {
+  _AdsEnabledMonetizationApi() : super(apiUrl: 'https://example.invalid');
+
+  @override
+  Future<AccessStatus> getAccess(String clientId) async => const AccessStatus(
+    starterScansRemaining: 3,
+    rewardedScans: 0,
+    legacyScans: 0,
+    remainingScans: 3,
+    rewardBalanceCap: 3,
+    scanAccessEnforced: true,
+    adsEnabled: true,
+    isAuthoritative: true,
+    analysisModel: 'gpt-5-nano',
+    adPolicy: AdPolicy(),
+  );
+}
+
+final class _AdsEnabledAppAdService extends AppAdService {
+  @override
+  bool get canRequestAds => true;
+
+  @override
+  bool get canRequestNativeAds => true;
+
+  @override
+  bool get rewardedReady => true;
+
+  @override
+  Future<void> updatePlan({
+    required bool adsAllowed,
+    required AdPolicy policy,
+  }) async {}
+
+  @override
+  void dispose() {}
 }
 
 final class _FakeScaleReader implements ScaleReader {

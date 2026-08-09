@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../data/monetization_config.dart';
+import '../../../l10n/l10n.dart';
 import '../data/app_ad_service.dart';
+import '../data/monetization_config.dart';
 
 class NativeAdCard extends StatefulWidget {
   const NativeAdCard({
@@ -131,7 +132,9 @@ class _NativeAdCardState extends State<NativeAdCard>
         ),
         alignment: Alignment.center,
         child: Text(
-          _adError ? 'Test ad retrying…' : 'Sponsored · test ad loading…',
+          _adError
+              ? context.l10n.nativeTestRetrying
+              : context.l10n.nativeTestLoading,
           style: const TextStyle(
             color: AppColors.inkMuted,
             fontSize: 11,
@@ -142,7 +145,7 @@ class _NativeAdCardState extends State<NativeAdCard>
     }
     return RepaintBoundary(
       child: Semantics(
-        label: 'Sponsored content',
+        label: context.l10n.nativeSponsored,
         child: Container(
           key: _adKey,
           height: widget.height,

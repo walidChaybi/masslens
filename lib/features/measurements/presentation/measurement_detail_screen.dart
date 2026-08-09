@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
+import '../../../l10n/display_labels.dart';
+import '../../../l10n/l10n.dart';
 import '../domain/measurement.dart';
 
 class MeasurementDetailScreen extends StatelessWidget {
@@ -13,22 +15,21 @@ class MeasurementDetailScreen extends StatelessWidget {
   final Measurement measurement;
 
   Future<void> _delete(BuildContext context) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete this estimate?'),
-        content: const Text(
-          'The saved result and its private image copy will be removed.',
-        ),
+        title: Text(l10n.detailDeleteTitle),
+        content: Text(l10n.detailDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
-            child: const Text('Delete'),
+            child: Text(l10n.commonDelete),
           ),
         ],
       ),
@@ -40,12 +41,13 @@ class MeasurementDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Saved estimate'),
+        title: Text(l10n.detailSavedEstimate),
         actions: [
           IconButton(
-            tooltip: 'Delete estimate',
+            tooltip: l10n.detailDeleteTooltip,
             onPressed: () => _delete(context),
             icon: const Icon(Icons.delete_outline_rounded),
           ),
@@ -78,6 +80,8 @@ class MeasurementSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final file = File(measurement.imagePath);
+    final l10n = context.l10n;
+    final localeName = Localizations.localeOf(context).toLanguageTag();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -113,7 +117,7 @@ class MeasurementSummary extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    measurement.category.toUpperCase(),
+                    localizedCategory(l10n, measurement.category).toUpperCase(),
                     style: const TextStyle(
                       color: AppColors.limeDark,
                       fontSize: 10,
@@ -133,7 +137,7 @@ class MeasurementSummary extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const StatusPill(label: 'AI estimate'),
+            StatusPill(label: l10n.detailAiEstimate),
           ],
         ),
         const SizedBox(height: 16),
@@ -147,9 +151,9 @@ class MeasurementSummary extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'ESTIMATED WEIGHT',
-                style: TextStyle(
+              Text(
+                l10n.detailEstimatedWeight,
+                style: const TextStyle(
                   color: Colors.white60,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -158,7 +162,11 @@ class MeasurementSummary extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                formatWeight(measurement.estimateGrams, unitSystem),
+                formatWeight(
+                  measurement.estimateGrams,
+                  unitSystem,
+                  localeName: localeName,
+                ),
                 key: const Key('result_weight'),
                 style: const TextStyle(
                   color: Colors.white,
@@ -192,28 +200,32 @@ class MeasurementSummary extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _ResultSection(
-          title: 'Likely range',
+          title: l10n.detailLikelyRange,
           icon: Icons.linear_scale_rounded,
           child: Text(
-            '${formatWeight(measurement.lowerBoundGrams, unitSystem)} — '
-            '${formatWeight(measurement.upperBoundGrams, unitSystem)}',
+            '${formatWeight(measurement.lowerBoundGrams, unitSystem, localeName: localeName)} — '
+            '${formatWeight(measurement.upperBoundGrams, unitSystem, localeName: localeName)}',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
         ),
         const SizedBox(height: 12),
         _ResultSection(
-          title: 'AI visual size',
+          title: l10n.detailAiVisualSize,
           icon: Icons.straighten_rounded,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                formatApproximateDimensions(measurement.dimensions, unitSystem),
+                formatApproximateDimensions(
+                  measurement.dimensions,
+                  unitSystem,
+                  localeName: localeName,
+                ),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 5),
               Text(
-                'Length × width × height · visual assumption',
+                l10n.detailDimensionOrder,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -221,7 +233,7 @@ class MeasurementSummary extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _ResultSection(
-          title: 'Assumptions',
+          title: l10n.detailAssumptions,
           icon: Icons.tune_rounded,
           child: Column(
             children: [
@@ -243,16 +255,15 @@ class MeasurementSummary extends StatelessWidget {
             color: AppColors.lime.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(22),
           ),
-          child: const Row(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline_rounded, color: AppColors.ink),
-              SizedBox(width: 12),
+              const Icon(Icons.info_outline_rounded, color: AppColors.ink),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'This is an informed visual estimate, not a sensor reading. '
-                  'Do not use it for safety-critical decisions.',
-                  style: TextStyle(
+                  l10n.detailSafetyNotice,
+                  style: const TextStyle(
                     color: AppColors.ink,
                     height: 1.45,
                     fontSize: 12.5,
@@ -290,13 +301,15 @@ class _ResultSection extends StatelessWidget {
               children: [
                 Icon(icon, size: 19, color: AppColors.limeDark),
                 const SizedBox(width: 8),
-                Text(
-                  title.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
+                Expanded(
+                  child: Text(
+                    title.toUpperCase(),
+                    style: const TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
                   ),
                 ),
               ],

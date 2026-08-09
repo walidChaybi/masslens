@@ -19,6 +19,7 @@ void main() {
       confidence: ConfidenceLevel.medium,
       dimensions: const DimensionsMm(width: 320, height: 220, depth: 260),
       assumptions: const ['Hollow construction'],
+      analysisLocale: 'fr',
     );
 
     final restored = Measurement.fromJson(measurement.toJson());
@@ -28,6 +29,19 @@ void main() {
     expect(restored.estimateGrams, measurement.estimateGrams);
     expect(restored.dimensions.width, 320);
     expect(restored.assumptions, ['Hollow construction']);
+    expect(restored.analysisLocale, 'fr');
+  });
+
+  test('locale-aware formatting uses localized decimal separators', () {
+    expect(formatWeight(2500, UnitSystem.metric, localeName: 'fr'), '2,50 kg');
+    expect(
+      formatApproximateDimensions(
+        const DimensionsMm(width: 180, height: 90, depth: 300),
+        UnitSystem.metric,
+        localeName: 'es',
+      ),
+      '≈ 30,0 × 18,0 × 9,0 cm',
+    );
   });
 
   test('weight formatting uses canonical grams for both unit systems', () {

@@ -85,6 +85,7 @@ class MonetizationController extends ChangeNotifier {
   String _clientId = '';
   String? _message;
   bool _initialized = false;
+  Future<void>? _initialization;
   bool _loading = false;
   int _completedScanCount = 0;
   int? _pendingInterstitialScanCount;
@@ -102,6 +103,10 @@ class MonetizationController extends ChangeNotifier {
   bool get canRequestNativeAds =>
       _adService.canRequestNativeAds && _access.adsEnabled;
   bool get rewardedAdReady => _adService.rewardedReady;
+  bool get onboardingInterstitialReady =>
+      _access.adsEnabled && _adService.interstitialReady;
+  bool get onboardingInterstitialLoading =>
+      _access.adsEnabled && _adService.interstitialLoading;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
   RewardFlowState get rewardFlowState => _rewardFlowState;
   bool get rewardActionBusy => _rewardActionBusy || _reconcilingRewards;
@@ -124,9 +129,22 @@ class MonetizationController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> initialize() async {
-    if (_initialized) return;
+  Future<void> initialize() {
+    final pending = _initialization;
+    if (pending != null) return pending;
+    if (_initialized) return Future<void>.value();
     _initialized = true;
+    late final Future<void> initialization;
+    initialization = _initialize().whenComplete(() {
+      if (identical(_initialization, initialization)) {
+        _initialization = null;
+      }
+    });
+    _initialization = initialization;
+    return initialization;
+  }
+
+  Future<void> _initialize() async {
     if (!enabled) {
       notifyListeners();
       return;
@@ -158,9 +176,9 @@ class MonetizationController extends ChangeNotifier {
         adsAllowed: access.adsEnabled,
         policy: access.adPolicy,
       );
-    } on Object catch (error) {
+    } on Object {
       // The Worker remains the authority; stale data never grants an AI scan.
-      _message = 'Could not refresh scan access: $error';
+      _message = 'Could not refresh scan access.';
     } finally {
       _loading = false;
       notifyListeners();
@@ -189,6 +207,30 @@ class MonetizationController extends ChangeNotifier {
     if (qualifyingCount == null) return;
     final shown = await _adService.showInterstitialAfterScan(qualifyingCount);
     if (shown) _pendingInterstitialScanCount = null;
+  }
+
+  Future<bool> waitForOnboardingInterstitial({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {
+    await initialize();
+    if (!_access.isAuthoritative && enabled) await refreshAccess();
+    if (!_access.adsEnabled) return false;
+    return _adService.waitForInterstitial(timeout: timeout);
+  }
+
+  Future<bool> showOnboardingInterstitial() {
+    if (!_access.adsEnabled) return Future<bool>.value(false);
+    return _adService.showOnboardingInterstitial();
+  }
+
+  Future<bool> showDrawerModeInterstitial({required bool aiScan}) async {
+    await initialize();
+    if (!_access.adsEnabled) return false;
+    final ready = await _adService.waitForInterstitial(
+      timeout: const Duration(milliseconds: 900),
+    );
+    if (!ready) return false;
+    return _adService.showDrawerModeInterstitial(aiScan: aiScan);
   }
 
   Future<bool> watchAdForScan() async {
@@ -289,7 +331,7 @@ class MonetizationController extends ChangeNotifier {
         _rewardFlowState = RewardFlowState.failed;
         _message = error is MonetizationApiException && error.statusCode == 429
             ? 'Please wait before starting another rewarded ad.'
-            : 'The rewarded ad could not start: $error';
+            : 'The rewarded ad could not start.';
       }
       return false;
     } finally {

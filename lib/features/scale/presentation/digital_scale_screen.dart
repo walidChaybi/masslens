@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-
-import '../../monetization/presentation/native_ad_card.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/l10n.dart';
 import '../../measurements/domain/measurement.dart';
+import '../../monetization/presentation/native_ad_card.dart';
+import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../data/standard_ble_scale_reader.dart';
 import '../domain/scale_device.dart';
 import '../domain/scale_reader.dart';
@@ -283,6 +285,7 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final l10n = context.l10n;
     final bluetoothConnected =
         _readerSnapshot.phase == ScaleReaderPhase.connected;
     final rawGrams = _mode == _ScaleMode.touchDemo
@@ -291,7 +294,13 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
     final adjustedGrams = rawGrams > _tareOffsetGrams
         ? rawGrams - _tareOffsetGrams
         : 0.0;
-    final display = _formatScaleWeight(adjustedGrams, controller.unitSystem);
+    final display = _formatScaleWeight(
+      adjustedGrams,
+      controller.unitSystem,
+      Localizations.localeOf(context).toLanguageTag(),
+    );
+    final access = controller.monetization.access;
+    final canEarnReward = access.adsEnabled && access.canEarnReward;
 
     return Material(
       key: const Key('digital_scale_screen'),
@@ -327,13 +336,39 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
                   padding: EdgeInsets.fromLTRB(28, 4, 28, 4),
                   child: _ScaleBottomControls(
                     unitLabel: controller.unitSystem == UnitSystem.metric
-                        ? 'UNIT'
+                        ? l10n.scaleUnit
                         : 'LB/OZ',
                     tareEnabled: rawGrams > 0,
                     onUnit: _toggleUnits,
                     onTare: () => _tareScale(rawGrams),
                   ),
                 ),
+                if (canEarnReward)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(28, 0, 28, 2),
+                    child: Center(
+                      child: SizedBox(
+                        height: 38,
+                        child: FilledButton.icon(
+                          key: const Key('scale_reward_cta'),
+                          onPressed: () => showRewardedScanSheet(context),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.lime,
+                            foregroundColor: AppColors.ink,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            minimumSize: const Size(0, 38),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 17),
+                          label: Text(l10n.scaleWatchAdGetScan),
+                        ),
+                      ),
+                    ),
+                  ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     16,
@@ -386,38 +421,56 @@ class _DigitalScaleScreenState extends State<DigitalScaleScreen> {
   }
 
   String _friendlyError(Object error) {
+    final l10n = context.l10n;
+    if (error is ScaleReaderError) {
+      return switch (error.code) {
+        ScaleReaderErrorCode.permissionDenied => l10n.scalePermissionNeeded,
+        ScaleReaderErrorCode.bluetoothPoweredOff => l10n.scalePowerOnBluetooth,
+        _ => l10n.scaleCommunicationFailed,
+      };
+    }
     final message = error.toString().replaceFirst(
       RegExp(r'^.*Exception:\s*'),
       '',
     );
     if (message.toLowerCase().contains('permission')) {
-      return 'Nearby devices permission is required to find a scale.';
+      return l10n.scalePermissionNeeded;
     }
     if (message.toLowerCase().contains('powered')) {
-      return 'Turn on Bluetooth, then search again.';
+      return l10n.scalePowerOnBluetooth;
     }
-    return message.isEmpty ? 'Could not communicate with this scale.' : message;
+    return l10n.scaleCommunicationFailed;
   }
 }
 
 ({String value, String unit}) _formatScaleWeight(
   double grams,
   UnitSystem unitSystem,
+  String localeName,
 ) {
   if (unitSystem == UnitSystem.imperial) {
     final ounces = grams / 28.349523125;
     if (ounces < 16) {
-      return (value: ounces.toStringAsFixed(2), unit: 'oz');
+      return (
+        value: NumberFormat('0.00', localeName).format(ounces),
+        unit: 'oz',
+      );
     }
-    return (value: (ounces / 16).toStringAsFixed(3), unit: 'lb');
+    return (
+      value: NumberFormat('0.000', localeName).format(ounces / 16),
+      unit: 'lb',
+    );
   }
   if (grams < 1000) {
     return (
-      value: grams < 10 ? grams.toStringAsFixed(1) : grams.toStringAsFixed(0),
+      value: NumberFormat(grams < 10 ? '0.0' : '0', localeName).format(grams),
       unit: 'g',
     );
   }
-  return (value: (grams / 1000).toStringAsFixed(3), unit: 'kg');
+  return (
+    value: NumberFormat('0.000', localeName).format(grams / 1000),
+    unit: 'kg',
+  );
 }
 
 class _ScaleReadout extends StatelessWidget {
@@ -448,18 +501,19 @@ class _ScaleReadout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDemo = mode == _ScaleMode.touchDemo;
+    final l10n = context.l10n;
     final status = isDemo
-        ? 'SIMULATOR · NOT A MEASUREMENT'
+        ? l10n.scaleSimulatorStatus
         : bluetoothConnected
-        ? 'LIVE · BLUETOOTH SCALE'
-        : 'BLUETOOTH · NOT CONNECTED';
+        ? l10n.scaleLiveStatus
+        : l10n.scaleDisconnectedStatus;
 
     return Semantics(
       label: isDemo
-          ? 'Touch scale simulator, not a physical measurement'
+          ? l10n.scaleSimulatorSemantics
           : bluetoothConnected
-          ? 'Live Bluetooth scale reading'
-          : 'Bluetooth scale disconnected',
+          ? l10n.scaleLiveSemantics
+          : l10n.scaleDisconnectedSemantics,
       value: '$value $unit',
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -716,27 +770,28 @@ class _ScaleTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
       child: Row(
         children: [
           _TopIconButton(
             key: const Key('open_navigation'),
-            tooltip: 'Open navigation menu',
+            tooltip: l10n.scaleOpenNavigation,
             icon: Icons.menu_rounded,
             onPressed: onOpenMenu,
           ),
           const Spacer(),
           _TopIconButton(
             key: const Key('open_ai_scan_button'),
-            tooltip: 'AI weight scan',
+            tooltip: l10n.scaleOpenAiScan,
             icon: Icons.center_focus_strong_rounded,
             onPressed: onOpenAiScan,
           ),
           const SizedBox(width: 18),
           _TopIconButton(
             key: const Key('open_bluetooth_panel'),
-            tooltip: 'Bluetooth scale',
+            tooltip: l10n.scaleBluetooth,
             icon: bluetoothConnected
                 ? Icons.bluetooth_connected_rounded
                 : Icons.bluetooth_disabled_rounded,
@@ -803,7 +858,7 @@ class _ScaleBottomControls extends StatelessWidget {
         ),
         _RoundScaleButton(
           key: const Key('scale_tare_button'),
-          label: 'TARE',
+          label: context.l10n.scaleTare,
           size: 80,
           onPressed: tareEnabled ? onTare : null,
         ),
@@ -891,7 +946,7 @@ class _BluetoothOverlay extends StatelessWidget {
                 top: 0,
                 right: 8,
                 child: IconButton.filled(
-                  tooltip: 'Close Bluetooth panel',
+                  tooltip: context.l10n.scaleCloseBluetooth,
                   onPressed: onClose,
                   icon: const Icon(Icons.close_rounded),
                   style: IconButton.styleFrom(
@@ -938,8 +993,11 @@ class _BluetoothPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final connected = snapshot.phase == ScaleReaderPhase.connected;
-    final message = localError ?? snapshot.message;
+    // Reader messages are diagnostics produced below the presentation layer.
+    // Only typed phases and localized errors are shown to users.
+    final message = localError;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -965,16 +1023,17 @@ class _BluetoothPanel extends StatelessWidget {
                   children: [
                     Text(
                       connected
-                          ? snapshot.connectedDevice?.displayName ??
-                                'Bluetooth scale'
-                          : _phaseLabel(snapshot.phase),
+                          ? snapshot.connectedDevice == null
+                                ? l10n.scaleBluetooth
+                                : _deviceName(l10n, snapshot.connectedDevice!)
+                          : _phaseLabel(l10n, snapshot.phase),
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       connected
-                          ? 'Receiving standard Weight Scale measurements'
-                          : 'Supports BLE Weight Scale Service (0x181D)',
+                          ? l10n.scaleReceivingMeasurements
+                          : l10n.scaleBleSupport,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -1018,7 +1077,7 @@ class _BluetoothPanel extends StatelessWidget {
                 key: const Key('disconnect_scale_button'),
                 onPressed: _busy ? null : onDisconnect,
                 icon: const Icon(Icons.link_off_rounded),
-                label: const Text('Disconnect scale'),
+                label: Text(l10n.scaleDisconnect),
               ),
             )
           else ...[
@@ -1030,15 +1089,15 @@ class _BluetoothPanel extends StatelessWidget {
                 icon: const Icon(Icons.bluetooth_searching_rounded),
                 label: Text(
                   snapshot.phase == ScaleReaderPhase.scanning
-                      ? 'Searching…'
-                      : 'Find compatible scales',
+                      ? l10n.scaleSearching
+                      : l10n.scaleFindCompatible,
                 ),
               ),
             ),
             if (devices.isNotEmpty) ...[
               const SizedBox(height: 18),
               Text(
-                'AVAILABLE SCALES',
+                l10n.scaleAvailableScales,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: AppColors.inkMuted,
                   fontWeight: FontWeight.w800,
@@ -1056,11 +1115,11 @@ class _BluetoothPanel extends StatelessWidget {
                       key: Key('scale_device_${device.id}'),
                       minTileHeight: 60,
                       leading: const Icon(Icons.scale_outlined),
-                      title: Text(device.displayName),
+                      title: Text(_deviceName(l10n, device)),
                       subtitle: Text(
                         device.rssi == null
-                            ? 'Compatible scale'
-                            : 'Signal ${device.rssi} dBm',
+                            ? l10n.scaleCompatible
+                            : l10n.scaleSignal(device.rssi!),
                       ),
                       trailing: const Icon(Icons.arrow_forward_rounded),
                       onTap: _busy ? null : () => onConnect(device),
@@ -1069,10 +1128,9 @@ class _BluetoothPanel extends StatelessWidget {
                 ),
             ] else if (hasScanned && !_busy) ...[
               const SizedBox(height: 14),
-              const Text(
-                'No standard scale found. Make sure the scale is awake and '
-                'not connected to another app, then try again.',
-                style: TextStyle(
+              Text(
+                l10n.scaleNoneFound,
+                style: const TextStyle(
                   color: AppColors.inkMuted,
                   fontSize: 12.5,
                   height: 1.45,
@@ -1081,11 +1139,9 @@ class _BluetoothPanel extends StatelessWidget {
             ],
           ],
           const SizedBox(height: 12),
-          const Text(
-            'Many kitchen scales use private manufacturer protocols. Those '
-            'need a model-specific integration even if they appear in phone '
-            'Bluetooth settings.',
-            style: TextStyle(
+          Text(
+            l10n.scalePrivateProtocolNotice,
+            style: const TextStyle(
               color: AppColors.inkMuted,
               fontSize: 11.5,
               height: 1.45,
@@ -1097,19 +1153,25 @@ class _BluetoothPanel extends StatelessWidget {
   }
 }
 
-String _phaseLabel(ScaleReaderPhase phase) => switch (phase) {
-  ScaleReaderPhase.idle => 'No scale connected',
-  ScaleReaderPhase.requestingPermission => 'Requesting permission',
-  ScaleReaderPhase.scanning => 'Searching nearby',
-  ScaleReaderPhase.connecting => 'Connecting',
-  ScaleReaderPhase.discovering => 'Checking compatibility',
-  ScaleReaderPhase.subscribing => 'Starting live readings',
-  ScaleReaderPhase.connected => 'Scale connected',
-  ScaleReaderPhase.disconnecting => 'Disconnecting',
-  ScaleReaderPhase.unavailable => 'Bluetooth unavailable',
-  ScaleReaderPhase.error => 'Connection needs attention',
-  ScaleReaderPhase.disposed => 'Reader closed',
-};
+String _phaseLabel(AppLocalizations l10n, ScaleReaderPhase phase) =>
+    switch (phase) {
+      ScaleReaderPhase.idle => l10n.scalePhaseIdle,
+      ScaleReaderPhase.requestingPermission => l10n.scalePhasePermission,
+      ScaleReaderPhase.scanning => l10n.scalePhaseScanning,
+      ScaleReaderPhase.connecting => l10n.scalePhaseConnecting,
+      ScaleReaderPhase.discovering => l10n.scalePhaseDiscovering,
+      ScaleReaderPhase.subscribing => l10n.scalePhaseSubscribing,
+      ScaleReaderPhase.connected => l10n.scalePhaseConnected,
+      ScaleReaderPhase.disconnecting => l10n.scalePhaseDisconnecting,
+      ScaleReaderPhase.unavailable => l10n.scalePhaseUnavailable,
+      ScaleReaderPhase.error => l10n.scalePhaseError,
+      ScaleReaderPhase.disposed => l10n.scalePhaseClosed,
+    };
+
+String _deviceName(AppLocalizations l10n, ScaleDevice device) {
+  final name = device.name?.trim();
+  return name == null || name.isEmpty ? l10n.scaleGenericDevice : name;
+}
 
 class _NoticeIcon extends StatelessWidget {
   const _NoticeIcon({required this.icon, required this.color});

@@ -45,6 +45,7 @@ const fillStateChoices = [
 const referenceObjectChoices = ["None", "Ruler", "Standard card"];
 const dimensionAxisChoices = ["Length", "Width", "Height", "Depth"];
 const dimensionUnitChoices = ["cm", "in"];
+const responseLocaleChoices = ["en", "fr", "es"];
 const mimeTypeChoices = [
   "image/jpeg",
   "image/png",
@@ -107,6 +108,11 @@ async function routeRequest(request, env) {
   const requestId = readRequestId(request);
   await enforceRateLimits(request, env, clientId);
   const data = await readRequestJson(request);
+  const responseLocale = readChoice(
+    data.responseLocale ?? "en",
+    "responseLocale",
+    responseLocaleChoices,
+  );
   // Category and structure are retained as optional legacy hints so older app
   // builds keep working while current builds provide physical context instead.
   const category = readChoice(
@@ -160,6 +166,7 @@ async function routeRequest(request, env) {
       referenceObject,
       knownDimension,
       images,
+      responseLocale,
       safetyIdentifier: clientIdHash,
     });
     await completeScan(env, clientIdHash, reservation, result.estimate);
@@ -367,6 +374,7 @@ async function requestOpenAi(
     referenceObject,
     knownDimension,
     images,
+    responseLocale,
     safetyIdentifier,
   },
 ) {
@@ -389,7 +397,12 @@ async function requestOpenAi(
       input: [
         {
           role: "developer",
-          content: [{type: "input_text", text: developerPrompt}],
+          content: [
+            {
+              type: "input_text",
+              text: developerPrompt(responseLocale),
+            },
+          ],
         },
         {
           role: "user",
@@ -638,7 +651,7 @@ class ApiError extends Error {
   }
 }
 
-const developerPrompt = `
+const baseDeveloperPrompt = `
 You are MassLens, a careful visual weight-estimation engine.
 
 Return only the structured JSON requested by the schema. Do not include prose
@@ -680,11 +693,37 @@ Precision priorities:
   visible in the supplied images.
 - Label the object specifically but briefly, for example "ceramic mug" instead
   of "object".
-- Return exactly three short assumptions in this order and with these prefixes:
-  "Size:" states the scale basis and approximate geometry; "Material:" states
-  construction and fill; "Uncertainty:" states the dominant uncertainty and one
-  concrete tip for the next scan.
+- Return exactly three short assumptions in this order: the first states the
+  scale basis and approximate geometry; the second states construction and
+  fill; the third states the dominant uncertainty and one concrete tip for the
+  next scan.
 `;
+
+const responseLocaleInstructions = {
+  en: {
+    language: "English",
+    prefixes: '"Size:", "Material:", and "Uncertainty:"',
+  },
+  fr: {
+    language: "French",
+    prefixes: '"Taille :", "Matériau :", and "Incertitude :"',
+  },
+  es: {
+    language: "Spanish",
+    prefixes: '"Tamaño:", "Material:", and "Incertidumbre:"',
+  },
+};
+
+function developerPrompt(responseLocale) {
+  const locale = responseLocaleInstructions[responseLocale];
+  return `${baseDeveloperPrompt}
+Output language rules:
+- Write object_label and all three assumptions in ${locale.language}.
+- Begin the three assumptions, in order, with ${locale.prefixes}
+- Keep every JSON property name and the category and confidence values as the
+  schema's exact canonical English tokens. Never translate those tokens.
+`;
+}
 
 const responseFormat = {
   type: "json_schema",

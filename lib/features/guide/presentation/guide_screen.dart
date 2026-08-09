@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
+import '../../../l10n/l10n.dart';
 
 class GuideScreen extends StatelessWidget {
   const GuideScreen({required this.onScan, super.key});
@@ -10,19 +11,20 @@ class GuideScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
-          const Eyebrow('Better input, better range'),
+          Eyebrow(l10n.guideEyebrow),
           const SizedBox(height: 8),
           Text(
-            'Capture guide',
+            l10n.guideTitle,
             style: Theme.of(context).textTheme.headlineLarge,
           ),
           const SizedBox(height: 8),
           Text(
-            'Four simple choices make a visual estimate more useful.',
+            l10n.guideIntro,
             style: Theme.of(
               context,
             ).textTheme.bodyLarge?.copyWith(color: AppColors.inkMuted),
@@ -30,48 +32,40 @@ class GuideScreen extends StatelessWidget {
           const SizedBox(height: 24),
           const _GuideHero(),
           const SizedBox(height: 22),
-          const _GuideStep(
+          _GuideStep(
             number: '01',
             icon: Icons.center_focus_strong_rounded,
-            title: 'Show the whole object',
-            message:
-                'Leave space around every edge. Avoid hands, labels, or other '
-                'objects overlapping the target.',
+            title: l10n.guideWholeObjectTitle,
+            message: l10n.guideWholeObjectBody,
             accent: AppColors.lime,
           ),
           const SizedBox(height: 12),
-          const _GuideStep(
+          _GuideStep(
             number: '02',
             icon: Icons.wb_sunny_outlined,
-            title: 'Use soft, even light',
-            message:
-                'Strong shadows hide shape. Bright daylight or a well-lit room '
-                'usually gives the cleanest visual evidence.',
+            title: l10n.guideLightingTitle,
+            message: l10n.guideLightingBody,
             accent: AppColors.aqua,
           ),
           const SizedBox(height: 12),
-          const _GuideStep(
+          _GuideStep(
             number: '03',
             icon: Icons.layers_outlined,
-            title: 'Tell us solid or hollow',
-            message:
-                'A suitcase and a block can occupy the same volume but weigh '
-                'very differently. Structure narrows the density assumption.',
+            title: l10n.guideStructureTitle,
+            message: l10n.guideStructureBody,
             accent: Color(0xFFFFD36A),
           ),
           const SizedBox(height: 12),
-          const _GuideStep(
+          _GuideStep(
             number: '04',
             icon: Icons.add_photo_alternate_outlined,
-            title: 'Add a side view',
-            message:
-                'Move 45–90° around the same object. A second view helps AI '
-                'infer shape, construction, and volume.',
+            title: l10n.guideSideViewTitle,
+            message: l10n.guideSideViewBody,
             accent: AppColors.navySoft,
           ),
           const SizedBox(height: 28),
           Text(
-            'Understanding confidence',
+            l10n.guideUnderstandingConfidence,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 12),
@@ -80,7 +74,7 @@ class GuideScreen extends StatelessWidget {
           FilledButton.icon(
             onPressed: onScan,
             icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('Try a guided capture'),
+            label: Text(l10n.guideTryCapture),
           ),
         ],
       ),
@@ -93,6 +87,7 @@ class _GuideHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       height: 226,
       decoration: BoxDecoration(
@@ -122,19 +117,19 @@ class _GuideHero extends StatelessWidget {
               size: 66,
             ),
           ),
-          const Positioned(
+          Positioned(
             top: 20,
             child: StatusPill(
-              label: 'Clear subject',
+              label: l10n.guideClearSubject,
               icon: Icons.check_rounded,
               background: AppColors.lime,
             ),
           ),
-          const Positioned(
+          Positioned(
             bottom: 18,
             child: Text(
-              'ALL EDGES VISIBLE  •  SINGLE OBJECT',
-              style: TextStyle(
+              l10n.guideAllEdgesVisible,
+              style: const TextStyle(
                 color: Colors.white60,
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
@@ -221,6 +216,7 @@ class _ConfidenceGuide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -228,30 +224,30 @@ class _ConfidenceGuide extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.line),
       ),
-      child: const Column(
+      child: Column(
         children: [
           _ConfidenceRow(
             color: AppColors.coral,
-            label: 'Low',
-            detail: 'One photo, inferred scale or category',
+            label: l10n.confidenceLow,
+            detail: l10n.guideLowDetail,
           ),
-          Padding(
+          const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
             child: Divider(),
           ),
           _ConfidenceRow(
             color: AppColors.limeDark,
-            label: 'Medium',
-            detail: 'Category plus structure confirmed',
+            label: l10n.confidenceMedium,
+            detail: l10n.guideMediumDetail,
           ),
-          Padding(
+          const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
             child: Divider(),
           ),
           _ConfidenceRow(
-            color: Color(0xFF168B78),
-            label: 'High',
-            detail: 'Two clear angles plus useful object details',
+            color: const Color(0xFF168B78),
+            label: l10n.confidenceHigh,
+            detail: l10n.guideHighDetail,
           ),
         ],
       ),

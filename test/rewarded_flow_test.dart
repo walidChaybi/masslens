@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
+import 'package:mass_lens/features/home/presentation/home_screen.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
 import 'package:mass_lens/features/monetization/application/monetization_controller.dart';
 import 'package:mass_lens/features/monetization/data/app_ad_service.dart';
@@ -11,6 +12,7 @@ import 'package:mass_lens/features/monetization/data/monetization_api.dart';
 import 'package:mass_lens/features/monetization/domain/access_status.dart';
 import 'package:mass_lens/features/monetization/domain/reward_attempt.dart';
 import 'package:mass_lens/features/monetization/presentation/rewarded_scan_sheet.dart';
+import 'package:mass_lens/l10n/l10n.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -49,6 +51,32 @@ void main() {
       expect(controller.rewardFlowState, RewardFlowState.verified);
     },
   );
+
+  test('provider exception details are never exposed as notices', () async {
+    final accessController = MonetizationController.forTesting(
+      api: _ThrowingAccessApi(),
+      adService: _FakeAppAdService(),
+    );
+    addTearDown(accessController.dispose);
+
+    await accessController.initialize();
+
+    expect(accessController.message, 'Could not refresh scan access.');
+    expect(accessController.message, isNot(contains('private-provider-token')));
+
+    final clock = _FakeClock(DateTime.utc(2026, 8, 8, 12));
+    final rewardController = MonetizationController.forTesting(
+      api: _ThrowingRewardStartApi(clock: clock),
+      adService: _FakeAppAdService(),
+      now: clock.now,
+    );
+    addTearDown(rewardController.dispose);
+    await rewardController.initialize();
+
+    expect(await rewardController.watchAdForScan(), isFalse);
+    expect(rewardController.message, 'The rewarded ad could not start.');
+    expect(rewardController.message, isNot(contains('private-provider-token')));
+  });
 
   test(
     'full rewarded balance keeps the earned attempt for a later retry',
@@ -170,6 +198,8 @@ void main() {
       AppScope(
         controller: appController,
         child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: buildAppTheme(),
           home: Builder(
             builder: (context) => Scaffold(
@@ -271,6 +301,47 @@ void main() {
     expect(ads.updatePlanCount, 2);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('AI home keeps a rewarded scan CTA when ads are enabled', (
+    tester,
+  ) async {
+    final clock = _FakeClock(DateTime.utc(2026, 8, 8, 12));
+    final monetization = MonetizationController.forTesting(
+      api: _FakeMonetizationApi(clock: clock),
+      adService: _FakeAppAdService(),
+      now: clock.now,
+    );
+    await monetization.initialize();
+    final appController = AppController(
+      measurementStore: const MeasurementStore(),
+      onboardingComplete: true,
+      monetizationController: monetization,
+    );
+    addTearDown(appController.dispose);
+
+    await tester.pumpWidget(
+      AppScope(
+        controller: appController,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildAppTheme(),
+          home: Scaffold(
+            body: HomeScreen(
+              onMeasure: () {},
+              onGallery: () {},
+              onViewHistory: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(appController.monetization.access.adsEnabled, isTrue);
+    expect(find.byKey(const Key('home_reward_cta')), findsOneWidget);
+    expect(find.text('0 left · Get +1'), findsOneWidget);
+  });
 }
 
 Future<void> _openRewardSheet(
@@ -281,6 +352,8 @@ Future<void> _openRewardSheet(
     AppScope(
       controller: controller,
       child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: buildAppTheme(),
         home: Builder(
           builder: (context) => Scaffold(
@@ -380,6 +453,28 @@ class _FakeMonetizationApi extends MonetizationApi {
     updatedAt: clock.now(),
     expiresAt: clock.now().add(const Duration(hours: 24)),
   );
+}
+
+final class _ThrowingAccessApi extends MonetizationApi {
+  _ThrowingAccessApi() : super(apiUrl: 'https://example.invalid');
+
+  @override
+  Future<AccessStatus> getAccess(String clientId) async {
+    throw StateError('private-provider-token');
+  }
+}
+
+final class _ThrowingRewardStartApi extends _FakeMonetizationApi {
+  _ThrowingRewardStartApi({required super.clock});
+
+  @override
+  Future<RewardAttemptStatus> recordRewardAttempt({
+    required String clientId,
+    required String attemptId,
+    required RewardAttemptEvent event,
+  }) async {
+    throw StateError('private-provider-token');
+  }
 }
 
 class _FakeAppAdService extends AppAdService {

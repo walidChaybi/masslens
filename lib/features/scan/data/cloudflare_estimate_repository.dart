@@ -38,6 +38,7 @@ class CloudflareEstimateRepository implements EstimateRepository {
         'material': request.material,
         'fillState': request.fillState,
         'referenceObject': request.referenceObject,
+        'responseLocale': request.responseLocale,
         if (request.knownDimension case final knownDimension?)
           'knownDimension': knownDimension.toJson(),
       },
@@ -47,7 +48,11 @@ class CloudflareEstimateRepository implements EstimateRepository {
           : request.requestId,
     );
 
-    return measurementFromAiEstimatePayload(payload, request.imagePath);
+    return measurementFromAiEstimatePayload(
+      payload,
+      request.imagePath,
+      analysisLocale: request.responseLocale,
+    );
   }
 
   Uri _validatedApiUri() {

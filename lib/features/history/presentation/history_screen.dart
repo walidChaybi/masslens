@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
+import '../../../l10n/display_labels.dart';
+import '../../../l10n/l10n.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
 import '../../monetization/presentation/native_ad_card.dart';
 
@@ -16,20 +18,24 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _filter = 'All';
+  String? _filterCategory;
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
-    final categories = {
-      'All',
-      ...controller.measurements.map((item) => item.category),
-    }.toList();
-    if (!categories.contains(_filter)) _filter = 'All';
-    final visible = _filter == 'All'
+    final l10n = context.l10n;
+    final categories = controller.measurements
+        .map((item) => item.category)
+        .toSet()
+        .toList();
+    if (_filterCategory != null && !categories.contains(_filterCategory)) {
+      _filterCategory = null;
+    }
+    final filterOptions = <String?>[null, ...categories];
+    final visible = _filterCategory == null
         ? controller.measurements
         : controller.measurements
-              .where((item) => item.category == _filter)
+              .where((item) => item.category == _filterCategory)
               .toList();
 
     return SafeArea(
@@ -45,17 +51,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Eyebrow('Private on-device log'),
+                          Eyebrow(l10n.historyEyebrow),
                           const SizedBox(height: 8),
                           Text(
-                            'Estimate history',
+                            l10n.historyTitle,
                             style: Theme.of(context).textTheme.headlineLarge,
                           ),
                         ],
                       ),
                     ),
                     IconButton.filledTonal(
-                      tooltip: 'New estimate',
+                      tooltip: l10n.historyNewEstimate,
                       onPressed: widget.onScan,
                       icon: const Icon(Icons.add_rounded),
                     ),
@@ -75,14 +81,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     height: 42,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: categories.length,
+                      itemCount: filterOptions.length,
                       separatorBuilder: (_, _) => const SizedBox(width: 8),
                       itemBuilder: (context, index) {
-                        final filter = categories[index];
+                        final filter = filterOptions[index];
                         return ChoiceChip(
-                          label: Text(filter),
-                          selected: filter == _filter,
-                          onSelected: (_) => setState(() => _filter = filter),
+                          label: Text(
+                            filter == null
+                                ? l10n.historyAll
+                                : localizedCategory(l10n, filter),
+                          ),
+                          selected: filter == _filterCategory,
+                          onSelected: (_) =>
+                              setState(() => _filterCategory = filter),
                         );
                       },
                     ),
@@ -93,16 +104,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   EmptyPanel(
                     icon: Icons.inventory_2_outlined,
                     title: controller.measurements.isEmpty
-                        ? 'Nothing saved yet'
-                        : 'No $_filter estimates',
+                        ? l10n.historyNothingSaved
+                        : l10n.historyNoCategoryEstimates(
+                            localizedCategory(l10n, _filterCategory!),
+                          ),
                     message: controller.measurements.isEmpty
-                        ? 'Save a result after your first photo estimate and '
-                              'it will appear here.'
-                        : 'Choose another filter or make a new estimate.',
+                        ? l10n.historyEmptyBody
+                        : l10n.historyFilteredEmptyBody,
                     action: FilledButton.icon(
                       onPressed: widget.onScan,
                       icon: const Icon(Icons.center_focus_strong_rounded),
-                      label: const Text('Start estimate'),
+                      label: Text(l10n.historyStartEstimate),
                     ),
                   )
                 else
@@ -145,29 +157,62 @@ class _HistoryStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
         color: AppColors.ink,
         borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
-        children: [
-          _Stat(value: '$total', label: 'Saved'),
-          Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final divider = Container(
             width: 1,
             height: 38,
-            margin: const EdgeInsets.symmetric(horizontal: 24),
+            margin: const EdgeInsets.symmetric(horizontal: 18),
             color: Colors.white.withValues(alpha: 0.15),
-          ),
-          _Stat(value: '$categories', label: 'Categories'),
-          const Spacer(),
-          const StatusPill(
-            label: 'Local',
+          );
+          final localBadge = StatusPill(
+            label: l10n.historyLocalBadge,
             icon: Icons.lock_outline_rounded,
             background: AppColors.lime,
-          ),
-        ],
+          );
+          if (constraints.maxWidth < 360) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Stat(
+                        value: '$total',
+                        label: l10n.historySavedStat,
+                      ),
+                    ),
+                    divider,
+                    Expanded(
+                      child: _Stat(
+                        value: '$categories',
+                        label: l10n.historyCategoriesStat,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                localBadge,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              _Stat(value: '$total', label: l10n.historySavedStat),
+              divider,
+              _Stat(value: '$categories', label: l10n.historyCategoriesStat),
+              const Spacer(),
+              localBadge,
+            ],
+          );
+        },
       ),
     );
   }

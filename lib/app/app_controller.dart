@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,12 +14,14 @@ class AppController extends ChangeNotifier {
     required MeasurementStore measurementStore,
     List<Measurement> measurements = const [],
     bool onboardingComplete = false,
+    bool onboardingInterstitialShown = false,
     UnitSystem unitSystem = UnitSystem.metric,
     DateTime? previousBackgroundedAt,
     MonetizationController? monetizationController,
   }) : _measurementStore = measurementStore,
        _measurements = List<Measurement>.from(measurements),
        _onboardingComplete = onboardingComplete,
+       _onboardingInterstitialShown = onboardingInterstitialShown,
        _unitSystem = unitSystem,
        _previousBackgroundedAt = previousBackgroundedAt,
        monetization =
@@ -27,6 +30,12 @@ class AppController extends ChangeNotifier {
   }
 
   static const _onboardingKey = 'mass_lens.onboarding_complete';
+  static const _onboardingSeenKey = 'mass_lens.onboarding_seen';
+  static const _onboardingInterstitialKey =
+      'mass_lens.onboarding_interstitial_shown';
+  static const _forceOnboarding = bool.fromEnvironment(
+    'MASSLENS_FORCE_ONBOARDING',
+  );
   static const _unitKey = 'mass_lens.unit_system';
   static const _backgroundedAtKey = 'mass_lens.backgrounded_at_ms';
 
@@ -34,33 +43,46 @@ class AppController extends ChangeNotifier {
   final MonetizationController monetization;
   final List<Measurement> _measurements;
   bool _onboardingComplete;
+  bool _onboardingInterstitialShown;
   UnitSystem _unitSystem;
   DateTime? _previousBackgroundedAt;
+  Future<void> _backgroundPersistence = Future<void>.value();
 
   List<Measurement> get measurements => List.unmodifiable(_measurements);
   bool get onboardingComplete => _onboardingComplete;
+  bool get onboardingInterstitialShown => _onboardingInterstitialShown;
   UnitSystem get unitSystem => _unitSystem;
 
   static Future<AppController> bootstrap({
     MeasurementStore store = const MeasurementStore(),
   }) async {
     var onboardingComplete = false;
+    var onboardingInterstitialShown = false;
     var unitSystem = UnitSystem.metric;
     DateTime? previousBackgroundedAt;
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedOnboarding = preferences.getBool(_onboardingKey);
-      // Earlier releases always opened AppShell and never wrote the onboarding
-      // preference. An existing installation ID proves this is an upgrade, so
-      // do not unexpectedly trap that user in newly restored onboarding.
+      final onboardingSeen = preferences.getBool(_onboardingSeenKey) ?? false;
+      final existingInstallation = InstallationIdStore.hasExisting(preferences);
+      // A genuinely fresh install sees onboarding during this launch only.
+      // Persisting `seen` now means closing midway never replays the guide.
+      // Existing installation IDs also preserve the legacy-upgrade behavior.
       onboardingComplete =
-          savedOnboarding ?? InstallationIdStore.hasExisting(preferences);
-      if (savedOnboarding == null) {
-        // Persist both outcomes before unconditional monetization startup can
-        // create an installation ID. A fresh user who closes onboarding midway
-        // must still see it on the next launch.
-        await preferences.setBool(_onboardingKey, onboardingComplete);
+          savedOnboarding == true || onboardingSeen || existingInstallation;
+      if (onboardingComplete) {
+        if (savedOnboarding != true) {
+          await preferences.setBool(_onboardingKey, true);
+        }
+        if (!onboardingSeen) {
+          await preferences.setBool(_onboardingSeenKey, true);
+        }
+      } else {
+        await preferences.setBool(_onboardingKey, false);
+        await preferences.setBool(_onboardingSeenKey, true);
       }
+      onboardingInterstitialShown =
+          preferences.getBool(_onboardingInterstitialKey) ?? false;
       unitSystem = UnitSystem.values.byName(
         preferences.getString(_unitKey) ?? UnitSystem.metric.name,
       );
@@ -77,7 +99,10 @@ class AppController extends ChangeNotifier {
     return AppController(
       measurementStore: store,
       measurements: await store.load(),
-      onboardingComplete: onboardingComplete,
+      onboardingComplete: kDebugMode && _forceOnboarding
+          ? false
+          : onboardingComplete,
+      onboardingInterstitialShown: onboardingInterstitialShown,
       unitSystem: unitSystem,
       previousBackgroundedAt: previousBackgroundedAt,
       monetizationController: MonetizationController.create(),
@@ -89,15 +114,48 @@ class AppController extends ChangeNotifier {
   Future<void> handleAppResumed(Duration backgroundTime) =>
       monetization.handleAppResumed(backgroundTime);
 
-  Duration? takePreviousBackgroundDuration() {
+  Future<Duration?> consumePreviousBackgroundDuration() async {
     final previous = _previousBackgroundedAt;
     _previousBackgroundedAt = null;
     if (previous == null) return null;
-    final duration = DateTime.now().difference(previous);
-    return duration.isNegative ? Duration.zero : duration;
+    return consumeBackgroundDuration(previous);
   }
 
-  Future<void> recordBackgrounded(DateTime time) async {
+  /// Consumes only the exact pause record being resumed. If another pause has
+  /// already written a newer timestamp, it is preserved and the stale resume
+  /// cannot trigger an app-open ad.
+  Future<Duration?> consumeBackgroundDuration(DateTime backgroundedAt) {
+    final result = _backgroundPersistence.then(
+      (_) => _consumeBackgroundDuration(backgroundedAt),
+    );
+    _backgroundPersistence = result.then<void>((_) {});
+    return result;
+  }
+
+  Future<Duration?> _consumeBackgroundDuration(DateTime backgroundedAt) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final expected = backgroundedAt.millisecondsSinceEpoch;
+      if (preferences.getInt(_backgroundedAtKey) != expected) return null;
+      if (!await preferences.remove(_backgroundedAtKey)) return null;
+      final duration = DateTime.now().difference(backgroundedAt);
+      return duration.isNegative ? Duration.zero : duration;
+    } on Object {
+      // Failing closed avoids replaying the same app-open opportunity on a
+      // later launch when persistence cannot be consumed safely.
+      return null;
+    }
+  }
+
+  Future<void> recordBackgrounded(DateTime time) {
+    final result = _backgroundPersistence.then(
+      (_) => _recordBackgrounded(time),
+    );
+    _backgroundPersistence = result;
+    return result;
+  }
+
+  Future<void> _recordBackgrounded(DateTime time) async {
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setInt(_backgroundedAtKey, time.millisecondsSinceEpoch);
@@ -107,15 +165,40 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> completeOnboarding() async {
-    _onboardingComplete = true;
-    notifyListeners();
+    if (_onboardingComplete) return;
     try {
       final preferences = await SharedPreferences.getInstance();
       await preferences.setBool(_onboardingKey, true);
     } on Object {
       // The current session can continue even if persistence fails.
     }
+    _onboardingComplete = true;
+    notifyListeners();
     unawaited(monetization.initialize());
+  }
+
+  Future<void> markOnboardingInterstitialShown() async {
+    if (_onboardingInterstitialShown) return;
+    _onboardingInterstitialShown = true;
+    notifyListeners();
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_onboardingInterstitialKey, true);
+    } on Object {
+      // The in-memory guard still prevents a duplicate in this session.
+    }
+  }
+
+  Future<void> clearOnboardingInterstitialShownAfterFailedDisplay() async {
+    if (!_onboardingInterstitialShown) return;
+    _onboardingInterstitialShown = false;
+    notifyListeners();
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove(_onboardingInterstitialKey);
+    } on Object {
+      // A stale true is safer than replaying an ad that may have appeared.
+    }
   }
 
   Future<void> setUnitSystem(UnitSystem value) async {

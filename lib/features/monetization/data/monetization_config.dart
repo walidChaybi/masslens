@@ -51,12 +51,26 @@ abstract final class AdMobConfig {
   );
   static const _interstitialProduction = String.fromEnvironment(
     'ADMOB_INTERSTITIAL_AD_UNIT_ID',
+    defaultValue: 'ca-app-pub-7681170430097585/5269089498',
+  );
+  // Reserved for future placements. These IDs are intentionally excluded from
+  // readiness, validation, and every loader until their UX is implemented.
+  static const _bannerProduction = String.fromEnvironment(
+    'ADMOB_BANNER_AD_UNIT_ID',
+    defaultValue: 'ca-app-pub-7681170430097585/7955628865',
+  );
+  static const _rewardedInterstitialProduction = String.fromEnvironment(
+    'ADMOB_REWARDED_INTERSTITIAL_AD_UNIT_ID',
+    defaultValue: 'ca-app-pub-7681170430097585/8620483744',
   );
 
   static const _nativeTest = 'ca-app-pub-3940256099942544/2247696110';
   static const _rewardedTest = 'ca-app-pub-3940256099942544/5224354917';
   static const _appOpenTest = 'ca-app-pub-3940256099942544/9257395921';
   static const _interstitialTest = 'ca-app-pub-3940256099942544/1033173712';
+  static const _bannerTest = 'ca-app-pub-3940256099942544/6300978111';
+  static const _rewardedInterstitialTest =
+      'ca-app-pub-3940256099942544/5354046379';
 
   static String get nativeAdUnitId =>
       useTestIds ? _nativeTest : _nativeProduction;
@@ -66,6 +80,10 @@ abstract final class AdMobConfig {
       useTestIds ? _appOpenTest : _appOpenProduction;
   static String get interstitialAdUnitId =>
       useTestIds ? _interstitialTest : _interstitialProduction;
+  static String get bannerAdUnitId =>
+      useTestIds ? _bannerTest : _bannerProduction;
+  static String get rewardedInterstitialAdUnitId =>
+      useTestIds ? _rewardedInterstitialTest : _rewardedInterstitialProduction;
 
   static bool get hasNativeConfiguration =>
       enabled && nativeAdUnitId.isNotEmpty;

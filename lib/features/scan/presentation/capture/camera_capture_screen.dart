@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../l10n/l10n.dart';
+
 class CameraCaptureScreen extends StatefulWidget {
   const CameraCaptureScreen({super.key});
 
@@ -45,15 +47,15 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
     } on CameraException catch (error) {
       if (mounted) setState(() => _error = _friendlyError(error));
     } on Object {
-      if (mounted) setState(() => _error = 'Camera is unavailable.');
+      if (mounted) setState(() => _error = context.l10n.cameraUnavailable);
     }
   }
 
   String _friendlyError(CameraException error) {
     if (error.code.toLowerCase().contains('access')) {
-      return 'Camera access is needed to photograph the object.';
+      return context.l10n.cameraAccessNeeded;
     }
-    return 'Camera is unavailable on this device.';
+    return context.l10n.cameraUnavailableDevice;
   }
 
   Future<void> _capture() async {
@@ -67,7 +69,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
       if (mounted) {
         setState(() {
           _capturing = false;
-          _error = 'The photo could not be captured. Try again.';
+          _error = context.l10n.cameraCaptureFailed;
         });
       }
     }
@@ -115,12 +117,10 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
           fit: StackFit.expand,
           children: [
             if (controller != null && controller.value.isInitialized)
-              Center(
-                child: AspectRatio(
-                  aspectRatio: controller.value.aspectRatio,
-                  child: CameraPreview(controller),
-                ),
-              )
+              // CameraPreview already owns the portrait reciprocal ratio and
+              // Android rotation. Wrapping it in the sensor's landscape ratio
+              // stretches the preview on portrait devices such as the S23.
+              Center(child: CameraPreview(controller))
             else
               Center(
                 child: _error == null
@@ -145,12 +145,14 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _CameraIconButton(
-                    tooltip: 'Close',
+                    tooltip: context.l10n.cameraCloseTooltip,
                     icon: Icons.close_rounded,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   _CameraIconButton(
-                    tooltip: _torch ? 'Turn torch off' : 'Turn torch on',
+                    tooltip: _torch
+                        ? context.l10n.cameraTorchOffTooltip
+                        : context.l10n.cameraTorchOnTooltip,
                     icon: _torch
                         ? Icons.flash_on_rounded
                         : Icons.flash_off_rounded,
@@ -167,7 +169,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
               child: Center(
                 child: Semantics(
                   button: true,
-                  label: 'Take photo',
+                  label: context.l10n.cameraTakePhotoSemantics,
                   child: GestureDetector(
                     key: const Key('camera_shutter_button'),
                     onTap: controller == null ? null : _capture,

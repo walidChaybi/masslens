@@ -13,15 +13,7 @@ abstract final class EstimateEngineConfig {
 
   static bool get isAiEnabled => true;
 
-  static String get analysisModeLabel => 'Secure cloud AI';
-
-  static String get cloudUploadLabel => 'Via secure API';
-
   static String get productionModelLabel => cloudModelLabel;
-
-  static String get reviewFootnote => 'AI analysis · Secure photo upload';
-
-  static String get analysisPrivacyLabel => 'Photo upload enabled';
 }
 
 EstimateRepository buildEstimateRepository() =>

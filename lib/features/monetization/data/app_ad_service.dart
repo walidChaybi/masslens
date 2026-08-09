@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../domain/access_status.dart';
@@ -13,11 +14,59 @@ typedef PaidAdReporter =
       String currencyCode,
     );
 
+typedef InterstitialAdLoader =
+    Future<InterstitialAdHandle?> Function(String adUnitId);
+
+/// Narrow adapter around the Mobile Ads interstitial so its lifecycle can be
+/// exercised without loading the platform plugin in unit tests.
+@visibleForTesting
+abstract interface class InterstitialAdHandle {
+  void configure({
+    required VoidCallback onShown,
+    required VoidCallback onDismissed,
+    required VoidCallback onFailedToShow,
+    required void Function(
+      double valueMicros,
+      PrecisionType precision,
+      String currencyCode,
+    )
+    onPaidEvent,
+  });
+
+  Future<void> show();
+
+  void dispose();
+}
+
 class AppAdService {
-  AppAdService({this.onPaidEvent, this.onStateChanged});
+  AppAdService({
+    this.onPaidEvent,
+    this.onStateChanged,
+    DateTime Function()? now,
+    InterstitialAdLoader? interstitialAdLoader,
+  }) : _now = now ?? DateTime.now,
+       _interstitialAdLoader = interstitialAdLoader ?? _loadGoogleInterstitial,
+       _testInterstitialConfiguration = false;
+
+  @visibleForTesting
+  AppAdService.forTesting({
+    required InterstitialAdLoader interstitialAdLoader,
+    this.onPaidEvent,
+    this.onStateChanged,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now,
+       _interstitialAdLoader = interstitialAdLoader,
+       _testInterstitialConfiguration = true {
+    _adsAllowed = true;
+    _canRequestAds = true;
+    _initialized = true;
+  }
 
   final PaidAdReporter? onPaidEvent;
   final void Function()? onStateChanged;
+  final DateTime Function() _now;
+  final InterstitialAdLoader _interstitialAdLoader;
+  final bool _testInterstitialConfiguration;
 
   bool _initialized = false;
   bool _disposed = false;
@@ -31,15 +80,18 @@ class AppAdService {
   bool _rewardedLoading = false;
   RewardedAd? _rewarded;
   AppOpenAd? _appOpenAd;
-  InterstitialAd? _interstitial;
+  InterstitialAdHandle? _interstitial;
+  InterstitialAdHandle? _activeInterstitial;
   DateTime? _appOpenLoadedAt;
   DateTime? _lastAppOpenShownAt;
   DateTime? _lastInterstitialShownAt;
   Completer<void>? _appOpenLoadWaiter;
+  Completer<bool>? _interstitialLoadWaiter;
+  Completer<bool>? _activeInterstitialResult;
   AdPolicy _policy = const AdPolicy();
 
   bool get canRequestAds =>
-      AdMobConfig.hasAnyConfiguration &&
+      (_testInterstitialConfiguration || AdMobConfig.hasAnyConfiguration) &&
       _adsAllowed &&
       (_canRequestAds || AdMobConfig.useTestIds);
   bool get canRequestNativeAds =>
@@ -48,7 +100,18 @@ class AppAdService {
       canRequestAds &&
       AdMobConfig.hasRewardedConfiguration &&
       _rewarded != null;
+  bool get interstitialLoading => _interstitialLoading;
+  bool get interstitialReady =>
+      canRequestAds &&
+      _hasInterstitialConfiguration &&
+      _interstitial != null &&
+      !_interstitialShowing &&
+      _interstitialCooldownElapsed(_now());
   bool get privacyOptionsRequired => _privacyOptionsRequired;
+
+  bool get _hasInterstitialConfiguration =>
+      _testInterstitialConfiguration ||
+      AdMobConfig.hasInterstitialConfiguration;
 
   Future<void> updatePlan({
     required bool adsAllowed,
@@ -60,7 +123,9 @@ class AppAdService {
       _disposeLoadedAds();
       return;
     }
-    if (!AdMobConfig.hasAnyConfiguration) return;
+    if (!_testInterstitialConfiguration && !AdMobConfig.hasAnyConfiguration) {
+      return;
+    }
     if (!_initialized) await _initialize();
     if (canRequestAds) _preloadAll();
   }
@@ -108,7 +173,7 @@ class AppAdService {
 
   void _preloadAll() {
     _loadRewarded();
-    _loadInterstitial();
+    unawaited(_loadInterstitial());
     _loadAppOpen();
   }
 
@@ -144,30 +209,57 @@ class AppAdService {
     );
   }
 
-  void _loadInterstitial() {
-    if (!canRequestAds ||
-        !AdMobConfig.hasInterstitialConfiguration ||
-        _interstitial != null ||
-        _interstitialLoading) {
-      return;
+  Future<bool> _loadInterstitial() {
+    if (_interstitial != null) return Future<bool>.value(true);
+    final pending = _interstitialLoadWaiter;
+    if (pending != null) return pending.future;
+    if (_disposed ||
+        !canRequestAds ||
+        !_hasInterstitialConfiguration ||
+        _interstitialShowing) {
+      return Future<bool>.value(false);
     }
     _interstitialLoading = true;
-    InterstitialAd.load(
-      adUnitId: AdMobConfig.interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialLoading = false;
-          _interstitial = ad;
-          onStateChanged?.call();
-        },
-        onAdFailedToLoad: (_) {
-          _interstitialLoading = false;
-          _interstitial = null;
-          onStateChanged?.call();
-        },
-      ),
-    );
+    final waiter = Completer<bool>();
+    _interstitialLoadWaiter = waiter;
+    onStateChanged?.call();
+    unawaited(_performInterstitialLoad(waiter));
+    return waiter.future;
+  }
+
+  Future<void> _performInterstitialLoad(Completer<bool> waiter) async {
+    InterstitialAdHandle? loaded;
+    try {
+      loaded = await _interstitialAdLoader(AdMobConfig.interstitialAdUnitId);
+    } on Object {
+      loaded = null;
+    }
+    if (!identical(_interstitialLoadWaiter, waiter) ||
+        _disposed ||
+        !_adsAllowed) {
+      loaded?.dispose();
+      return;
+    }
+    _interstitialLoadWaiter = null;
+    _interstitialLoading = false;
+    _interstitial = loaded;
+    if (!waiter.isCompleted) waiter.complete(loaded != null);
+    onStateChanged?.call();
+  }
+
+  Future<bool> waitForInterstitial({
+    Duration timeout = const Duration(seconds: 4),
+  }) async {
+    if (interstitialReady) return true;
+    if (_interstitialShowing || !_interstitialCooldownElapsed(_now())) {
+      return false;
+    }
+    try {
+      await _loadInterstitial().timeout(timeout);
+    } on TimeoutException {
+      return false;
+    }
+    return interstitialReady;
   }
 
   void _loadAppOpen() {
@@ -204,37 +296,94 @@ class AppAdService {
   }
 
   Future<bool> showInterstitialAfterScan(int completedScanCount) async {
-    if (!canRequestAds || _interstitialShowing) return false;
     if (!_policy.shouldShowInterstitial(
       completedScanCount: completedScanCount,
-      now: DateTime.now(),
+      now: _now(),
       lastShownAt: _lastInterstitialShownAt,
     )) {
       return false;
     }
+    return _showInterstitial(placement: 'interstitial');
+  }
+
+  /// Shows at the explicit transition out of onboarding. It intentionally
+  /// bypasses completed-scan cadence while sharing the regular interstitial's
+  /// inventory, in-flight guard, and cooldown.
+  Future<bool> showOnboardingInterstitial() =>
+      _showInterstitial(placement: 'onboarding_interstitial');
+
+  /// Shows at a user-initiated drawer transition between the two primary app
+  /// modes. It shares inventory and the global interstitial cooldown.
+  Future<bool> showDrawerModeInterstitial({required bool aiScan}) =>
+      _showInterstitial(
+        placement: aiScan
+            ? 'drawer_ai_scan_interstitial'
+            : 'drawer_digital_scale_interstitial',
+      );
+
+  Future<bool> _showInterstitial({required String placement}) async {
+    if (!canRequestAds ||
+        _interstitialShowing ||
+        !_interstitialCooldownElapsed(_now())) {
+      return false;
+    }
     final ad = _interstitial;
     if (ad == null) {
-      _loadInterstitial();
+      unawaited(_loadInterstitial());
       return false;
     }
     _interstitial = null;
+    _activeInterstitial = ad;
     _interstitialShowing = true;
-    ad.onPaidEvent = (ad, value, precision, currency) {
-      onPaidEvent?.call('interstitial', value, precision, currency);
-    };
-    ad.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) => _finishInterstitial(ad),
-      onAdFailedToShowFullScreenContent: (ad, _) => _finishInterstitial(ad),
-    );
-    await ad.show();
-    _lastInterstitialShownAt = DateTime.now();
-    return true;
+    final result = Completer<bool>();
+    _activeInterstitialResult = result;
+    var didShow = false;
+
+    void recordShown() {
+      if (!identical(_activeInterstitial, ad) || didShow) return;
+      didShow = true;
+      _lastInterstitialShownAt = _now();
+      onStateChanged?.call();
+    }
+
+    try {
+      ad.configure(
+        onShown: recordShown,
+        onDismissed: () {
+          // Dismissal proves the ad was visible even if a platform omitted its
+          // earlier showed callback.
+          recordShown();
+          _finishInterstitial(ad, shown: true);
+        },
+        onFailedToShow: () => _finishInterstitial(ad, shown: false),
+        onPaidEvent: (value, precision, currency) {
+          onPaidEvent?.call(placement, value, precision, currency);
+        },
+      );
+      await ad.show();
+    } on Object {
+      _finishInterstitial(ad, shown: false);
+    }
+    return result.future;
   }
 
-  void _finishInterstitial(InterstitialAd ad) {
+  bool _interstitialCooldownElapsed(DateTime now) {
+    final lastShownAt = _lastInterstitialShownAt;
+    if (lastShownAt == null) return true;
+    return now.difference(lastShownAt) >=
+        Duration(seconds: _policy.interstitialCooldownSeconds);
+  }
+
+  void _finishInterstitial(InterstitialAdHandle ad, {required bool shown}) {
+    if (!identical(_activeInterstitial, ad)) return;
+    final result = _activeInterstitialResult;
+    _activeInterstitial = null;
+    _activeInterstitialResult = null;
     ad.dispose();
     _interstitialShowing = false;
-    _loadInterstitial();
+    if (result != null && !result.isCompleted) result.complete(shown);
+    if (!_disposed && _adsAllowed) unawaited(_loadInterstitial());
+    onStateChanged?.call();
   }
 
   bool get _appOpenFresh {
@@ -327,6 +476,18 @@ class AppAdService {
     _rewardedLoading = false;
     _interstitial?.dispose();
     _interstitial = null;
+    _activeInterstitial?.dispose();
+    _activeInterstitial = null;
+    final activeResult = _activeInterstitialResult;
+    _activeInterstitialResult = null;
+    if (activeResult != null && !activeResult.isCompleted) {
+      activeResult.complete(false);
+    }
+    final loadWaiter = _interstitialLoadWaiter;
+    _interstitialLoadWaiter = null;
+    if (loadWaiter != null && !loadWaiter.isCompleted) {
+      loadWaiter.complete(false);
+    }
     _interstitialLoading = false;
     _interstitialShowing = false;
     _appOpenAd?.dispose();
@@ -342,4 +503,63 @@ class AppAdService {
     _disposed = true;
     _disposeLoadedAds();
   }
+}
+
+Future<InterstitialAdHandle?> _loadGoogleInterstitial(String adUnitId) {
+  final loaded = Completer<InterstitialAdHandle?>();
+  unawaited(
+    InterstitialAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (!loaded.isCompleted) {
+            loaded.complete(_GoogleInterstitialAdHandle(ad));
+          } else {
+            ad.dispose();
+          }
+        },
+        onAdFailedToLoad: (_) {
+          if (!loaded.isCompleted) loaded.complete(null);
+        },
+      ),
+    ).onError((_, _) {
+      if (!loaded.isCompleted) loaded.complete(null);
+    }),
+  );
+  return loaded.future;
+}
+
+final class _GoogleInterstitialAdHandle implements InterstitialAdHandle {
+  _GoogleInterstitialAdHandle(this._ad);
+
+  final InterstitialAd _ad;
+
+  @override
+  void configure({
+    required VoidCallback onShown,
+    required VoidCallback onDismissed,
+    required VoidCallback onFailedToShow,
+    required void Function(
+      double valueMicros,
+      PrecisionType precision,
+      String currencyCode,
+    )
+    onPaidEvent,
+  }) {
+    _ad.onPaidEvent = (_, value, precision, currency) {
+      onPaidEvent(value, precision, currency);
+    };
+    _ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (_) => onShown(),
+      onAdDismissedFullScreenContent: (_) => onDismissed(),
+      onAdFailedToShowFullScreenContent: (_, _) => onFailedToShow(),
+    );
+  }
+
+  @override
+  Future<void> show() => _ad.show();
+
+  @override
+  void dispose() => _ad.dispose();
 }

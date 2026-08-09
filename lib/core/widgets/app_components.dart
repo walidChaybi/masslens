@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../features/measurements/domain/measurement.dart';
+import '../../l10n/display_labels.dart';
+import '../../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 
 class MassLensLogo extends StatelessWidget {
@@ -193,6 +195,8 @@ class MeasurementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageFile = File(measurement.imagePath);
+    final l10n = context.l10n;
+    final localeName = Localizations.localeOf(context).toLanguageTag();
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -230,7 +234,12 @@ class MeasurementCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      formatMeasurementDate(measurement.createdAt),
+                      formatMeasurementDate(
+                        measurement.createdAt,
+                        localeName: localeName,
+                        todayLabel: l10n.measurementToday,
+                        yesterdayLabel: l10n.measurementYesterday,
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     if (!compact) ...[
@@ -245,7 +254,11 @@ class MeasurementCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    formatWeight(measurement.estimateGrams, unitSystem),
+                    formatWeight(
+                      measurement.estimateGrams,
+                      unitSystem,
+                      localeName: localeName,
+                    ),
                     style: const TextStyle(
                       color: AppColors.ink,
                       fontSize: 18,
@@ -276,11 +289,16 @@ class ConfidenceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (level) {
-      ConfidenceLevel.low => ('Low confidence', AppColors.coral),
-      ConfidenceLevel.medium => ('Medium confidence', AppColors.limeDark),
-      ConfidenceLevel.high => ('High confidence', const Color(0xFF168B78)),
+    final color = switch (level) {
+      ConfidenceLevel.low => AppColors.coral,
+      ConfidenceLevel.medium => AppColors.limeDark,
+      ConfidenceLevel.high => const Color(0xFF168B78),
     };
+    final label = localizedConfidence(
+      context.l10n,
+      level,
+      includeConfidence: true,
+    );
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

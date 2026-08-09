@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
 import 'package:mass_lens/app/mass_lens_app.dart';
-import 'package:mass_lens/core/services/installation_id_store.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
 import 'package:mass_lens/features/home/presentation/home_screen.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
@@ -11,6 +10,7 @@ import 'package:mass_lens/features/scan/data/photo_picker.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
 import 'package:mass_lens/features/scan/presentation/capture/camera_launcher.dart';
 import 'package:mass_lens/features/scan/presentation/scan_screen.dart';
+import 'package:mass_lens/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -44,7 +44,18 @@ void main() {
     expect(find.byKey(const Key('onboarding_pages')), findsOneWidget);
     expect(find.byKey(const Key('digital_scale_screen')), findsNothing);
 
-    await tester.tap(find.text('Skip'));
+    for (var step = 0; step < 3; step += 1) {
+      await tester.ensureVisible(find.byKey(const Key('onboarding_continue')));
+      await tester.tap(find.byKey(const Key('onboarding_continue')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 450));
+    }
+    expect(find.text('Almost ready'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1700));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('You’re ready to scan'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('onboarding_continue')));
+    await tester.tap(find.byKey(const Key('onboarding_continue')));
     await tester.pumpAndSettle();
 
     expect(controller.onboardingComplete, isTrue);
@@ -69,23 +80,22 @@ void main() {
     },
   );
 
-  test(
-    'fresh onboarding remains incomplete after an installation ID is created',
-    () async {
-      final first = await AppController.bootstrap(
-        store: const _FakeMeasurementStore(),
-      );
-      addTearDown(first.dispose);
-      expect(first.onboardingComplete, isFalse);
+  test('fresh onboarding appears for one app launch only', () async {
+    final first = await AppController.bootstrap(
+      store: const _FakeMeasurementStore(),
+    );
+    addTearDown(first.dispose);
+    expect(first.onboardingComplete, isFalse);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('mass_lens.onboarding_seen'), isTrue);
 
-      await InstallationIdStore.getOrCreate();
-      final relaunched = await AppController.bootstrap(
-        store: const _FakeMeasurementStore(),
-      );
-      addTearDown(relaunched.dispose);
-      expect(relaunched.onboardingComplete, isFalse);
-    },
-  );
+    final relaunched = await AppController.bootstrap(
+      store: const _FakeMeasurementStore(),
+    );
+    addTearDown(relaunched.dispose);
+    expect(relaunched.onboardingComplete, isTrue);
+    expect(preferences.getBool('mass_lens.onboarding_complete'), isTrue);
+  });
 
   testWidgets('left navigation exposes AI scan, history, and settings', (
     tester,
@@ -138,7 +148,7 @@ void main() {
     await tester.tap(find.text('Earn AI scans'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Watch one ad.\nGet one scan.'), findsOneWidget);
+    expect(find.text('Watch one ad. Get one scan.'), findsOneWidget);
     expect(find.textContaining('No subscription'), findsOneWidget);
     expect(find.textContaining('100 scans'), findsNothing);
     expect(find.textContaining('500 scans'), findsNothing);
@@ -157,6 +167,8 @@ void main() {
       AppScope(
         controller: controller,
         child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: buildAppTheme(),
           home: ScanScreen(
             photoPicker: photoPicker,
@@ -282,6 +294,8 @@ void main() {
       AppScope(
         controller: controller,
         child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: buildAppTheme(),
           home: ScanScreen(
             estimateRepository: estimateRepository,
@@ -321,6 +335,8 @@ void main() {
       AppScope(
         controller: controller,
         child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: buildAppTheme(),
           home: ScanScreen(
             estimateRepository: _FakeEstimateRepository(),
@@ -334,6 +350,125 @@ void main() {
     expect(launcher.launchCount, 1);
     expect(find.text('Photograph an object'), findsOneWidget);
     expect(find.text('The camera could not be opened.'), findsNothing);
+  });
+
+  testWidgets('Android back returns false before an estimate completes', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    addTearDown(controller.dispose);
+    final routeResults = <bool?>[];
+    await tester.pumpWidget(
+      AppScope(
+        controller: controller,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildAppTheme(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: FilledButton(
+                  key: const Key('open_scan_route'),
+                  onPressed: () async {
+                    routeResults.add(
+                      await Navigator.of(context).push<bool>(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => ScanScreen(
+                            estimateRepository: _FakeEstimateRepository(),
+                            autoStart: false,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open scan'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('open_scan_route')));
+    await tester.pumpAndSettle();
+    expect(find.text('New estimate'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(routeResults, <bool?>[false]);
+  });
+
+  testWidgets('Android back and close return true after an estimate', (
+    tester,
+  ) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+    );
+    addTearDown(controller.dispose);
+    final routeResults = <bool?>[];
+    await tester.pumpWidget(
+      AppScope(
+        controller: controller,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildAppTheme(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: FilledButton(
+                  key: const Key('open_completed_scan_route'),
+                  onPressed: () async {
+                    routeResults.add(
+                      await Navigator.of(context).push<bool>(
+                        MaterialPageRoute<bool>(
+                          builder: (_) => ScanScreen(
+                            estimateRepository: _FakeEstimateRepository(),
+                            cameraLauncher: _FakeCameraLauncher(
+                              '/tmp/camera-object.jpg',
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open scan'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Future<void> openAndAnalyze() async {
+      await tester.tap(find.byKey(const Key('open_completed_scan_route')));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('analyze_button')),
+        300,
+      );
+      await tester.tap(find.byKey(const Key('analyze_button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('result_weight')), findsOneWidget);
+    }
+
+    await openAndAnalyze();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(routeResults, <bool?>[true]);
+
+    await openAndAnalyze();
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(routeResults, <bool?>[true, true]);
   });
 
   testWidgets('minimal AI entry fits compact and large Android viewports', (
@@ -351,6 +486,8 @@ void main() {
         AppScope(
           controller: controller,
           child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             theme: buildAppTheme(),
             home: Scaffold(
               body: HomeScreen(

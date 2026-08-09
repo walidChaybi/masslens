@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/l10n.dart';
 import '../domain/access_status.dart';
 
 class AccessCard extends StatelessWidget {
@@ -19,10 +20,11 @@ class AccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final canEarn = access.adsEnabled && access.canEarnReward;
     final balanceText = access.isAuthoritative
-        ? '${access.remainingScans} scan${access.remainingScans == 1 ? '' : 's'} available'
-        : 'Loading scan balance…';
+        ? l10n.accessScansAvailable(access.remainingScans)
+        : l10n.accessLoadingBalance;
     return Material(
       key: const Key('compact_access_card'),
       color: AppColors.ink,
@@ -64,8 +66,12 @@ class AccessCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       access.isAuthoritative
-                          ? access.breakdownLabel
-                          : '3 starter scans, then watch an ad',
+                          ? l10n.accessBreakdown(
+                              access.starterScansRemaining,
+                              access.rewardedScans,
+                              access.legacyScans,
+                            )
+                          : l10n.accessStarterThenAd,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -92,7 +98,7 @@ class AccessCard extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: const Text('Get +1'),
+                  label: Text(l10n.accessGetOne),
                 )
               else
                 const Icon(Icons.chevron_right_rounded, color: Colors.white54),

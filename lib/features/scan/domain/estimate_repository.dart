@@ -28,6 +28,7 @@ class EstimateRequest {
     this.fillState = 'Unknown',
     this.referenceObject = 'None',
     this.knownDimension,
+    this.responseLocale = 'en',
   });
 
   final String imagePath;
@@ -37,6 +38,7 @@ class EstimateRequest {
   final String fillState;
   final String referenceObject;
   final KnownDimensionInput? knownDimension;
+  final String responseLocale;
 }
 
 abstract final class ScanRequestId {

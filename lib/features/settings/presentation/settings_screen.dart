@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
+import '../../../l10n/l10n.dart';
+import '../../../l10n/display_labels.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../../scan/data/estimate_repository_factory.dart';
@@ -12,25 +14,24 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _clearHistory(BuildContext context) async {
     final controller = AppScope.of(context);
+    final l10n = context.l10n;
     if (controller.measurements.isEmpty) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Clear all history?'),
+        title: Text(l10n.settingsClearHistoryTitle),
         content: Text(
-          '${controller.measurements.length} saved estimate'
-          '${controller.measurements.length == 1 ? '' : 's'} and private '
-          'image copies will be deleted from this device.',
+          l10n.settingsClearHistoryBody(controller.measurements.length),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
-            child: const Text('Clear history'),
+            child: Text(l10n.settingsClearHistoryAction),
           ),
         ],
       ),
@@ -39,8 +40,8 @@ class SettingsScreen extends StatelessWidget {
     await controller.clearHistory();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Estimate history cleared.'),
+      SnackBar(
+        content: Text(l10n.settingsHistoryCleared),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -50,15 +51,19 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final monetization = controller.monetization;
+    final l10n = context.l10n;
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
-          const Eyebrow('Preferences and privacy'),
+          Eyebrow(l10n.settingsEyebrow),
           const SizedBox(height: 8),
-          Text('Settings', style: Theme.of(context).textTheme.headlineLarge),
+          Text(
+            l10n.settingsTitle,
+            style: Theme.of(context).textTheme.headlineLarge,
+          ),
           const SizedBox(height: 24),
-          const _SettingsHeader(title: 'Measurement'),
+          _SettingsHeader(title: l10n.settingsMeasurement),
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
@@ -67,100 +72,110 @@ class SettingsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _SettingLabel(
+                    _SettingLabel(
                       icon: Icons.straighten_rounded,
-                      title: 'Units',
-                      subtitle: 'All values are stored canonically in metric.',
+                      title: l10n.settingsUnits,
+                      subtitle: l10n.settingsUnitsBody,
                     ),
                     const SizedBox(height: 16),
-                    SegmentedButton<UnitSystem>(
-                      expandedInsets: EdgeInsets.zero,
-                      segments: const [
-                        ButtonSegment(
-                          value: UnitSystem.metric,
-                          label: Text('Metric'),
-                          icon: Icon(Icons.scale_outlined),
-                        ),
-                        ButtonSegment(
-                          value: UnitSystem.imperial,
-                          label: Text('Imperial'),
-                          icon: Icon(Icons.monitor_weight_outlined),
-                        ),
-                      ],
-                      selected: {controller.unitSystem},
-                      onSelectionChanged: (selection) {
-                        controller.setUnitSystem(selection.single);
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final showIcons = constraints.maxWidth >= 320;
+                        return SegmentedButton<UnitSystem>(
+                          expandedInsets: EdgeInsets.zero,
+                          segments: [
+                            ButtonSegment(
+                              value: UnitSystem.metric,
+                              label: Text(l10n.settingsMetric),
+                              icon: showIcons
+                                  ? const Icon(Icons.scale_outlined)
+                                  : null,
+                            ),
+                            ButtonSegment(
+                              value: UnitSystem.imperial,
+                              label: Text(l10n.settingsImperial),
+                              icon: showIcons
+                                  ? const Icon(Icons.monitor_weight_outlined)
+                                  : null,
+                            ),
+                          ],
+                          selected: {controller.unitSystem},
+                          onSelectionChanged: (selection) {
+                            controller.setUnitSystem(selection.single);
+                          },
+                          showSelectedIcon: false,
+                        );
                       },
-                      showSelectedIcon: false,
                     ),
                   ],
                 ),
               ),
               const Divider(),
-              const _SettingRow(
+              _SettingRow(
                 icon: Icons.bluetooth_rounded,
-                title: 'Bluetooth scale support',
-                value: 'Standard BLE WSS',
+                title: l10n.settingsBluetoothSupport,
+                value: l10n.settingsStandardBle,
               ),
             ],
           ),
           const SizedBox(height: 24),
-          const _SettingsHeader(title: 'Engine'),
+          _SettingsHeader(title: l10n.settingsEngine),
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
               _SettingRow(
                 icon: Icons.science_outlined,
-                title: 'Analysis mode',
-                value: EstimateEngineConfig.analysisModeLabel,
+                title: l10n.settingsAnalysisMode,
+                value: l10n.settingsAnalysisSecureCloudAi,
               ),
               const Divider(),
               _SettingRow(
                 icon: EstimateEngineConfig.isAiEnabled
                     ? Icons.cloud_upload_outlined
                     : Icons.cloud_off_outlined,
-                title: 'Cloud uploads',
-                value: EstimateEngineConfig.cloudUploadLabel,
+                title: l10n.settingsCloudUploads,
+                value: l10n.settingsCloudViaSecureApi,
               ),
               const Divider(),
               _SettingRow(
                 icon: Icons.auto_awesome_outlined,
-                title: 'Production model',
+                title: l10n.settingsProductionModel,
                 value: EstimateEngineConfig.productionModelLabel,
               ),
             ],
           ),
           const SizedBox(height: 24),
-          const _SettingsHeader(title: 'Scan credits'),
+          _SettingsHeader(title: l10n.settingsScanCredits),
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
               _ActionRow(
                 icon: Icons.play_circle_outline_rounded,
-                title: 'Earn AI scans',
-                subtitle:
-                    '${monetization.access.usageLabel} · watch one ad for one scan',
+                title: l10n.settingsEarnAiScans,
+                subtitle: l10n.settingsEarnAiScansBody(
+                  localizedScanUsage(l10n, monetization.access),
+                ),
                 color: AppColors.ink,
                 onTap: () => showRewardedScanSheet(context),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          const _SettingsHeader(title: 'Privacy'),
+          _SettingsHeader(title: l10n.settingsPrivacy),
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
-              const _SettingRow(
+              _SettingRow(
                 icon: Icons.lock_outline_rounded,
-                title: 'Saved photos',
-                value: 'Private storage',
+                title: l10n.settingsSavedPhotos,
+                value: l10n.settingsPrivateStorage,
               ),
               if (monetization.privacyOptionsRequired) ...[
                 const Divider(),
                 _ActionRow(
                   icon: Icons.privacy_tip_outlined,
-                  title: 'Ad privacy choices',
-                  subtitle: 'Review or change consent',
+                  title: l10n.settingsAdPrivacyChoices,
+                  subtitle: l10n.settingsReviewConsent,
                   color: AppColors.ink,
                   onTap: monetization.showPrivacyOptions,
                 ),
@@ -168,34 +183,31 @@ class SettingsScreen extends StatelessWidget {
               const Divider(),
               _ActionRow(
                 icon: Icons.delete_sweep_outlined,
-                title: 'Clear estimate history',
+                title: l10n.settingsClearHistory,
                 subtitle: controller.measurements.isEmpty
-                    ? 'No saved estimates'
-                    : '${controller.measurements.length} saved',
+                    ? l10n.settingsNoSavedEstimates
+                    : l10n.settingsSavedCount(controller.measurements.length),
                 color: AppColors.coral,
                 onTap: () => _clearHistory(context),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          const _SettingsHeader(title: 'About'),
+          _SettingsHeader(title: l10n.settingsAbout),
           const SizedBox(height: 10),
-          const _SettingsCard(
+          _SettingsCard(
             children: [
               _SettingRow(
                 icon: Icons.info_outline_rounded,
-                title: 'MassLens',
-                value: 'MVP 1.0.0',
+                title: l10n.appTitle,
+                value: l10n.settingsVersion,
               ),
-              Divider(),
+              const Divider(),
               Padding(
-                padding: EdgeInsets.all(17),
+                padding: const EdgeInsets.all(17),
                 child: Text(
-                  'A compatible Bluetooth scale provides physical readings. '
-                  'Touch mode is an interactive simulator and AI scans are '
-                  'real visual estimates. Never use MassLens for medical dosing, legal '
-                  'trade, or other safety-critical decisions.',
-                  style: TextStyle(
+                  l10n.settingsSafetyBody,
+                  style: const TextStyle(
                     color: AppColors.inkMuted,
                     fontSize: 12.5,
                     height: 1.5,
@@ -295,7 +307,13 @@ class _SettingRow extends StatelessWidget {
             child: Text(title, style: Theme.of(context).textTheme.titleMedium),
           ),
           const SizedBox(width: 10),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
         ],
       ),
     );

@@ -1,8 +1,9 @@
 # Ads-only production setup
 
 MassLens has three lifetime starter scans and ad-funded rewarded scans. Historical
-billing tables stay inert for safe migration; any real old purchase balance is
-preserved as ad-free `legacyScans` until used. No Play Billing dependency or
+billing tables stay inert for safe migration. The production audit found no old
+purchases; migrated bonus and support balances remain as `legacyScans` until
+used and stay part of the ads-only experience. No Play Billing dependency or
 purchase endpoint remains.
 
 ## Worker and D1
@@ -33,8 +34,23 @@ Create/verify four Android units:
 
 - native, used on scale, AI home, and after history result two;
 - rewarded with reward amount `1` and reward item exactly `scan`;
-- interstitial, shown after every second completed scan only after result close;
+- interstitial, shown once during the first-open onboarding transition, at
+  drawer transitions into AI Scan or Digital Scale, and after every second
+  completed scan only after result close. All uses share the server-controlled
+  cooldown;
 - app-open, eligible only after four hours in background and after onboarding.
+
+Production IDs:
+
+- native: `ca-app-pub-7681170430097585/1035038854`;
+- rewarded: `ca-app-pub-7681170430097585/3756662851`;
+- regular interstitial: `ca-app-pub-7681170430097585/5269089498`;
+- app-open: `ca-app-pub-7681170430097585/3116075891`.
+
+The banner (`ca-app-pub-7681170430097585/7955628865`) and rewarded
+interstitial (`ca-app-pub-7681170430097585/8620483744`) are reserved. This
+release never loads or requests either format, and they are not release
+requirements.
 
 The app registers a random reward-attempt ID before showing the ad. After the
 Google Mobile Ads SDK reports `onUserEarnedReward`, the app sends the exact ID
@@ -48,7 +64,9 @@ credits. The former `/admob/reward` route is intentionally unavailable; mobile
 SDK grants are recorded only in the separate `client_reward_grants` audit table.
 
 Debug builds use Google's test IDs. The release app fails fast if ads are
-disabled, test IDs are enabled, or any live unit is missing. Build production:
+disabled, test IDs are enabled, or any live unit is missing. Put the live AdMob
+app ID in `android/gradle.properties` as `ADMOB_APP_ID=ca-app-pub-…~…`, then
+build production:
 
 ```bash
 flutter build appbundle --release \
@@ -57,9 +75,22 @@ flutter build appbundle --release \
   --dart-define=ADMOB_USE_TEST_IDS=false \
   --dart-define=ADMOB_NATIVE_AD_UNIT_ID=ca-app-pub-7681170430097585/1035038854 \
   --dart-define=ADMOB_REWARDED_AD_UNIT_ID=ca-app-pub-7681170430097585/3756662851 \
-  --dart-define=ADMOB_INTERSTITIAL_AD_UNIT_ID=REPLACE_WITH_LIVE_ID \
+  --dart-define=ADMOB_INTERSTITIAL_AD_UNIT_ID=ca-app-pub-7681170430097585/5269089498 \
   --dart-define=ADMOB_APP_OPEN_AD_UNIT_ID=ca-app-pub-7681170430097585/3116075891
 ```
+
+For a safe physical-device onboarding check, keep Google test ads and force the
+new onboarding without deleting local history:
+
+```bash
+flutter run \
+  --dart-define=MASSLENS_API_URL=https://masslens-api.masslens.workers.dev/estimate \
+  --dart-define=ADMOB_ENABLED=true \
+  --dart-define=ADMOB_USE_TEST_IDS=true \
+  --dart-define=MASSLENS_FORCE_ONBOARDING=true
+```
+
+`MASSLENS_FORCE_ONBOARDING` is ignored by release builds.
 
 Never use live ads during development. Test EEA consent and privacy choices,
 reward acknowledgement/deduplication, unavailable inventory, every placement,
