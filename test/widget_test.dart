@@ -9,9 +9,7 @@ import 'package:mass_lens/features/measurements/data/measurement_store.dart';
 import 'package:mass_lens/features/measurements/domain/measurement.dart';
 import 'package:mass_lens/features/scan/data/photo_picker.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
-import 'package:mass_lens/features/scan/domain/measurement_capture.dart';
-import 'package:mass_lens/features/scan/domain/measured_dimensions.dart';
-import 'package:mass_lens/features/scan/presentation/capture/measurement_launcher.dart';
+import 'package:mass_lens/features/scan/presentation/capture/camera_launcher.dart';
 import 'package:mass_lens/features/scan/presentation/scan_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,7 +103,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nav_history')));
     await tester.pumpAndSettle();
-    expect(find.text('Measurement history'), findsOneWidget);
+    expect(find.text('Estimate history'), findsOneWidget);
     expect(find.text('Nothing saved yet'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('open_navigation')));
@@ -177,13 +175,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Confirm the object'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('add_details_button')));
+    await tester.tap(find.byKey(const Key('add_second_photo_button')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('add_second_photo_button')),
-      250,
-      scrollable: find.byType(Scrollable).last,
-    );
+    await tester.tap(find.byKey(const Key('second_photo_gallery_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('second_photo_preview')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('remove_second_photo_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('second_photo_preview')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('add_second_photo_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('second_photo_gallery_button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('add_second_photo_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('second_photo_gallery_button')));
@@ -231,11 +236,14 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('analyze_button')));
     await tester.pumpAndSettle();
-    expect(estimateRepository.lastRequest?.secondaryImagePath, isNotNull);
+    expect(
+      estimateRepository.lastRequest?.secondaryImagePath,
+      '/tmp/mass-lens-test-4.jpg',
+    );
     expect(estimateRepository.lastRequest?.material, 'Metal');
     expect(estimateRepository.lastRequest?.fillState, 'Partly filled');
     expect(estimateRepository.lastRequest?.referenceObject, 'Standard card');
-    expect(estimateRepository.lastRequest?.knownDimension?.axis, 'Width');
+    expect(estimateRepository.lastRequest?.knownDimension?.axis, 'Length');
     expect(estimateRepository.lastRequest?.knownDimension?.value, 12.5);
     expect(estimateRepository.lastRequest?.knownDimension?.unit, 'cm');
     expect(find.text('Object category'), findsNothing);
@@ -261,7 +269,7 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
   });
 
-  testWidgets('AR capture preserves measured axes through analysis', (
+  testWidgets('normal camera capture goes directly to AI review', (
     tester,
   ) async {
     final controller = AppController(
@@ -269,16 +277,7 @@ void main() {
       onboardingComplete: true,
     );
     final estimateRepository = _FakeEstimateRepository();
-    final launcher = _FakeMeasurementLauncher(
-      const MeasurementCapture(
-        imagePath: '/tmp/ar-object.jpg',
-        dimensions: MeasuredDimensions(
-          widthMm: 410,
-          heightMm: 205,
-          method: MeasurementMethod.arCoreDepth,
-        ),
-      ),
-    );
+    final launcher = _FakeCameraLauncher('/tmp/camera-object.jpg');
     await tester.pumpWidget(
       AppScope(
         controller: controller,
@@ -286,7 +285,7 @@ void main() {
           theme: buildAppTheme(),
           home: ScanScreen(
             estimateRepository: estimateRepository,
-            measurementLauncher: launcher,
+            cameraLauncher: launcher,
           ),
         ),
       ),
@@ -294,8 +293,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(launcher.launchCount, 1);
-    expect(find.text('41.0 × 20.5 cm'), findsOneWidget);
-    expect(find.text('AR depth'), findsOneWidget);
+    expect(find.text('Confirm the object'), findsOneWidget);
+    expect(find.byKey(const Key('measured_summary')), findsNothing);
+    expect(find.textContaining('AR depth'), findsNothing);
+    expect(find.text('Measure photo'), findsNothing);
     await tester.scrollUntilVisible(
       find.byKey(const Key('analyze_button')),
       250,
@@ -303,19 +304,19 @@ void main() {
     await tester.tap(find.byKey(const Key('analyze_button')));
     await tester.pumpAndSettle();
 
-    expect(estimateRepository.lastRequest?.measuredDimensions?.widthMm, 410);
-    expect(estimateRepository.lastRequest?.measuredDimensions?.heightMm, 205);
-    expect(find.text('41.0 × 20.5 × 18.0 cm'), findsOneWidget);
+    expect(estimateRepository.lastRequest?.imagePath, '/tmp/camera-object.jpg');
+    expect(find.byKey(const Key('result_weight')), findsOneWidget);
+    expect(find.text('AI visual size · L × W × H'), findsOneWidget);
   });
 
-  testWidgets('measurement cancellation returns to the quiet capture view', (
+  testWidgets('camera cancellation returns to the quiet capture view', (
     tester,
   ) async {
     final controller = AppController(
       measurementStore: const _FakeMeasurementStore(),
       onboardingComplete: true,
     );
-    final launcher = _FakeMeasurementLauncher(null);
+    final launcher = _FakeCameraLauncher(null);
     await tester.pumpWidget(
       AppScope(
         controller: controller,
@@ -323,7 +324,7 @@ void main() {
           theme: buildAppTheme(),
           home: ScanScreen(
             estimateRepository: _FakeEstimateRepository(),
-            measurementLauncher: launcher,
+            cameraLauncher: launcher,
           ),
         ),
       ),
@@ -331,8 +332,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(launcher.launchCount, 1);
-    expect(find.text('Measure an object'), findsOneWidget);
-    expect(find.text('Measurement camera could not be opened.'), findsNothing);
+    expect(find.text('Photograph an object'), findsOneWidget);
+    expect(find.text('The camera could not be opened.'), findsNothing);
   });
 
   testWidgets('minimal AI entry fits compact and large Android viewports', (
@@ -420,15 +421,15 @@ class _FakeMeasurementStore extends MeasurementStore {
   Future<void> saveAll(List<Measurement> measurements) async {}
 }
 
-class _FakeMeasurementLauncher implements MeasurementLauncher {
-  _FakeMeasurementLauncher(this.capture);
+class _FakeCameraLauncher implements CameraLauncher {
+  _FakeCameraLauncher(this.imagePath);
 
-  final MeasurementCapture? capture;
+  final String? imagePath;
   int launchCount = 0;
 
   @override
-  Future<MeasurementCapture?> launch(BuildContext context) async {
+  Future<String?> launch(BuildContext context) async {
     launchCount++;
-    return capture;
+    return imagePath;
   }
 }

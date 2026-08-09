@@ -1,24 +1,30 @@
 const clientIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 const requestIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
+const rewardAttemptIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 const lifetimeStarterScans = 3;
 const rewardBalanceCap = 3;
 const resultTtlMs = 24 * 60 * 60 * 1000;
 const pendingTtlMs = 2 * 60 * 1000;
+const rewardAttemptTtlMs = 24 * 60 * 60 * 1000;
+const rewardCooldownMs = 2 * 60 * 1000;
 
-let cachedAdMobKeys;
-
-export async function handleMonetizationRoute(request, env, url) {
+export async function handleMonetizationRoute(
+  request,
+  env,
+  url,
+  dependencies = {},
+) {
   if (request.method === "GET" && url.pathname === "/access") {
     const clientIdHash = await readHashedClientId(request);
     return jsonResponse(await getAccess(env, clientIdHash));
   }
 
-  if (request.method === "GET" && url.pathname === "/admob/reward") {
-    await handleAdMobReward(request, env);
-    return new Response("OK", {
-      status: 200,
-      headers: {"Cache-Control": "no-store", "Content-Type": "text/plain"},
-    });
+  if (request.method === "POST" && url.pathname === "/reward-attempts") {
+    return handleRewardAttemptPost(request, env, dependencies);
+  }
+
+  if (request.method === "GET" && url.pathname.startsWith("/reward-attempts/")) {
+    return handleRewardAttemptGet(request, env, url, dependencies);
   }
 
   if (request.method === "POST" && url.pathname === "/metrics/ad-revenue") {
@@ -326,6 +332,13 @@ async function ensureWallet(db, clientIdHash, now) {
   ).bind(clientIdHash, now).run();
 }
 
+async function readRewardWallet(db, clientIdHash) {
+  return db.prepare(
+    `SELECT starter_used, rewarded_balance
+       FROM ad_scan_wallets WHERE client_id_hash = ?`,
+  ).bind(clientIdHash).first();
+}
+
 async function cleanupExpiredRequests(db, now) {
   await db.prepare(
     `DELETE FROM scan_requests
@@ -334,121 +347,380 @@ async function cleanupExpiredRequests(db, now) {
   ).bind(now, now - resultTtlMs).run();
 }
 
-async function handleAdMobReward(request, env) {
+async function handleRewardAttemptPost(request, env, dependencies) {
   const db = requireDatabase(env);
-  const requestUrl = request.url;
-  const query = requestUrl.includes("?") ? requestUrl.split("?")[1] : "";
-  const signatureMarker = "&signature=";
-  const signatureIndex = query.indexOf(signatureMarker);
-  if (signatureIndex < 1) {
-    throw new MonetizationError(400, "invalid_reward", "Missing signature.");
-  }
-  const content = query.slice(0, signatureIndex);
-  const signedParameters = new URLSearchParams(
-    query.slice(signatureIndex + 1),
-  );
-  const signature = signedParameters.get("signature");
-  const keyId = signedParameters.get("key_id");
-  if (!signature || !keyId) {
-    throw new MonetizationError(400, "invalid_reward", "Invalid signature.");
-  }
-  await verifyAdMobSignature(content, signature, keyId);
-
-  const parameters = new URLSearchParams(content);
-  const clientId = parameters.get("user_id") || "";
-  const transactionId = parameters.get("transaction_id") || "";
-  const timestamp = Number(parameters.get("timestamp"));
-  const rewardAmount = Number(parameters.get("reward_amount"));
-  const rewardItem = parameters.get("reward_item") || "";
-  const receivedAdUnit = parameters.get("ad_unit") || "";
-  const expectedAdUnit = (env.ADMOB_REWARDED_AD_UNIT_ID || "").split("/").pop();
-  if (!expectedAdUnit) {
-    throw new MonetizationError(
-      503,
-      "reward_not_configured",
-      "Reward verification is not configured.",
-    );
-  }
-  if (
-    !clientIdPattern.test(clientId) ||
-    !/^[A-Fa-f0-9]{16,128}$/.test(transactionId) ||
-    !Number.isFinite(timestamp) ||
-    Math.abs(Date.now() - timestamp) > 24 * 60 * 60 * 1000 ||
-    rewardAmount !== 1 ||
-    rewardItem !== "scan" ||
-    receivedAdUnit !== expectedAdUnit
-  ) {
+  const clientIdHash = await readHashedClientId(request);
+  const data = await readSmallJson(request);
+  const attemptId = String(data.attemptId || "");
+  const event = String(data.event || "started");
+  if (!rewardAttemptIdPattern.test(attemptId)) {
     throw new MonetizationError(
       400,
-      "invalid_reward",
-      "Reward callback data is invalid.",
+      "invalid_reward_attempt_id",
+      "A valid reward attempt identifier is required.",
+    );
+  }
+  if (event !== "started" && event !== "client_earned") {
+    throw new MonetizationError(
+      400,
+      "invalid_reward_attempt_event",
+      "The reward attempt event is invalid.",
     );
   }
 
-  const clientIdHash = await hashIdentifier(clientId);
-  const now = Date.now();
+  const now = dependencyNow(dependencies);
+  if (event === "started") {
+    let attempt = await readRewardAttempt(db, attemptId);
+    if (attempt) {
+      if (attempt.client_id_hash !== clientIdHash) {
+        throw new MonetizationError(
+          409,
+          "reward_attempt_conflict",
+          "This reward attempt identifier is already in use.",
+        );
+      }
+      attempt = await expireRewardAttemptIfNeeded(
+        db,
+        attempt,
+        clientIdHash,
+        now,
+      );
+      return jsonResponse(rewardAttemptPayload(attempt));
+    }
+
+    await ensureWallet(db, clientIdHash, now);
+    const ensureCooldown = db.prepare(
+      `INSERT OR IGNORE INTO reward_client_cooldowns (
+         client_id_hash, active_attempt_id, last_started_at_ms,
+         last_granted_at_ms, updated_at_ms
+       ) VALUES (?, NULL, NULL, NULL, ?)`,
+    ).bind(clientIdHash, now);
+    const claimCooldown = db.prepare(
+      `UPDATE reward_client_cooldowns
+          SET active_attempt_id = ?, last_started_at_ms = ?, updated_at_ms = ?
+        WHERE client_id_hash = ?
+          AND (last_started_at_ms IS NULL OR last_started_at_ms <= ?)
+          AND (last_granted_at_ms IS NULL OR last_granted_at_ms <= ?)
+          AND EXISTS (
+            SELECT 1 FROM ad_scan_wallets
+             WHERE client_id_hash = ? AND rewarded_balance < ?
+          )
+          AND (
+            active_attempt_id IS NULL OR NOT EXISTS (
+              SELECT 1 FROM reward_attempts
+               WHERE attempt_id = reward_client_cooldowns.active_attempt_id
+                 AND state = 'pending' AND client_earned_at_ms IS NOT NULL
+                 AND expires_at_ms >= ?
+            )
+          )`,
+    ).bind(
+      attemptId,
+      now,
+      now,
+      clientIdHash,
+      now - rewardCooldownMs,
+      now - rewardCooldownMs,
+      clientIdHash,
+      rewardBalanceCap,
+      now,
+    );
+    const insertAttempt = db.prepare(
+      `INSERT OR IGNORE INTO reward_attempts (
+         attempt_id, client_id_hash, state, created_at_ms, updated_at_ms,
+         expires_at_ms
+       )
+       SELECT ?, ?, 'pending', ?, ?, ?
+         FROM reward_client_cooldowns
+        WHERE client_id_hash = ? AND active_attempt_id = ?
+          AND last_started_at_ms = ?`,
+    ).bind(
+      attemptId,
+      clientIdHash,
+      now,
+      now,
+      now + rewardAttemptTtlMs,
+      clientIdHash,
+      attemptId,
+      now,
+    );
+    const results = await runDatabaseBatch(
+      db,
+      [ensureCooldown, claimCooldown, insertAttempt],
+    );
+    attempt = await readRewardAttempt(db, attemptId);
+    if (attempt?.client_id_hash !== clientIdHash && attempt) {
+      throw new MonetizationError(
+        409,
+        "reward_attempt_conflict",
+        "This reward attempt identifier is already in use.",
+      );
+    }
+    if (!attempt) {
+      const wallet = await readRewardWallet(db, clientIdHash);
+      if (Number(wallet?.rewarded_balance || 0) >= rewardBalanceCap) {
+        await safeMetric(env, "reward_rejected", "balance_cap", 1, 0);
+        throw new MonetizationError(
+          409,
+          "reward_balance_cap_reached",
+          "Use an earned scan before watching another ad.",
+        );
+      }
+      await safeMetric(env, "reward_rejected", "cooldown", 1, 0);
+      throw new MonetizationError(
+        429,
+        "reward_cooldown",
+        "Please wait before watching another rewarded ad.",
+      );
+    }
+    if (changedRows(results[2]) === 1) {
+      await safeMetric(env, "reward_attempt_started", "client", 1, 0);
+    }
+    return jsonResponse(
+      rewardAttemptPayload(attempt),
+      changedRows(results[2]) === 1 ? 201 : 200,
+    );
+  }
+
+  let attempt = await readRewardAttempt(db, attemptId);
+  if (!attempt || attempt.client_id_hash !== clientIdHash) {
+    throw new MonetizationError(
+      404,
+      "reward_attempt_not_found",
+      "Reward attempt not found.",
+    );
+  }
+  attempt = await expireRewardAttemptIfNeeded(
+    db,
+    attempt,
+    clientIdHash,
+    now,
+  );
+  if (attempt.state !== "pending") {
+    return jsonResponse(rewardAttemptPayload(attempt));
+  }
+
   await ensureWallet(db, clientIdHash, now);
-  const inserted = await db.prepare(
-    `INSERT OR IGNORE INTO ad_rewards (
-       transaction_id, client_id_hash, period_key, reward_amount, created_at_ms
-     ) VALUES (?, ?, 'lifetime', 1, ?)`,
-  ).bind(transactionId, clientIdHash, now).run();
-  if (changedRows(inserted) === 1) {
-    await safeMetric(env, "reward_granted", "rewarded", 1, 0);
+  const ensureCooldown = db.prepare(
+    `INSERT OR IGNORE INTO reward_client_cooldowns (
+       client_id_hash, active_attempt_id, last_started_at_ms,
+       last_granted_at_ms, updated_at_ms
+     ) VALUES (?, ?, NULL, NULL, ?)`,
+  ).bind(clientIdHash, attemptId, now);
+  const claimUnleasedAttempt = db.prepare(
+    `UPDATE reward_client_cooldowns
+        SET active_attempt_id = ?, updated_at_ms = ?
+      WHERE client_id_hash = ? AND active_attempt_id IS NULL
+        AND (last_granted_at_ms IS NULL OR last_granted_at_ms <= ?)`,
+  ).bind(
+    attemptId,
+    now,
+    clientIdHash,
+    now - rewardCooldownMs,
+  );
+  const recordClientEarned = db.prepare(
+    `UPDATE reward_attempts
+        SET client_earned_at_ms = COALESCE(client_earned_at_ms, ?),
+            updated_at_ms = MAX(updated_at_ms, ?)
+      WHERE attempt_id = ? AND client_id_hash = ? AND state = 'pending'
+        AND expires_at_ms >= ?`,
+  ).bind(now, now, attemptId, clientIdHash, now);
+  const insertGrant = db.prepare(
+    `INSERT OR IGNORE INTO client_reward_grants (
+       attempt_id, client_id_hash, reward_amount, source, created_at_ms
+     )
+     SELECT ?, ?, 1, 'mobile_sdk', ?
+      WHERE EXISTS (
+        SELECT 1
+          FROM reward_attempts AS attempt
+          JOIN ad_scan_wallets AS wallet
+            ON wallet.client_id_hash = attempt.client_id_hash
+          JOIN reward_client_cooldowns AS cooldown
+            ON cooldown.client_id_hash = attempt.client_id_hash
+         WHERE attempt.attempt_id = ? AND attempt.client_id_hash = ?
+           AND attempt.state = 'pending' AND attempt.client_earned_at_ms IS NOT NULL
+           AND attempt.expires_at_ms >= ?
+           AND wallet.rewarded_balance < ?
+           AND cooldown.active_attempt_id = attempt.attempt_id
+           AND (
+             cooldown.last_granted_at_ms IS NULL OR
+             cooldown.last_granted_at_ms <= ?
+           )
+      )`,
+  ).bind(
+    attemptId,
+    clientIdHash,
+    now,
+    attemptId,
+    clientIdHash,
+    now,
+    rewardBalanceCap,
+    now - rewardCooldownMs,
+  );
+  const verifyAttempt = db.prepare(
+    `UPDATE reward_attempts
+        SET state = 'verified', rejection_code = NULL,
+            verified_at_ms = COALESCE(verified_at_ms, ?), updated_at_ms = ?
+      WHERE attempt_id = ? AND client_id_hash = ? AND state = 'pending'
+        AND EXISTS (
+          SELECT 1 FROM client_reward_grants WHERE attempt_id = ?
+        )`,
+  ).bind(now, now, attemptId, clientIdHash, attemptId);
+  const finishCooldown = db.prepare(
+    `UPDATE reward_client_cooldowns
+        SET active_attempt_id = NULL, last_granted_at_ms = ?, updated_at_ms = ?
+      WHERE client_id_hash = ? AND active_attempt_id = ?
+        AND EXISTS (
+          SELECT 1 FROM client_reward_grants
+           WHERE attempt_id = ? AND created_at_ms = ?
+        )`,
+  ).bind(now, now, clientIdHash, attemptId, attemptId, now);
+  const results = await runDatabaseBatch(db, [
+    ensureCooldown,
+    claimUnleasedAttempt,
+    recordClientEarned,
+    insertGrant,
+    verifyAttempt,
+    finishCooldown,
+  ]);
+  attempt = await readRewardAttempt(db, attemptId);
+  if (attempt.state === "verified") {
+    const granted = changedRows(results[3]) === 1;
+    await safeMetric(
+      env,
+      granted ? "reward_granted" : "reward_duplicate",
+      granted ? "client_earned" : "client_attempt",
+      1,
+      0,
+    );
+    return jsonResponse(rewardAttemptPayload(attempt));
   }
+
+  const wallet = await readRewardWallet(db, clientIdHash);
+  if (Number(wallet?.rewarded_balance || 0) >= rewardBalanceCap) {
+    await safeMetric(env, "reward_rejected", "balance_cap", 1, 0);
+    throw new MonetizationError(
+      409,
+      "reward_balance_cap_reached",
+      "Use an earned scan before retrying this reward.",
+    );
+  }
+  const cooldown = await db.prepare(
+    `SELECT active_attempt_id, last_granted_at_ms
+       FROM reward_client_cooldowns WHERE client_id_hash = ?`,
+  ).bind(clientIdHash).first();
+  if (Number(cooldown?.last_granted_at_ms || 0) > now - rewardCooldownMs) {
+    await safeMetric(env, "reward_rejected", "cooldown", 1, 0);
+    throw new MonetizationError(
+      429,
+      "reward_cooldown",
+      "Please wait before retrying this reward.",
+    );
+  }
+  if (cooldown?.active_attempt_id !== attemptId) {
+    await rejectRewardAttempt(
+      db,
+      attemptId,
+      clientIdHash,
+      "attempt_superseded",
+      now,
+    );
+    attempt = await readRewardAttempt(db, attemptId);
+    await safeMetric(env, "reward_rejected", "attempt_superseded", 1, 0);
+    return jsonResponse(rewardAttemptPayload(attempt));
+  }
+  throw new MonetizationError(
+    503,
+    "reward_persistence_failed",
+    "Reward credit storage is temporarily unavailable.",
+  );
 }
 
-async function verifyAdMobSignature(content, signature, keyId) {
-  const keys = await getAdMobKeys();
-  const matching = keys.find((key) => String(key.keyId) === String(keyId));
-  if (!matching) {
-    cachedAdMobKeys = null;
+async function handleRewardAttemptGet(request, env, url, dependencies) {
+  const db = requireDatabase(env);
+  const clientIdHash = await readHashedClientId(request);
+  const attemptId = url.pathname.slice("/reward-attempts/".length);
+  if (!rewardAttemptIdPattern.test(attemptId)) {
     throw new MonetizationError(
       400,
-      "invalid_reward_signature",
-      "The reward signature key is unknown.",
+      "invalid_reward_attempt_id",
+      "A valid reward attempt identifier is required.",
     );
   }
-  const key = await crypto.subtle.importKey(
-    "spki",
-    base64ToBytes(matching.base64),
-    {name: "ECDSA", namedCurve: "P-256"},
-    false,
-    ["verify"],
-  );
-  const valid = await crypto.subtle.verify(
-    {name: "ECDSA", hash: "SHA-256"},
-    key,
-    derSignatureToRaw(base64UrlToBytes(signature), 32),
-    new TextEncoder().encode(content),
-  );
-  if (!valid) {
+  let attempt = await readRewardAttempt(db, attemptId);
+  if (!attempt || attempt.client_id_hash !== clientIdHash) {
     throw new MonetizationError(
-      400,
-      "invalid_reward_signature",
-      "The reward signature is invalid.",
+      404,
+      "reward_attempt_not_found",
+      "Reward attempt not found.",
     );
   }
+  attempt = await expireRewardAttemptIfNeeded(
+    db,
+    attempt,
+    clientIdHash,
+    dependencyNow(dependencies),
+  );
+  return jsonResponse(rewardAttemptPayload(attempt));
 }
 
-async function getAdMobKeys() {
-  if (cachedAdMobKeys?.expiresAt > Date.now()) return cachedAdMobKeys.keys;
-  const response = await fetch(
-    "https://www.gstatic.com/admob/reward/verifier-keys.json",
-  );
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !Array.isArray(payload.keys)) {
-    throw new MonetizationError(
-      502,
-      "reward_verification_unavailable",
-      "Reward verification is temporarily unavailable.",
-    );
+async function readRewardAttempt(db, attemptId) {
+  return db.prepare(
+    `SELECT attempt_id, client_id_hash, state, client_earned_at_ms,
+            transaction_id, rejection_code, callback_count,
+            last_callback_at_ms, verified_at_ms, created_at_ms,
+            updated_at_ms, expires_at_ms
+       FROM reward_attempts WHERE attempt_id = ?`,
+  ).bind(attemptId).first();
+}
+
+async function expireRewardAttemptIfNeeded(db, attempt, clientIdHash, now) {
+  if (
+    attempt.state !== "pending" ||
+    Number(attempt.expires_at_ms) >= now
+  ) {
+    return attempt;
   }
-  cachedAdMobKeys = {
-    keys: payload.keys,
-    expiresAt: Date.now() + 23 * 60 * 60 * 1000,
+  await db.prepare(
+    `UPDATE reward_attempts
+        SET state = 'expired', rejection_code = 'attempt_expired',
+            updated_at_ms = ?
+      WHERE attempt_id = ? AND client_id_hash = ? AND state = 'pending'
+        AND expires_at_ms < ?`,
+  ).bind(now, attempt.attempt_id, clientIdHash, now).run();
+  return readRewardAttempt(db, attempt.attempt_id);
+}
+
+function rewardAttemptPayload(attempt) {
+  const payload = {
+    attemptId: attempt.attempt_id,
+    state: attempt.state,
+    createdAtMs: Number(attempt.created_at_ms),
+    updatedAtMs: Number(attempt.updated_at_ms),
+    expiresAtMs: Number(attempt.expires_at_ms),
   };
-  return payload.keys;
+  if (attempt.client_earned_at_ms != null) {
+    payload.clientEarnedAtMs = Number(attempt.client_earned_at_ms);
+  }
+  if (attempt.verified_at_ms != null) {
+    payload.verifiedAtMs = Number(attempt.verified_at_ms);
+  }
+  if (attempt.rejection_code) payload.rejectionCode = attempt.rejection_code;
+  return payload;
+}
+
+async function rejectRewardAttempt(db, attemptId, clientIdHash, code, now) {
+  await db.prepare(
+    `UPDATE reward_attempts
+        SET state = 'rejected', rejection_code = ?, updated_at_ms = ?
+      WHERE attempt_id = ? AND client_id_hash = ? AND state = 'pending'`,
+  ).bind(code, now, attemptId, clientIdHash).run();
+}
+
+async function runDatabaseBatch(db, statements) {
+  if (typeof db.batch === "function") return db.batch(statements);
+  const results = [];
+  for (const statement of statements) results.push(await statement.run());
+  return results;
 }
 
 async function recordAdRevenue(request, env, clientIdHash) {
@@ -540,43 +812,6 @@ async function readSmallJson(request) {
   }
 }
 
-function derSignatureToRaw(der, componentSize) {
-  let offset = 0;
-  if (der[offset++] !== 0x30) throw new Error("Invalid ECDSA signature.");
-  const sequenceLength = readDerLength(der, offset);
-  offset = sequenceLength.offset;
-  if (der[offset++] !== 0x02) throw new Error("Invalid ECDSA signature.");
-  const rLength = readDerLength(der, offset);
-  offset = rLength.offset;
-  const r = der.slice(offset, offset + rLength.length);
-  offset += rLength.length;
-  if (der[offset++] !== 0x02) throw new Error("Invalid ECDSA signature.");
-  const sLength = readDerLength(der, offset);
-  offset = sLength.offset;
-  const s = der.slice(offset, offset + sLength.length);
-  const raw = new Uint8Array(componentSize * 2);
-  copyDerInteger(r, raw, 0, componentSize);
-  copyDerInteger(s, raw, componentSize, componentSize);
-  return raw;
-}
-
-function readDerLength(bytes, offset) {
-  const first = bytes[offset++];
-  if ((first & 0x80) === 0) return {length: first, offset};
-  const count = first & 0x7f;
-  let length = 0;
-  for (let index = 0; index < count; index++) {
-    length = (length << 8) | bytes[offset++];
-  }
-  return {length, offset};
-}
-
-function copyDerInteger(integer, output, outputOffset, size) {
-  const withoutPadding = integer[0] === 0 ? integer.slice(1) : integer;
-  if (withoutPadding.length > size) throw new Error("Invalid ECDSA integer.");
-  output.set(withoutPadding, outputOffset + size - withoutPadding.length);
-}
-
 function readPositiveInteger(value, fallback) {
   const number = Number(value);
   return Number.isInteger(number) && number > 0 ? number : fallback;
@@ -585,6 +820,11 @@ function readPositiveInteger(value, fallback) {
 function readPositiveNumber(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function dependencyNow(dependencies = {}) {
+  const now = dependencies.now ? Number(dependencies.now()) : Date.now();
+  return Number.isFinite(now) ? now : Date.now();
 }
 
 function currentDay(now = new Date()) {
@@ -614,16 +854,6 @@ async function hashIdentifier(value) {
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
-}
-
-function base64ToBytes(value) {
-  const binary = atob(value);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-function base64UrlToBytes(value) {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  return base64ToBytes(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
 }
 
 function jsonResponse(payload, status = 200) {

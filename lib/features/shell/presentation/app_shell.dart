@@ -96,7 +96,7 @@ class _AppShellState extends State<AppShell> {
           Padding(
             padding: EdgeInsets.fromLTRB(24, 0, 24, 18),
             child: Text(
-              'Choose how you want to measure.',
+              'Choose a physical scale or an AI photo estimate.',
               style: TextStyle(
                 color: AppColors.inkMuted,
                 fontSize: 13,

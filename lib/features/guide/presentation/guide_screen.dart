@@ -62,11 +62,11 @@ class GuideScreen extends StatelessWidget {
           const SizedBox(height: 12),
           const _GuideStep(
             number: '04',
-            icon: Icons.credit_card_rounded,
-            title: 'Add scale in phase two',
+            icon: Icons.add_photo_alternate_outlined,
+            title: 'Add a side view',
             message:
-                'The production guided scan will use AR depth or a known-size '
-                'reference to estimate physical dimensions.',
+                'Move 45–90° around the same object. A second view helps AI '
+                'infer shape, construction, and volume.',
             accent: AppColors.navySoft,
           ),
           const SizedBox(height: 28),
@@ -251,7 +251,7 @@ class _ConfidenceGuide extends StatelessWidget {
           _ConfidenceRow(
             color: Color(0xFF168B78),
             label: 'High',
-            detail: 'Future AR scan plus validated geometry',
+            detail: 'Two clear angles plus useful object details',
           ),
         ],
       ),

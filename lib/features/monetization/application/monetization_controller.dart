@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -9,14 +10,27 @@ import '../data/app_ad_service.dart';
 import '../data/monetization_api.dart';
 import '../data/monetization_config.dart';
 import '../domain/access_status.dart';
+import '../domain/reward_attempt.dart';
+
+enum RewardFlowState {
+  idle,
+  starting,
+  showingAd,
+  verifying,
+  pending,
+  verified,
+  failed,
+}
 
 class MonetizationController extends ChangeNotifier {
   MonetizationController._({
     required this.enabled,
     required MonetizationApi? api,
     required AppAdService adService,
+    DateTime Function()? now,
   }) : _api = api,
-       _adService = adService;
+       _adService = adService,
+       _now = now ?? DateTime.now;
 
   factory MonetizationController.create() {
     final api = MonetizationConfig.backendConfigured
@@ -43,12 +57,29 @@ class MonetizationController extends ChangeNotifier {
     adService: AppAdService(),
   );
 
+  @visibleForTesting
+  factory MonetizationController.forTesting({
+    required MonetizationApi api,
+    required AppAdService adService,
+    DateTime Function()? now,
+  }) => MonetizationController._(
+    enabled: true,
+    api: api,
+    adService: adService,
+    now: now,
+  );
+
   static const _completedScanCountKey =
       'mass_lens.completed_scan_count_for_ads';
+  static const _rewardStateKey = 'mass_lens.reward_attempt_state.v1';
+  static const _rewardAttemptLifetime = Duration(hours: 24);
+  static const _rewardAdGuard = Duration(minutes: 2);
+  static const _reconcileRequestLimit = Duration(seconds: 5);
 
   final bool enabled;
   final MonetizationApi? _api;
   final AppAdService _adService;
+  final DateTime Function() _now;
 
   AccessStatus _access = const AccessStatus.fallback();
   String _clientId = '';
@@ -57,6 +88,12 @@ class MonetizationController extends ChangeNotifier {
   bool _loading = false;
   int _completedScanCount = 0;
   int? _pendingInterstitialScanCount;
+  List<PendingRewardAttempt> _rewardAttempts = [];
+  DateTime? _lastRewardAdStartedAt;
+  RewardFlowState _rewardFlowState = RewardFlowState.idle;
+  bool _rewardActionBusy = false;
+  bool _reconcilingRewards = false;
+  bool _rewardStateNeedsPersist = false;
 
   AccessStatus get access => _access;
   String? get message => _message;
@@ -66,6 +103,21 @@ class MonetizationController extends ChangeNotifier {
       _adService.canRequestNativeAds && _access.adsEnabled;
   bool get rewardedAdReady => _adService.rewardedReady;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
+  RewardFlowState get rewardFlowState => _rewardFlowState;
+  bool get rewardActionBusy => _rewardActionBusy || _reconcilingRewards;
+  bool get hasPendingReward => _rewardAttempts.isNotEmpty;
+  int get pendingRewardCount => _rewardAttempts.length;
+
+  Duration get rewardRetryAfter {
+    final startedAt = _lastRewardAdStartedAt;
+    if (startedAt == null) return Duration.zero;
+    final elapsed = _now().difference(startedAt);
+    if (elapsed.isNegative) return _rewardAdGuard;
+    final remaining = _rewardAdGuard - elapsed;
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  bool get rewardStartBlocked => rewardRetryAfter > Duration.zero;
 
   void _notifyAdStateChanged() {
     if (!hasListeners) return;
@@ -84,10 +136,14 @@ class MonetizationController extends ChangeNotifier {
     try {
       final preferences = await SharedPreferences.getInstance();
       _completedScanCount = preferences.getInt(_completedScanCountKey) ?? 0;
+      _restoreRewardState(preferences.getString(_rewardStateKey));
+      if (_rewardStateNeedsPersist) await _persistRewardState();
     } on Object {
-      // Ad cadence can safely restart if local preferences are unavailable.
+      // Access and ad cadence can continue if local preferences are unavailable.
     }
+    notifyListeners();
     await refreshAccess();
+    await reconcileRewardAttempts();
   }
 
   Future<void> refreshAccess() async {
@@ -136,6 +192,13 @@ class MonetizationController extends ChangeNotifier {
   }
 
   Future<bool> watchAdForScan() async {
+    if (_rewardActionBusy || _reconcilingRewards) return false;
+
+    // Recover a locally earned reward before asking the user to spend time on
+    // another ad.
+    if (_rewardAttempts.isNotEmpty && await reconcileRewardAttempts()) {
+      return true;
+    }
     if (!_access.adsEnabled) {
       _message = 'Ads are unavailable. Your existing scans are still safe.';
       notifyListeners();
@@ -147,31 +210,363 @@ class MonetizationController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    final earned = await _adService.showRewarded(clientId: _clientId);
-    if (!earned) {
+    if (rewardStartBlocked) {
+      _message = 'Please wait before starting another rewarded ad.';
+      notifyListeners();
+      return false;
+    }
+    if (!_adService.rewardedReady) {
       _message = 'A rewarded ad is not ready. Try again shortly.';
       notifyListeners();
       return false;
     }
+    final api = _api;
+    if (api == null || _clientId.isEmpty) return false;
 
-    _message = 'Reward earned. Confirming it securely…';
+    final attempt = PendingRewardAttempt(
+      attemptId: RewardAttemptId.create(),
+      createdAt: _now(),
+    );
+    _rewardAttempts = [..._rewardAttempts, attempt];
+    _lastRewardAdStartedAt = attempt.createdAt;
+    _rewardActionBusy = true;
+    _rewardFlowState = RewardFlowState.starting;
+    _message = 'Starting the rewarded ad…';
+    await _persistRewardState();
     notifyListeners();
-    final previousRewarded = _access.rewardedScans;
-    for (final delay in const [1, 2, 4, 6]) {
-      await Future<void>.delayed(Duration(seconds: delay));
-      await refreshAccess();
-      if (_access.rewardedScans > previousRewarded) {
-        _message = 'One scan was added.';
-        notifyListeners();
-        return true;
+
+    Future<bool>? earnedAcknowledgement;
+    try {
+      final started = await api.recordRewardAttempt(
+        clientId: _clientId,
+        attemptId: attempt.attemptId,
+        event: RewardAttemptEvent.started,
+      );
+      if (started.state == RewardAttemptServerState.verified) {
+        return await _finalizeVerified(attempt.attemptId);
       }
+      if (started.state != RewardAttemptServerState.pending) {
+        await _finalizeTerminal(attempt.attemptId, started.state);
+        return false;
+      }
+
+      _rewardFlowState = RewardFlowState.showingAd;
+      _message = 'Rewarded ad started.';
+      notifyListeners();
+      final earned = await _adService.showRewarded(
+        onClientEarned: () {
+          earnedAcknowledgement ??= _acknowledgeClientEarned(attempt.attemptId);
+        },
+      );
+      if (!earned) {
+        final acknowledgement = earnedAcknowledgement;
+        if (acknowledgement != null) return await acknowledgement;
+        final active = _findAttempt(attempt.attemptId);
+        if (active?.clientEarned == true) {
+          return await (earnedAcknowledgement ??= _acknowledgeClientEarned(
+            attempt.attemptId,
+          ));
+        }
+        await _removeRewardAttempt(attempt.attemptId);
+        _rewardFlowState = RewardFlowState.failed;
+        _message = 'The ad ended before a reward was earned.';
+        return false;
+      }
+
+      return await (earnedAcknowledgement ??= _acknowledgeClientEarned(
+        attempt.attemptId,
+      ));
+    } on Object catch (error) {
+      final acknowledgement = earnedAcknowledgement;
+      if (acknowledgement != null) return await acknowledgement;
+      final active = _findAttempt(attempt.attemptId);
+      if (active?.clientEarned == true) {
+        return await (earnedAcknowledgement ??= _acknowledgeClientEarned(
+          attempt.attemptId,
+        ));
+      } else {
+        await _removeRewardAttempt(attempt.attemptId);
+        _rewardFlowState = RewardFlowState.failed;
+        _message = error is MonetizationApiException && error.statusCode == 429
+            ? 'Please wait before starting another rewarded ad.'
+            : 'The rewarded ad could not start: $error';
+      }
+      return false;
+    } finally {
+      _rewardActionBusy = false;
+      notifyListeners();
     }
-    _message = 'Your verified reward is still processing. Try refresh shortly.';
+  }
+
+  Future<bool> _acknowledgeClientEarned(String attemptId) async {
+    final index = _rewardAttempts.indexWhere(
+      (attempt) => attempt.attemptId == attemptId,
+    );
+    if (index < 0) return false;
+    if (!_rewardAttempts[index].clientEarned) {
+      _rewardAttempts = [..._rewardAttempts]
+        ..[index] = _rewardAttempts[index].copyWith(clientEarned: true);
+      await _persistRewardState();
+    }
+    _rewardFlowState = RewardFlowState.verifying;
+    _message = 'Ad completed. Adding your scan…';
     notifyListeners();
+    final api = _api;
+    if (api == null) {
+      await _markRewardSyncPending();
+      return false;
+    }
+    try {
+      final status = await api
+          .recordRewardAttempt(
+            clientId: _clientId,
+            attemptId: attemptId,
+            event: RewardAttemptEvent.clientEarned,
+          )
+          .timeout(_reconcileRequestLimit);
+      if (status.state == RewardAttemptServerState.verified) {
+        return _finalizeVerified(attemptId);
+      }
+      if (status.state != RewardAttemptServerState.pending) {
+        await _finalizeTerminal(attemptId, status.state);
+        return false;
+      }
+    } on MonetizationApiException catch (error) {
+      if (error.statusCode == 404) {
+        await _removeRewardAttempt(attemptId);
+        _rewardFlowState = RewardFlowState.failed;
+        _message = 'This reward attempt could not be found.';
+        notifyListeners();
+        return false;
+      }
+      if (error.statusCode == 409) {
+        await _markRewardSyncPending(
+          message:
+              'Your rewarded scan balance is full. This earned scan is saved '
+              'and will retry after you use one.',
+        );
+        return false;
+      }
+      // The earned callback is persisted before this request. Retrying the
+      // same exact attempt ID is idempotent and cannot add a second scan.
+    } on Object {
+      // The earned callback is persisted before this request. Retrying the
+      // same exact attempt ID is idempotent and cannot add a second scan.
+    }
+    await _markRewardSyncPending();
     return false;
   }
 
+  Future<void> _markRewardSyncPending({String? message}) async {
+    _rewardFlowState = RewardFlowState.pending;
+    _message =
+        message ??
+        'Your ad was completed. Scan credit sync is pending and will retry '
+            'automatically for 24 hours.';
+    await _persistRewardState();
+    notifyListeners();
+  }
+
+  /// Reconciles only locally earned, exact attempt IDs. A lost response is
+  /// recovered with GET first; a still-pending attempt retries the idempotent
+  /// client-earned acknowledgement.
+  Future<bool> reconcileRewardAttempts() async {
+    if (_reconcilingRewards || _rewardActionBusy) return false;
+    final api = _api;
+    if (api == null || _clientId.isEmpty) return false;
+
+    final expiredLocally = _pruneExpiredRewardAttempts();
+    if (_rewardAttempts.isEmpty) {
+      if (expiredLocally) await _persistRewardState();
+      if (_rewardFlowState == RewardFlowState.pending) {
+        _rewardFlowState = RewardFlowState.idle;
+        notifyListeners();
+      }
+      return false;
+    }
+
+    _reconcilingRewards = true;
+    _rewardFlowState = RewardFlowState.verifying;
+    notifyListeners();
+    var credited = false;
+    var terminalFailure = false;
+    var balanceFull = false;
+    try {
+      for (final attempt in List<PendingRewardAttempt>.from(_rewardAttempts)) {
+        if (!attempt.clientEarned) {
+          _removeRewardAttemptInMemory(attempt.attemptId);
+          continue;
+        }
+        try {
+          var status = await api
+              .getRewardAttempt(
+                clientId: _clientId,
+                attemptId: attempt.attemptId,
+              )
+              .timeout(_reconcileRequestLimit);
+          if (status.state == RewardAttemptServerState.pending) {
+            status = await api
+                .recordRewardAttempt(
+                  clientId: _clientId,
+                  attemptId: attempt.attemptId,
+                  event: RewardAttemptEvent.clientEarned,
+                )
+                .timeout(_reconcileRequestLimit);
+          }
+          switch (status.state) {
+            case RewardAttemptServerState.pending:
+              break;
+            case RewardAttemptServerState.verified:
+              _removeRewardAttemptInMemory(attempt.attemptId);
+              credited = true;
+              break;
+            case RewardAttemptServerState.rejected:
+            case RewardAttemptServerState.expired:
+              _removeRewardAttemptInMemory(attempt.attemptId);
+              terminalFailure = true;
+              break;
+          }
+        } on MonetizationApiException catch (error) {
+          if (error.statusCode == 404) {
+            _removeRewardAttemptInMemory(attempt.attemptId);
+            terminalFailure = true;
+          } else if (error.statusCode == 409) {
+            balanceFull = true;
+          }
+        } on Object {
+          // Keep an earned attempt for a later launch/resume when the network
+          // is available.
+        }
+      }
+      await _persistRewardState();
+      if (credited) {
+        await refreshAccess();
+        _rewardFlowState = RewardFlowState.verified;
+        _message = 'One scan was added.';
+      } else if (_rewardAttempts.isNotEmpty) {
+        _rewardFlowState = RewardFlowState.pending;
+        _message = balanceFull
+            ? 'Your rewarded scan balance is full. This earned scan is saved '
+                  'and will retry after you use one.'
+            : 'Scan credit sync is pending. It is safe to close this screen.';
+      } else if (terminalFailure || expiredLocally) {
+        _rewardFlowState = RewardFlowState.failed;
+        _message = 'A reward attempt expired before a scan could be added.';
+      } else {
+        _rewardFlowState = RewardFlowState.idle;
+      }
+      return credited;
+    } finally {
+      _reconcilingRewards = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> _finalizeVerified(String attemptId) async {
+    await _removeRewardAttempt(attemptId);
+    await refreshAccess();
+    _rewardFlowState = RewardFlowState.verified;
+    _message = 'One scan was added.';
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _finalizeTerminal(
+    String attemptId,
+    RewardAttemptServerState state,
+  ) async {
+    await _removeRewardAttempt(attemptId);
+    _rewardFlowState = RewardFlowState.failed;
+    _message = state == RewardAttemptServerState.expired
+        ? 'This reward expired before a scan could be added.'
+        : 'This reward could not be credited. No scan was added.';
+    notifyListeners();
+  }
+
+  PendingRewardAttempt? _findAttempt(String attemptId) {
+    for (final attempt in _rewardAttempts) {
+      if (attempt.attemptId == attemptId) return attempt;
+    }
+    return null;
+  }
+
+  Future<void> _removeRewardAttempt(String attemptId) async {
+    _removeRewardAttemptInMemory(attemptId);
+    await _persistRewardState();
+  }
+
+  void _removeRewardAttemptInMemory(String attemptId) {
+    _rewardAttempts = _rewardAttempts
+        .where((attempt) => attempt.attemptId != attemptId)
+        .toList();
+  }
+
+  void _restoreRewardState(String? encoded) {
+    if (encoded == null || encoded.isEmpty) return;
+    try {
+      final decoded = jsonDecode(encoded);
+      if (decoded is! Map) return;
+      final json = Map<String, Object?>.from(decoded);
+      final lastStartedAtMs = json['lastStartedAtMs'];
+      _lastRewardAdStartedAt = lastStartedAtMs is num
+          ? DateTime.fromMillisecondsSinceEpoch(lastStartedAtMs.toInt())
+          : null;
+      final attempts = json['attempts'];
+      if (attempts is List) {
+        _rewardAttempts = attempts
+            .whereType<Map>()
+            .map(
+              (item) => PendingRewardAttempt.fromJson(
+                Map<String, Object?>.from(item),
+              ),
+            )
+            .toList();
+      }
+      final beforeEarnedFilter = _rewardAttempts.length;
+      _rewardAttempts = _rewardAttempts
+          .where((attempt) => attempt.clientEarned)
+          .toList();
+      _rewardStateNeedsPersist =
+          _pruneExpiredRewardAttempts() ||
+          beforeEarnedFilter != _rewardAttempts.length;
+      if (_rewardAttempts.isNotEmpty) {
+        _rewardFlowState = RewardFlowState.pending;
+      }
+    } on Object {
+      _rewardAttempts = [];
+      _lastRewardAdStartedAt = null;
+    }
+  }
+
+  bool _pruneExpiredRewardAttempts() {
+    final before = _rewardAttempts.length;
+    final now = _now();
+    _rewardAttempts = _rewardAttempts.where((attempt) {
+      final age = now.difference(attempt.createdAt);
+      return age.isNegative || age < _rewardAttemptLifetime;
+    }).toList();
+    return before != _rewardAttempts.length;
+  }
+
+  Future<void> _persistRewardState() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(
+        _rewardStateKey,
+        jsonEncode({
+          'lastStartedAtMs': _lastRewardAdStartedAt?.millisecondsSinceEpoch,
+          'attempts': _rewardAttempts
+              .map((attempt) => attempt.toJson())
+              .toList(),
+        }),
+      );
+    } on Object {
+      // Server state remains authoritative if local persistence is unavailable.
+    }
+  }
+
   Future<void> handleAppResumed(Duration backgroundTime) async {
+    await reconcileRewardAttempts();
     if (backgroundTime <
         Duration(seconds: _access.adPolicy.appOpenCooldownSeconds)) {
       return;

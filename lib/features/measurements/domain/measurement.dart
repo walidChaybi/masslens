@@ -124,16 +124,33 @@ String formatWeight(double grams, UnitSystem unitSystem) {
 }
 
 String formatDimensions(DimensionsMm dimensions, UnitSystem unitSystem) {
+  return formatApproximateDimensions(dimensions, unitSystem);
+}
+
+/// Formats the AI-inferred vertical axis and unordered horizontal footprint as
+/// user-facing length x width x height. The approximation marker is
+/// intentional: an uncalibrated photo is not a physical measurement.
+String formatApproximateDimensions(
+  DimensionsMm dimensions,
+  UnitSystem unitSystem,
+) {
+  final length = dimensions.width > dimensions.depth
+      ? dimensions.width
+      : dimensions.depth;
+  final width = dimensions.width > dimensions.depth
+      ? dimensions.depth
+      : dimensions.width;
+
   if (unitSystem == UnitSystem.imperial) {
     const mmPerInch = 25.4;
-    return '${(dimensions.width / mmPerInch).toStringAsFixed(1)} × '
-        '${(dimensions.height / mmPerInch).toStringAsFixed(1)} × '
-        '${(dimensions.depth / mmPerInch).toStringAsFixed(1)} in';
+    return '≈ ${(length / mmPerInch).toStringAsFixed(1)} × '
+        '${(width / mmPerInch).toStringAsFixed(1)} × '
+        '${(dimensions.height / mmPerInch).toStringAsFixed(1)} in';
   }
 
-  return '${(dimensions.width / 10).toStringAsFixed(1)} × '
-      '${(dimensions.height / 10).toStringAsFixed(1)} × '
-      '${(dimensions.depth / 10).toStringAsFixed(1)} cm';
+  return '≈ ${(length / 10).toStringAsFixed(1)} × '
+      '${(width / 10).toStringAsFixed(1)} × '
+      '${(dimensions.height / 10).toStringAsFixed(1)} cm';
 }
 
 String formatMeasurementDate(DateTime date) {

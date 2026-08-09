@@ -36,6 +36,19 @@ void main() {
     expect(formatWeight(453.59237, UnitSystem.imperial), '1.00 lb');
   });
 
+  test('AI size is approximate and displays length x width x height', () {
+    const dimensions = DimensionsMm(width: 180, height: 90, depth: 300);
+
+    expect(
+      formatApproximateDimensions(dimensions, UnitSystem.metric),
+      '≈ 30.0 × 18.0 × 9.0 cm',
+    );
+    expect(
+      formatApproximateDimensions(dimensions, UnitSystem.imperial),
+      '≈ 11.8 × 7.1 × 3.5 in',
+    );
+  });
+
   test('repository factory always uses the real cloud AI path', () {
     expect(EstimateEngineConfig.isAiEnabled, isTrue);
     expect(buildEstimateRepository(), isA<CloudflareEstimateRepository>());

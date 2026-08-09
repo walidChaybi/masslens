@@ -48,7 +48,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           const Eyebrow('Private on-device log'),
                           const SizedBox(height: 8),
                           Text(
-                            'Measurement history',
+                            'Estimate history',
                             style: Theme.of(context).textTheme.headlineLarge,
                           ),
                         ],

@@ -20,18 +20,11 @@
     <uses-feature
         android:name="android.hardware.bluetooth_le"
         android:required="false" />
-    <uses-feature
-        android:name="android.hardware.camera.ar"
-        android:required="false" />
-
     <application
         android:label="MassLens"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher">
-        <meta-data
-            android:name="com.google.ar.core"
-            android:value="optional" />
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${admobAppId}" />
@@ -57,13 +50,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity
-            android:name=".ArMeasureActivity"
-            android:configChanges="orientation|screenSize"
-            android:exported="false"
-            android:hardwareAccelerated="true"
-            android:screenOrientation="portrait"
-            android:theme="@style/NormalTheme" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../app/app_controller.dart';
@@ -23,38 +25,96 @@ class _RewardedScanBody extends StatefulWidget {
 }
 
 class _RewardedScanBodyState extends State<_RewardedScanBody> {
-  bool _busy = false;
+  bool _watching = false;
+  bool _checking = false;
+  Timer? _retryTicker;
+
+  @override
+  void initState() {
+    super.initState();
+    _retryTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _retryTicker?.cancel();
+    super.dispose();
+  }
 
   Future<void> _watch() async {
-    setState(() => _busy = true);
+    if (_watching || _checking) return;
+    setState(() => _watching = true);
     final monetization = AppScope.of(context).monetization;
     final added = await monetization.watchAdForScan();
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() => _watching = false);
     if (added) {
       Navigator.of(context).pop(true);
       return;
     }
+    if (monetization.hasPendingReward) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          monetization.message ?? 'The verified reward is still processing.',
+          monetization.message ?? 'The scan credit is still syncing.',
         ),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
+  Future<void> _check() async {
+    if (_watching || _checking) return;
+    setState(() => _checking = true);
+    final monetization = AppScope.of(context).monetization;
+    final added = await monetization.reconcileRewardAttempts();
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (added) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    if (!monetization.hasPendingReward) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            monetization.message ?? 'No pending scan credit was added.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _retryAd() async {
+    if (_watching || _checking) return;
+    setState(() => _checking = true);
+    await AppScope.of(context).monetization.refreshAccess();
+    if (mounted) setState(() => _checking = false);
+  }
+
+  String _retryText(Duration duration) {
+    final seconds = (duration.inMilliseconds / 1000).ceil();
+    if (seconds >= 60) return '${(seconds / 60).ceil()} min';
+    return '$seconds sec';
+  }
+
   @override
   Widget build(BuildContext context) {
     final monetization = AppScope.of(context).monetization;
     final access = monetization.access;
+    final busy = _watching || _checking || monetization.rewardActionBusy;
+    final retryAfter = monetization.rewardRetryAfter;
     final canWatch =
-        !_busy &&
+        !busy &&
         access.adsEnabled &&
         access.canEarnReward &&
-        monetization.rewardedAdReady;
-    return Padding(
+        monetization.canRequestAds &&
+        monetization.rewardedAdReady &&
+        !monetization.rewardStartBlocked;
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         22,
         8,
@@ -75,8 +135,8 @@ class _RewardedScanBodyState extends State<_RewardedScanBody> {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Your reward is granted only after AdMob verifies it. No '
-            'subscription, purchase, or fabricated result.',
+            'Finish the ad and MassLens adds one scan. No subscription, '
+            'purchase, or fabricated result.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.inkMuted, height: 1.45),
           ),
@@ -124,20 +184,70 @@ class _RewardedScanBodyState extends State<_RewardedScanBody> {
             ),
           ),
           const SizedBox(height: 18),
+          if (monetization.hasPendingReward) ...[
+            Container(
+              key: const Key('reward_sync_pending'),
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              decoration: BoxDecoration(
+                color: AppColors.lime.withValues(alpha: 0.18),
+                border: Border.all(
+                  color: AppColors.limeDark.withValues(alpha: 0.35),
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.sync_rounded, size: 22),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Scan credit sync pending',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Safe to close. We will keep checking for 24 hours.',
+                          style: TextStyle(
+                            color: AppColors.inkMuted,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    key: const Key('check_reward_status'),
+                    onPressed: busy ? null : _check,
+                    child: Text(_checking ? 'Checking' : 'Check'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               key: const Key('watch_ad_for_scan'),
               onPressed: canWatch ? _watch : null,
-              icon: _busy
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.play_circle_outline_rounded),
+              icon: Icon(
+                busy
+                    ? Icons.shield_outlined
+                    : monetization.rewardStartBlocked
+                    ? Icons.schedule_rounded
+                    : Icons.play_circle_outline_rounded,
+              ),
               label: Text(
-                _busy
-                    ? 'Confirming reward…'
+                busy
+                    ? 'Adding your scan…'
+                    : monetization.rewardStartBlocked
+                    ? 'Another ad in ${_retryText(retryAfter)}'
+                    : !monetization.canRequestAds
+                    ? 'Rewarded ads unavailable'
                     : monetization.rewardedAdReady
                     ? 'Watch an ad · Get 1 scan'
                     : 'Rewarded ad is loading',
@@ -146,11 +256,35 @@ class _RewardedScanBodyState extends State<_RewardedScanBody> {
           ),
           if (!access.adsEnabled) ...[
             const SizedBox(height: 12),
+            Text(
+              access.legacyScans > 0
+                  ? 'Use your ad-free scan credit before earning more scans.'
+                  : 'Rewarded ads are not available for this access state.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
+            ),
+          ] else if (!monetization.canRequestAds) ...[
+            const SizedBox(height: 12),
             const Text(
-              'Ads are unavailable because of consent, configuration, or '
-              'inventory. Existing scans and non-AI features remain available.',
+              'Ads are unavailable because of consent or configuration. '
+              'Existing scans and non-AI features remain available.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.inkMuted, fontSize: 12),
+            ),
+            if (monetization.privacyOptionsRequired)
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () => monetization.showPrivacyOptions(),
+                child: const Text('Privacy choices'),
+              ),
+          ] else if (!monetization.rewardedAdReady && !busy) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              key: const Key('retry_rewarded_ad'),
+              onPressed: _retryAd,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try loading again'),
             ),
           ],
         ],

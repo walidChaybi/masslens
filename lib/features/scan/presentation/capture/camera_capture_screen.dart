@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
-class FallbackCameraScreen extends StatefulWidget {
-  const FallbackCameraScreen({super.key});
+class CameraCaptureScreen extends StatefulWidget {
+  const CameraCaptureScreen({super.key});
 
   @override
-  State<FallbackCameraScreen> createState() => _FallbackCameraScreenState();
+  State<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
 }
 
-class _FallbackCameraScreenState extends State<FallbackCameraScreen>
+class _CameraCaptureScreenState extends State<CameraCaptureScreen>
     with WidgetsBindingObserver {
   CameraController? _controller;
   String? _error;
@@ -169,7 +169,7 @@ class _FallbackCameraScreenState extends State<FallbackCameraScreen>
                   button: true,
                   label: 'Take photo',
                   child: GestureDetector(
-                    key: const Key('fallback_shutter_button'),
+                    key: const Key('camera_shutter_button'),
                     onTap: controller == null ? null : _capture,
                     child: Container(
                       width: 76,

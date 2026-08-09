@@ -6,15 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_library;
 import 'package:mass_lens/features/scan/data/cloudflare_estimate_repository.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
-import 'package:mass_lens/features/scan/domain/measured_dimensions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('Cloudflare request includes serialized measured dimensions', () async {
+  test('Cloudflare request sends photo views and compact hints only', () async {
     SharedPreferences.setMockInitialValues({});
     final directory = await Directory.systemTemp.createTemp('masslens-test-');
     final image = File('${directory.path}/object.jpg');
     await image.writeAsBytes(
+      image_library.encodeJpg(image_library.Image(width: 320, height: 320)),
+    );
+    final sideImage = File('${directory.path}/object-side.jpg');
+    await sideImage.writeAsBytes(
       image_library.encodeJpg(image_library.Image(width: 320, height: 320)),
     );
     final received = Completer<Map<String, Object?>>();
@@ -45,22 +48,26 @@ void main() {
       await repository.analyze(
         EstimateRequest(
           imagePath: image.path,
+          secondaryImagePath: sideImage.path,
           requestId: 'request_identifier_flutter_test',
-          measuredDimensions: const MeasuredDimensions(
-            widthMm: 320,
-            heightMm: 210,
-            method: MeasurementMethod.arCorePlane,
+          material: 'Metal',
+          knownDimension: const KnownDimensionInput(
+            axis: 'Length',
+            value: 32,
+            unit: 'cm',
           ),
         ),
       );
 
       final body = await received.future;
-      expect(body['measuredDimensions'], {
-        'widthMm': 320.0,
-        'heightMm': 210.0,
-        'method': 'arcore_plane',
+      expect(body.containsKey('measuredDimensions'), isFalse);
+      expect(body['knownDimension'], {
+        'axis': 'Length',
+        'value': 32,
+        'unit': 'cm',
       });
-      expect((body['images'] as List), hasLength(1));
+      expect(body['material'], 'Metal');
+      expect((body['images'] as List), hasLength(2));
     } finally {
       await server.close(force: true);
       await directory.delete(recursive: true);

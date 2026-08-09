@@ -40,7 +40,7 @@ class SettingsScreen extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Measurement history cleared.'),
+        content: Text('Estimate history cleared.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -155,17 +155,6 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Saved photos',
                 value: 'Private storage',
               ),
-              const Divider(),
-              const Padding(
-                padding: EdgeInsets.all(17),
-                child: _SettingLabel(
-                  icon: Icons.view_in_ar_outlined,
-                  title: 'AR measurement',
-                  subtitle:
-                      'Uses Google Play Services for AR (ARCore), provided by '
-                      'Google LLC and governed by the Google Privacy Policy.',
-                ),
-              ),
               if (monetization.privacyOptionsRequired) ...[
                 const Divider(),
                 _ActionRow(
@@ -179,7 +168,7 @@ class SettingsScreen extends StatelessWidget {
               const Divider(),
               _ActionRow(
                 icon: Icons.delete_sweep_outlined,
-                title: 'Clear measurement history',
+                title: 'Clear estimate history',
                 subtitle: controller.measurements.isEmpty
                     ? 'No saved estimates'
                     : '${controller.measurements.length} saved',

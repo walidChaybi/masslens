@@ -32,14 +32,15 @@ class HomeScreen extends StatelessWidget {
       (MediaQuery.sizeOf(context).width - 720) / 2,
     );
 
+    final canEarnReward = access.adsEnabled && access.canEarnReward;
     return SafeArea(
-      bottom: false,
+      maintainBottomViewPadding: true,
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           horizontalPadding,
           28,
           horizontalPadding,
-          32 + MediaQuery.viewPaddingOf(context).bottom,
+          32,
         ),
         children: [
           Row(
@@ -54,19 +55,40 @@ class HomeScreen extends StatelessWidget {
               InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => showRewardedScanSheet(context),
-                child: Padding(
+                child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
+                    horizontal: 10,
+                    vertical: 7,
                   ),
-                  child: Text(
-                    access.usageLabel,
-                    key: const Key('scan_balance'),
-                    style: const TextStyle(
-                      color: AppColors.inkMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  decoration: BoxDecoration(
+                    color: canEarnReward ? AppColors.lime : Colors.transparent,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (canEarnReward) ...[
+                        const Icon(
+                          Icons.play_arrow_rounded,
+                          size: 16,
+                          color: AppColors.ink,
+                        ),
+                        const SizedBox(width: 3),
+                      ],
+                      Text(
+                        canEarnReward && access.isAuthoritative
+                            ? '${access.remainingScans} left · Get +1'
+                            : access.usageLabel,
+                        key: const Key('scan_balance'),
+                        style: TextStyle(
+                          color: canEarnReward
+                              ? AppColors.ink
+                              : AppColors.inkMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -146,7 +168,7 @@ class _HomeCapturePanel extends StatelessWidget {
             key: const Key('home_scan_button'),
             onPressed: onMeasure,
             icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('Measure'),
+            label: const Text('Scan object'),
           ),
           const SizedBox(height: 4),
           TextButton.icon(

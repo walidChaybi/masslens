@@ -33,10 +33,6 @@ abstract final class AdMobConfig {
     'ADMOB_USE_TEST_IDS',
     defaultValue: true,
   );
-  static const debugRewardedUsesProductionId = bool.fromEnvironment(
-    'ADMOB_DEBUG_REWARDED_SSV',
-    defaultValue: false,
-  );
   static const _testDeviceIdsValue = String.fromEnvironment(
     'ADMOB_TEST_DEVICE_IDS',
   );
@@ -65,9 +61,7 @@ abstract final class AdMobConfig {
   static String get nativeAdUnitId =>
       useTestIds ? _nativeTest : _nativeProduction;
   static String get rewardedAdUnitId =>
-      useTestIds && !(kDebugMode && debugRewardedUsesProductionId)
-      ? _rewardedTest
-      : _rewardedProduction;
+      useTestIds ? _rewardedTest : _rewardedProduction;
   static String get appOpenAdUnitId =>
       useTestIds ? _appOpenTest : _appOpenProduction;
   static String get interstitialAdUnitId =>

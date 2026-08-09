@@ -40,8 +40,6 @@ class CloudflareEstimateRepository implements EstimateRepository {
         'referenceObject': request.referenceObject,
         if (request.knownDimension case final knownDimension?)
           'knownDimension': knownDimension.toJson(),
-        if (request.measuredDimensions case final measuredDimensions?)
-          'measuredDimensions': measuredDimensions.toJson(),
       },
       clientId: await InstallationIdStore.getOrCreate(),
       requestId: request.requestId.isEmpty

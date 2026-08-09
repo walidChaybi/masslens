@@ -1,6 +1,6 @@
+import {randomBytes} from "node:crypto";
 import {readFile, stat} from "node:fs/promises";
 import {extname, resolve} from "node:path";
-import {randomBytes} from "node:crypto";
 import {fileURLToPath} from "node:url";
 
 const manifestPath = resolve(process.argv[2] || "../eval/manifest.json");
@@ -17,78 +17,105 @@ const outputUsdPerMillion = Number(
 const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 if (!Array.isArray(manifest) || manifest.length < 30) {
-  throw new Error("Evaluation requires a manifest with at least 30 objects.");
+  throw new Error("Evaluation requires at least 30 labeled objects.");
+}
+if (manifest.filter((entry) => entry.images?.length === 2).length < 10) {
+  throw new Error("At least 10 objects need a guided side-view photo.");
 }
 
 const samples = [];
 for (const entry of manifest) {
-  const started = performance.now();
-  try {
-    const imagePaths = entry.images || [];
-    if (imagePaths.length < 1 || imagePaths.length > 2) {
-      throw new Error("Each object needs one or two images.");
+  validateEntry(entry);
+  const loadedImages = await Promise.all(entry.images.map(loadImage));
+  const variants = [
+    {viewMode: "one_view", images: loadedImages.slice(0, 1)},
+    ...(loadedImages.length === 2
+      ? [{viewMode: "two_view", images: loadedImages}]
+      : []),
+  ];
+
+  for (const variant of variants) {
+    const started = performance.now();
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MassLens-Client-ID": clientId,
+          "X-MassLens-Request-ID": randomBytes(18).toString("base64url"),
+        },
+        body: JSON.stringify({images: variant.images, ...(entry.context || {})}),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error?.message || String(response.status));
+      }
+      const inputTokens = Number(
+        response.headers.get("x-masslens-input-tokens") || 0,
+      );
+      const outputTokens = Number(
+        response.headers.get("x-masslens-output-tokens") || 0,
+      );
+      const trueWeight = Number(entry.trueWeightGrams);
+      samples.push({
+        id: entry.id,
+        viewMode: variant.viewMode,
+        valid: true,
+        categoryCorrect:
+          normalize(payload.category) === normalize(entry.category),
+        contained: trueWeight >= payload.lower_bound_grams &&
+          trueWeight <= payload.upper_bound_grams,
+        massRelativeError:
+          Math.abs(payload.estimate_grams - trueWeight) / trueWeight,
+        dimensionRelativeError: dimensionError(
+          payload.dimensions_mm,
+          entry.trueDimensionsMm,
+        ),
+        latencyMs: performance.now() - started,
+        costUsd: inputTokens * inputUsdPerMillion / 1_000_000 +
+          outputTokens * outputUsdPerMillion / 1_000_000,
+      });
+      process.stdout.write(".");
+    } catch (error) {
+      samples.push({
+        id: entry.id,
+        viewMode: variant.viewMode,
+        valid: false,
+        error: String(error),
+      });
+      process.stdout.write("x");
     }
-    const images = await Promise.all(imagePaths.map(async (path) => {
-      const absolute = resolve(repositoryRoot, path);
-      const file = await readFile(absolute);
-      if ((await stat(absolute)).size === 0) throw new Error("Empty image.");
-      return {
-        imageBase64: file.toString("base64"),
-        mimeType: mimeType(absolute),
-      };
-    }));
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-MassLens-Client-ID": clientId,
-        "X-MassLens-Request-ID": randomBytes(18).toString("base64url"),
-      },
-      body: JSON.stringify({images, ...(entry.context || {})}),
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error?.message || response.status);
-    const inputTokens = Number(response.headers.get(
-      "x-masslens-input-tokens",
-    ) || 0);
-    const outputTokens = Number(response.headers.get(
-      "x-masslens-output-tokens",
-    ) || 0);
-    const trueWeight = Number(entry.trueWeightGrams);
-    const relativeError = Math.abs(payload.estimate_grams - trueWeight) /
-      trueWeight;
-    samples.push({
-      id: entry.id,
-      valid: true,
-      categoryCorrect: normalize(payload.category) === normalize(entry.category),
-      contained: trueWeight >= payload.lower_bound_grams &&
-        trueWeight <= payload.upper_bound_grams,
-      relativeError,
-      hasDimensions: Boolean(entry.hasDimensions),
-      latencyMs: performance.now() - started,
-      costUsd: inputTokens * inputUsdPerMillion / 1_000_000 +
-        outputTokens * outputUsdPerMillion / 1_000_000,
-    });
-    process.stdout.write(".");
-  } catch (error) {
-    samples.push({id: entry.id, valid: false, error: String(error)});
-    process.stdout.write("x");
   }
 }
 process.stdout.write("\n");
 
 const valid = samples.filter((item) => item.valid);
-const withDimensions = valid.filter((item) => item.hasDimensions);
-const photoOnly = valid.filter((item) => !item.hasDimensions);
+const oneView = valid.filter((item) => item.viewMode === "one_view");
+const twoView = valid.filter((item) => item.viewMode === "two_view");
+const pairedIds = new Set(twoView.map((item) => item.id));
+const pairedOneView = oneView.filter((item) => pairedIds.has(item.id));
 const metrics = {
   model: process.env.MASSLENS_EVAL_MODEL || "gpt-5-nano",
+  objectCount: manifest.length,
+  requestCount: samples.length,
   validStructuredRate: valid.length / samples.length,
   categoryAccuracy: ratio(valid, "categoryCorrect"),
   rangeContainment: ratio(valid, "contained"),
-  medianErrorWithDimensions: median(
-    withDimensions.map((item) => item.relativeError),
+  medianMassErrorOneView: median(
+    oneView.map((item) => item.massRelativeError),
   ),
-  medianErrorPhotoOnly: median(photoOnly.map((item) => item.relativeError)),
+  medianMassErrorTwoView: median(
+    twoView.map((item) => item.massRelativeError),
+  ),
+  pairedMedianMassErrorOneView: median(
+    pairedOneView.map((item) => item.massRelativeError),
+  ),
+  medianDimensionErrorOneView: median(
+    oneView.map((item) => item.dimensionRelativeError),
+  ),
+  medianDimensionErrorTwoView: median(
+    twoView.map((item) => item.dimensionRelativeError),
+  ),
   p95LatencyMs: percentile(valid.map((item) => item.latencyMs), 0.95),
   averageCostUsd: average(valid.map((item) => item.costUsd)),
 };
@@ -97,8 +124,11 @@ console.log(JSON.stringify(metrics, null, 2));
 const passed = metrics.validStructuredRate === 1 &&
   metrics.categoryAccuracy >= 0.80 &&
   metrics.rangeContainment >= 0.70 &&
-  (withDimensions.length === 0 || metrics.medianErrorWithDimensions <= 0.40) &&
-  (photoOnly.length === 0 || metrics.medianErrorPhotoOnly <= 0.60) &&
+  metrics.medianMassErrorOneView <= 0.60 &&
+  metrics.medianMassErrorTwoView <= 0.60 &&
+  metrics.medianMassErrorTwoView <= metrics.pairedMedianMassErrorOneView &&
+  metrics.medianDimensionErrorOneView <= 0.60 &&
+  metrics.medianDimensionErrorTwoView <= 0.40 &&
   metrics.p95LatencyMs <= 15000 &&
   metrics.averageCostUsd < 0.001;
 if (!passed) {
@@ -108,6 +138,53 @@ if (!passed) {
   process.exitCode = 1;
 } else {
   console.log("RELEASE GATE PASSED");
+}
+
+function validateEntry(entry) {
+  if (!entry || typeof entry !== "object") {
+    throw new Error("Every manifest entry must be an object.");
+  }
+  if (!Array.isArray(entry.images) ||
+      entry.images.length < 1 || entry.images.length > 2) {
+    throw new Error(`${entry.id || "Unknown object"} needs one or two images.`);
+  }
+  if (!Number.isFinite(entry.trueWeightGrams) || entry.trueWeightGrams <= 0) {
+    throw new Error(`${entry.id || "Unknown object"} needs a positive mass.`);
+  }
+  const dimensions = entry.trueDimensionsMm;
+  for (const axis of ["length", "width", "height"]) {
+    if (!Number.isFinite(dimensions?.[axis]) || dimensions[axis] <= 0) {
+      throw new Error(`${entry.id || "Unknown object"} needs ${axis}.`);
+    }
+  }
+}
+
+async function loadImage(path) {
+  const absolute = resolve(repositoryRoot, path);
+  const file = await readFile(absolute);
+  if ((await stat(absolute)).size === 0) throw new Error("Empty image.");
+  return {
+    imageBase64: file.toString("base64"),
+    mimeType: mimeType(absolute),
+  };
+}
+
+function dimensionError(predicted, actual) {
+  const predictedHorizontal = [Number(predicted.width), Number(predicted.depth)]
+    .sort((a, b) => b - a);
+  const actualHorizontal = [Number(actual.length), Number(actual.width)]
+    .sort((a, b) => b - a);
+  const pairs = [
+    [predictedHorizontal[0], actualHorizontal[0]],
+    [predictedHorizontal[1], actualHorizontal[1]],
+    [Number(predicted.height), Number(actual.height)],
+  ];
+  if (pairs.some(([predictedValue]) =>
+    !Number.isFinite(predictedValue) || predictedValue <= 0)) {
+    throw new Error("AI returned invalid dimensions.");
+  }
+  return average(pairs.map(([predictedValue, actualValue]) =>
+    Math.abs(predictedValue - actualValue) / actualValue));
 }
 
 function mimeType(path) {

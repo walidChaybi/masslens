@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../domain/access_status.dart';
+import '../domain/reward_attempt.dart';
 
 class MonetizationApi {
   const MonetizationApi({
@@ -15,6 +16,50 @@ class MonetizationApi {
   Future<AccessStatus> getAccess(String clientId) async {
     final payload = await _request('GET', '/access', clientId: clientId);
     return AccessStatus.fromJson(payload);
+  }
+
+  Future<RewardAttemptStatus> recordRewardAttempt({
+    required String clientId,
+    required String attemptId,
+    required RewardAttemptEvent event,
+  }) async {
+    if (!RewardAttemptId.isValid(attemptId)) {
+      throw const MonetizationApiException('Invalid reward attempt ID.');
+    }
+    final payload = await _request(
+      'POST',
+      '/reward-attempts',
+      clientId: clientId,
+      body: {'attemptId': attemptId, 'event': event.wireName},
+    );
+    try {
+      return RewardAttemptStatus.fromJson(payload);
+    } on FormatException catch (error) {
+      throw MonetizationApiException(
+        'The reward service returned invalid data: ${error.message}',
+      );
+    }
+  }
+
+  Future<RewardAttemptStatus> getRewardAttempt({
+    required String clientId,
+    required String attemptId,
+  }) async {
+    if (!RewardAttemptId.isValid(attemptId)) {
+      throw const MonetizationApiException('Invalid reward attempt ID.');
+    }
+    final payload = await _request(
+      'GET',
+      '/reward-attempts/$attemptId',
+      clientId: clientId,
+    );
+    try {
+      return RewardAttemptStatus.fromJson(payload);
+    } on FormatException catch (error) {
+      throw MonetizationApiException(
+        'The reward service returned invalid data: ${error.message}',
+      );
+    }
   }
 
   Future<void> reportAdRevenue({

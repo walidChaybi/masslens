@@ -1,6 +1,6 @@
 # Ads-only production setup
 
-MassLens has one lifetime starter scan and verified rewarded scans. Historical
+MassLens has three lifetime starter scans and ad-funded rewarded scans. Historical
 billing tables stay inert for safe migration; any real old purchase balance is
 preserved as ad-free `legacyScans` until used. No Play Billing dependency or
 purchase endpoint remains.
@@ -18,10 +18,13 @@ npx wrangler deploy
 curl -f https://masslens-api.masslens.workers.dev/ready
 ```
 
-`/ready` fails unless the OpenAI secret, D1 binding, enforced wallet,
-`gpt-5-nano`, and live rewarded unit are configured. Migration 0003 creates the
-ads wallet, idempotent request/result cache, and daily metrics without deleting
-old ledgers. The default AI cost ceiling is $5/day
+`/ready` fails unless the OpenAI secret, D1 binding, enforced wallet, and
+`gpt-5-nano` are configured. Migration 0003 creates the ads wallet, idempotent
+request/result cache, and daily metrics without deleting old ledgers. Migration
+0004 adds durable reward-attempt reconciliation and an audited support-credit
+ledger. Migration 0005 adds the separate idempotent mobile-SDK reward ledger and
+server cooldown lease; it does not create signed SSV transactions. The default
+AI cost ceiling is $5/day
 (`MAX_DAILY_AI_COST_MICROS=5000000`); tune it in Worker variables.
 
 ## AdMob
@@ -29,10 +32,20 @@ old ledgers. The default AI cost ceiling is $5/day
 Create/verify four Android units:
 
 - native, used on scale, AI home, and after history result two;
-- rewarded with reward amount `1`, reward item `scan`, and SSV callback
-  `https://masslens-api.masslens.workers.dev/admob/reward`;
+- rewarded with reward amount `1` and reward item exactly `scan`;
 - interstitial, shown after every second completed scan only after result close;
 - app-open, eligible only after four hours in background and after onboarding.
+
+The app registers a random reward-attempt ID before showing the ad. After the
+Google Mobile Ads SDK reports `onUserEarnedReward`, the app sends the exact ID
+to the Worker, which atomically adds one scan. The request is idempotent, so a
+retry cannot add a second scan. Locally earned attempts remain retryable for 24
+hours after a lost response. Both client and Worker enforce a two-minute
+repeat-ad guard, and the rewarded balance is capped at three.
+
+No AdMob server-side verification callback is configured or required for scan
+credits. The former `/admob/reward` route is intentionally unavailable; mobile
+SDK grants are recorded only in the separate `client_reward_grants` audit table.
 
 Debug builds use Google's test IDs. The release app fails fast if ads are
 disabled, test IDs are enabled, or any live unit is missing. Build production:
@@ -49,8 +62,13 @@ flutter build appbundle --release \
 ```
 
 Never use live ads during development. Test EEA consent and privacy choices,
-reward SSV/deduplication, unavailable inventory, every placement, interstitial
-cadence/cooldown, and four-hour app-open suppression on physical devices.
+reward acknowledgement/deduplication, unavailable inventory, every placement,
+interstitial cadence/cooldown, and four-hour app-open suppression on physical
+devices.
+
+Before release, use Google's rewarded test unit and then the production rewarded
+unit on a registered test device. Each completed ad must add exactly one scan;
+replaying the same attempt ID must grant zero additional scans.
 
 ## Seven-day margin check
 

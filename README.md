@@ -8,7 +8,7 @@ MassLens is an Android-first Flutter app with three honest modes:
 
 There is no AI demo, offline fallback result, subscription, or scan pack. A new
 installation receives three lifetime starter scans. After that, one AdMob rewarded
-ad earns one scan after server-side verification. Provider failures refund the
+ad earns one scan after the SDK reports the completed reward. Provider failures refund the
 reserved scan; the app never fabricates a result.
 
 ## AI and privacy
@@ -34,10 +34,10 @@ npm install
 npm run check
 ```
 
-Camera, ARCore, BLE, consent, and AdMob test units still require physical-device
+Camera, BLE, consent, and AdMob test units still require physical-device
 verification. Model release requires the private 30+ object gate documented in
 `eval/README.md`. Profit is not guaranteed; compare real seven-day paid-event
 revenue with direct AI cost before changing cadence.
 
-See `MONETIZATION_SETUP.md` for Worker, D1, SSV, ad IDs, release validation, and
+See `MONETIZATION_SETUP.md` for Worker, D1, ad IDs, release validation, and
 unit-economics operations.

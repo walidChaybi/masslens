@@ -43,13 +43,8 @@ const fillStateChoices = [
   "Full",
 ];
 const referenceObjectChoices = ["None", "Ruler", "Standard card"];
-const dimensionAxisChoices = ["Width", "Height", "Depth"];
+const dimensionAxisChoices = ["Length", "Width", "Height", "Depth"];
 const dimensionUnitChoices = ["cm", "in"];
-const measurementMethodChoices = [
-  "arcore_depth",
-  "arcore_plane",
-  "photo_reference",
-];
 const mimeTypeChoices = [
   "image/jpeg",
   "image/png",
@@ -140,7 +135,6 @@ async function routeRequest(request, env) {
     referenceObjectChoices,
   );
   const knownDimension = readKnownDimension(data.knownDimension);
-  const measuredDimensions = readMeasuredDimensions(data.measuredDimensions);
   const images = readImages(data);
   const clientIdHash = await hashIdentifier(clientId);
   const reservation = await reserveScan(env, clientIdHash, requestId);
@@ -165,7 +159,6 @@ async function routeRequest(request, env) {
       fillState,
       referenceObject,
       knownDimension,
-      measuredDimensions,
       images,
       safetyIdentifier: clientIdHash,
     });
@@ -194,10 +187,6 @@ function productionConfigurationErrors(env) {
   if (!env.DB) errors.push("D1 database binding is missing");
   if (env.SCAN_ACCESS_ENFORCED !== "true") {
     errors.push("SCAN_ACCESS_ENFORCED must be true");
-  }
-  const rewardedId = String(env.ADMOB_REWARDED_AD_UNIT_ID || "");
-  if (!rewardedId || rewardedId.includes("3940256099942544")) {
-    errors.push("a live rewarded AdMob unit is required");
   }
   if ((env.OPENAI_MODEL || "") !== "gpt-5-nano") {
     errors.push("OPENAI_MODEL must be gpt-5-nano for this release");
@@ -296,56 +285,6 @@ function readKnownDimension(value) {
   };
 }
 
-function readMeasuredMillimeters(value, axis) {
-  if (
-    typeof value !== "number" ||
-    !Number.isFinite(value) ||
-    value < 5 ||
-    value > 5000
-  ) {
-    throw new ApiError(400, "invalid_request", `Invalid measured ${axis}.`);
-  }
-  return value;
-}
-
-function readMeasuredDimensions(value) {
-  if (value === undefined || value === null) return null;
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new ApiError(400, "invalid_request", "Invalid measured dimensions.");
-  }
-
-  const method = readChoice(
-    value.method,
-    "measurement method",
-    measurementMethodChoices,
-  );
-  const referenceLabel = value.referenceLabel;
-  if (
-    referenceLabel !== undefined &&
-    referenceLabel !== null &&
-    (typeof referenceLabel !== "string" ||
-      referenceLabel.trim().length === 0 ||
-      referenceLabel.length > 60)
-  ) {
-    throw new ApiError(400, "invalid_request", "Invalid measurement reference.");
-  }
-  if (method === "photo_reference" && typeof referenceLabel !== "string") {
-    throw new ApiError(400, "invalid_request", "A photo reference is required.");
-  }
-
-  return {
-    widthMm: readMeasuredMillimeters(value.widthMm, "width"),
-    heightMm: readMeasuredMillimeters(value.heightMm, "height"),
-    depthMm:
-      value.depthMm === undefined || value.depthMm === null
-        ? null
-        : readMeasuredMillimeters(value.depthMm, "depth"),
-    method,
-    referenceLabel:
-      typeof referenceLabel === "string" ? referenceLabel.trim() : null,
-  };
-}
-
 function readImageBase64(value) {
   if (typeof value !== "string" || value.length === 0) {
     throw new ApiError(400, "invalid_request", "Missing image.");
@@ -427,7 +366,6 @@ async function requestOpenAi(
     fillState,
     referenceObject,
     knownDimension,
-    measuredDimensions,
     images,
     safetyIdentifier,
   },
@@ -465,7 +403,6 @@ async function requestOpenAi(
                 fillState,
                 referenceObject,
                 knownDimension,
-                measuredDimensions,
                 imageCount: images.length,
               }),
             },
@@ -601,18 +538,28 @@ function validateEstimate(estimate) {
     throw invalidEstimate("dimensions");
   }
   for (const key of ["width", "height", "depth"]) {
-    if (!isNonNegativeNumber(estimate.dimensions_mm[key])) {
+    if (!isPositiveNumber(estimate.dimensions_mm[key])) {
       throw invalidEstimate(key);
     }
   }
 
-  if (!Array.isArray(estimate.assumptions) || estimate.assumptions.length === 0) {
+  if (
+    !Array.isArray(estimate.assumptions) ||
+    estimate.assumptions.length !== 3 ||
+    estimate.assumptions.some(
+      (assumption) => typeof assumption !== "string" || !assumption.trim(),
+    )
+  ) {
     throw invalidEstimate("assumptions");
   }
 }
 
 function isNonNegativeNumber(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isPositiveNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function invalidEstimate(field) {
@@ -630,26 +577,10 @@ function requestPrompt({
   fillState,
   referenceObject,
   knownDimension,
-  measuredDimensions,
   imageCount,
 }) {
   const knownDimensionText = knownDimension
     ? `${knownDimension.axis}: ${knownDimension.value} ${knownDimension.unit}.`
-    : "None supplied.";
-  const measuredText = measuredDimensions
-    ? [
-        `width ${measuredDimensions.widthMm} mm`,
-        `height ${measuredDimensions.heightMm} mm`,
-        measuredDimensions.depthMm
-          ? `depth ${measuredDimensions.depthMm} mm`
-          : null,
-        `method ${measuredDimensions.method}`,
-        measuredDimensions.referenceLabel
-          ? `reference ${measuredDimensions.referenceLabel}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join(", ")
     : "None supplied.";
   const legacyHints = [];
   if (category !== "Auto") legacyHints.push(`Legacy category hint: ${category}.`);
@@ -663,19 +594,14 @@ function requestPrompt({
     "User-provided physical context:",
     `- Material: ${material}.`,
     `- Fill state: ${fillState}.`,
-    `- Visible reference: ${referenceObject}.`,
-    `- Known dimension: ${knownDimensionText}`,
-    `- Measured dimensions: ${measuredText}`,
+    `- Claimed visible reference: ${referenceObject}. Confirm it in the images.`,
+    `- Already-known side: ${knownDimensionText}`,
     ...legacyHints.map((hint) => `- ${hint}`),
     `- Number of views: ${imageCount}.`,
     "",
-    "Infer the object category from the images. Treat all supplied context as",
-    "helpful evidence, not proof. Preserve supplied measured axes exactly and",
-    "estimate only a missing depth. Use a ruler only when its markings are visible",
-    "and it lies near the object's plane. A standard payment-size card is about",
-    "85.6 by 54.0 mm; use that scale only when the card is clearly visible.",
-    "When two views are supplied, treat them as angles of the same object and",
-    "use the second view to resolve depth, construction, and occluded details.",
+    "Treat supplied context as evidence, not proof. If two views are present,",
+    "use the second as a 45-90 degree side view only after confirming it shows",
+    "the same physical object. Ignore a mismatched view and lower confidence.",
   ].join("\n");
 }
 
@@ -715,26 +641,36 @@ class ApiError extends Error {
 const developerPrompt = `
 You are MassLens, a careful visual weight-estimation engine.
 
-Return only the structured JSON requested by the schema. Do not include prose.
+Return only the structured JSON requested by the schema. Do not include prose
+or reveal private reasoning. The assumptions are concise evidence summaries,
+not chain-of-thought.
 
-Use this estimation method:
+Perform this consistency workflow internally:
 1. Identify the single primary object the user is trying to weigh. Prefer the
-   centered, fully visible object. Ignore hands, table surfaces, shadows,
-   background clutter, packaging labels, and secondary objects unless they are
-   part of the item being weighed.
-2. Infer the category. Estimate visible dimensions in millimeters using any
-   supplied known dimension, a clearly visible ruler or standard card,
-   perspective, familiar proportions, and category priors. Adopt dimensions
-   measured by AR or calibrated tracing exactly, while treating their method as
-   an uncertainty signal. If there is no reliable scale reference, keep
-   confidence lower and widen the range.
-3. Estimate material and construction. Combine approximate volume with plausible
-   density or known category priors. Adjust for hollow, solid, filled, porous,
-   wet, folded, or packaged structure when visible or user-provided. Treat the
-   user's material and fill state as hints; call out important conflicts.
-4. Produce a weight range that honestly reflects uncertainty. The point estimate
-   must be inside the range. Low confidence usually needs at least +/-25%.
-5. Never pretend a photo is a scale. Do not use results for safety-critical,
+   centered, fully visible object. Across two views, first confirm shape, color,
+   markings, and construction are consistent with the same physical object.
+   Ignore hands, surfaces, shadows, clutter, and unrelated packaging.
+2. Infer the category and a plausible vertical height plus two horizontal
+   footprint axes. Use silhouette, perspective, familiar proportions, category
+   priors, an already-known side, and only scale evidence actually visible in
+   the images. Return width and depth as the two horizontal axes and height as
+   the vertical axis; the client presents the horizontal axes as length and
+   width. A payment card is about 85.6 by 54.0 mm, but use it only when clearly
+   visible and near the object's plane. Use ruler markings only when legible.
+3. Infer material, effective density, and construction. Account for solid,
+   hollow, empty, filled, porous, wet, folded, or packaged forms. Treat user
+   material and fill selections as hints and resolve visible conflicts honestly.
+4. Compare plausible geometry and material hypotheses. Estimate volume times
+   effective density, then cross-check against known category size and weight
+   priors so perspective or density errors do not dominate the result.
+5. Choose the most robust mass estimate and a credible range. The point estimate
+   must lie inside the range. Without trustworthy scale or with conflicting
+   evidence, lower confidence and widen the range; low confidence normally needs
+   at least +/-25%.
+6. Check that dimensions and mass are positive and mutually plausible before
+   returning the result.
+
+Never pretend a photo is a physical scale. Do not use results for safety-critical,
    medical, legal-trade, load-bearing, or shipping-billing decisions.
 
 Precision priorities:
@@ -744,8 +680,10 @@ Precision priorities:
   visible in the supplied images.
 - Label the object specifically but briefly, for example "ceramic mug" instead
   of "object".
-- Keep assumptions short, concrete, and useful to a user trying to improve the
-  next scan.
+- Return exactly three short assumptions in this order and with these prefixes:
+  "Size:" states the scale basis and approximate geometry; "Material:" states
+  construction and fill; "Uncertainty:" states the dominant uncertainty and one
+  concrete tip for the next scan.
 `;
 
 const responseFormat = {
@@ -793,15 +731,15 @@ const responseFormat = {
         additionalProperties: false,
         required: ["width", "height", "depth"],
         properties: {
-          width: {type: "number", minimum: 0},
-          height: {type: "number", minimum: 0},
-          depth: {type: "number", minimum: 0},
+          width: {type: "number", exclusiveMinimum: 0},
+          height: {type: "number", exclusiveMinimum: 0},
+          depth: {type: "number", exclusiveMinimum: 0},
         },
       },
       assumptions: {
         type: "array",
-        minItems: 1,
-        maxItems: 6,
+        minItems: 3,
+        maxItems: 3,
         items: {type: "string"},
       },
     },

@@ -13,26 +13,23 @@ import '../data/estimate_repository_factory.dart';
 import '../data/photo_picker.dart';
 import '../data/scan_image_processor.dart';
 import '../domain/estimate_repository.dart';
-import '../domain/measurement_capture.dart';
-import '../domain/measured_dimensions.dart';
-import 'capture/measurement_launcher.dart';
+import 'capture/camera_launcher.dart';
 
 class ScanScreen extends StatefulWidget {
   ScanScreen({
     EstimateRepository? estimateRepository,
     PhotoPicker? photoPicker,
-    MeasurementLauncher? measurementLauncher,
+    CameraLauncher? cameraLauncher,
     this.autoStart = true,
     this.startWithGallery = false,
     super.key,
   }) : estimateRepository = estimateRepository ?? buildEstimateRepository(),
        photoPicker = photoPicker ?? DevicePhotoPicker(),
-       measurementLauncher =
-           measurementLauncher ?? const DeviceMeasurementLauncher();
+       cameraLauncher = cameraLauncher ?? const DeviceCameraLauncher();
 
   final EstimateRepository estimateRepository;
   final PhotoPicker photoPicker;
-  final MeasurementLauncher measurementLauncher;
+  final CameraLauncher cameraLauncher;
   final bool autoStart;
   final bool startWithGallery;
 
@@ -60,16 +57,15 @@ class _ScanScreenState extends State<ScanScreen> {
     'Full',
   ];
   static const _references = ['None', 'Ruler', 'Standard card'];
-  static const _axes = ['Width', 'Height', 'Depth'];
+  static const _axes = ['Length', 'Width', 'Height'];
 
   final _dimensionController = TextEditingController();
   String? _imagePath;
   String? _secondaryImagePath;
-  MeasuredDimensions? _measuredDimensions;
   String _material = 'Unknown';
   String _fillState = 'Unknown';
   String _referenceObject = 'None';
-  String _dimensionAxis = 'Width';
+  String _dimensionAxis = 'Length';
   String _dimensionUnit = 'cm';
   bool _isPicking = false;
   bool _isAnalyzing = false;
@@ -90,7 +86,7 @@ class _ScanScreenState extends State<ScanScreen> {
         if (widget.startWithGallery) {
           unawaited(_captureFromGallery());
         } else {
-          unawaited(_captureMeasured());
+          unawaited(_capturePhoto());
         }
       });
     }
@@ -103,7 +99,7 @@ class _ScanScreenState extends State<ScanScreen> {
     super.dispose();
   }
 
-  Future<void> _captureMeasured() async {
+  Future<void> _capturePhoto() async {
     if (_isPicking) return;
     setState(() {
       _isPicking = true;
@@ -111,12 +107,12 @@ class _ScanScreenState extends State<ScanScreen> {
       _requestId = null;
     });
     try {
-      final capture = await widget.measurementLauncher.launch(context);
-      if (!mounted || capture == null) return;
-      _acceptCapture(capture);
+      final imagePath = await widget.cameraLauncher.launch(context);
+      if (!mounted || imagePath == null) return;
+      _acceptImage(imagePath);
     } on Object {
       if (mounted) {
-        setState(() => _error = 'Measurement camera could not be opened.');
+        setState(() => _error = 'The camera could not be opened.');
       }
     } finally {
       if (mounted) setState(() => _isPicking = false);
@@ -132,14 +128,7 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       final imagePath = await widget.photoPicker.pick(PhotoSource.gallery);
       if (!mounted || imagePath == null) return;
-      MeasuredDimensions? dimensions;
-      if (File(imagePath).existsSync()) {
-        dimensions = await launchPhotoMeasurement(context, imagePath);
-        if (!mounted) return;
-      }
-      _acceptCapture(
-        MeasurementCapture(imagePath: imagePath, dimensions: dimensions),
-      );
+      _acceptImage(imagePath);
     } on Object {
       if (mounted) {
         setState(() => _error = 'The selected photo could not be opened.');
@@ -149,27 +138,14 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  void _acceptCapture(MeasurementCapture capture) {
+  void _acceptImage(String imagePath) {
     setState(() {
-      _imagePath = capture.imagePath;
+      _imagePath = imagePath;
       _secondaryImagePath = null;
-      _measuredDimensions = capture.dimensions;
       _result = null;
       _saved = false;
       _error = null;
     });
-  }
-
-  Future<void> _editMeasurement() async {
-    final imagePath = _imagePath;
-    if (imagePath == null || !File(imagePath).existsSync()) return;
-    final measured = await launchPhotoMeasurement(context, imagePath);
-    if (mounted && measured != null) {
-      setState(() {
-        _measuredDimensions = measured;
-        _requestId = null;
-      });
-    }
   }
 
   Future<void> _pickSecondary(PhotoSource source) async {
@@ -202,7 +178,6 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   KnownDimensionInput? _knownDimension() {
-    if (_measuredDimensions != null) return null;
     final text = _dimensionController.text.trim().replaceAll(',', '.');
     if (text.isEmpty) return null;
     final value = double.tryParse(text);
@@ -240,7 +215,7 @@ class _ScanScreenState extends State<ScanScreen> {
         if (warnings.isNotEmpty) {
           final useAnyway = await _showScanCoach(warnings.toSet().toList());
           if (!mounted || !useAnyway) {
-            if (mounted && !useAnyway) unawaited(_captureMeasured());
+            if (mounted && !useAnyway) unawaited(_capturePhoto());
             return;
           }
         }
@@ -293,7 +268,7 @@ class _ScanScreenState extends State<ScanScreen> {
     });
     _startProgress(run);
     try {
-      var result = await widget.estimateRepository.analyze(
+      final result = await widget.estimateRepository.analyze(
         EstimateRequest(
           imagePath: imagePath,
           requestId: _requestId!,
@@ -302,22 +277,9 @@ class _ScanScreenState extends State<ScanScreen> {
           fillState: _fillState,
           referenceObject: _referenceObject,
           knownDimension: knownDimension,
-          measuredDimensions: _measuredDimensions,
         ),
       );
       if (!mounted || run != _analysisRun) return;
-      final measured = _measuredDimensions;
-      if (measured != null) {
-        final measurementNote =
-            '${measured.formatSummary()} measured with ${measured.sourceLabel}';
-        result = result.copyWith(
-          dimensions: measured.mergeWith(result.dimensions),
-          assumptions: [
-            measurementNote,
-            ...result.assumptions.where((item) => item != measurementNote),
-          ],
-        );
-      }
       setState(() {
         _analysisTimer?.cancel();
         _result = result;
@@ -418,11 +380,10 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() {
       _imagePath = null;
       _secondaryImagePath = null;
-      _measuredDimensions = null;
       _material = 'Unknown';
       _fillState = 'Unknown';
       _referenceObject = 'None';
-      _dimensionAxis = 'Width';
+      _dimensionAxis = 'Length';
       _dimensionUnit = 'cm';
       _dimensionController.clear();
       _isAnalyzing = false;
@@ -450,6 +411,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
           return SafeArea(
             top: false,
+            maintainBottomViewPadding: true,
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                 20,
@@ -496,90 +458,67 @@ class _ScanScreenState extends State<ScanScreen> {
                         ),
                     ],
                   ),
-                  if (_measuredDimensions == null) ...[
-                    const SizedBox(height: 20),
-                    const _SheetLabel('Known size'),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _dimensionAxis,
-                            items: [
-                              for (final item in _axes)
-                                DropdownMenuItem(
-                                  value: item,
-                                  child: Text(item),
-                                ),
-                            ],
-                            onChanged: (value) => update(
-                              () => _dimensionAxis = value ?? _dimensionAxis,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            key: const Key('known_dimension_field'),
-                            controller: _dimensionController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) => _requestId = null,
-                            decoration: InputDecoration(
-                              suffixText: _dimensionUnit,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        SegmentedButton<String>(
-                          segments: const [
-                            ButtonSegment(value: 'cm', label: Text('cm')),
-                            ButtonSegment(value: 'in', label: Text('in')),
-                          ],
-                          selected: {_dimensionUnit},
-                          onSelectionChanged: (value) =>
-                              update(() => _dimensionUnit = value.single),
-                          showSelectedIcon: false,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const _SheetLabel('Visible reference'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final item in _references)
-                          ChoiceChip(
-                            key: Key('reference_$item'),
-                            label: Text(item),
-                            selected: _referenceObject == item,
-                            onSelected: (_) =>
-                                update(() => _referenceObject = item),
-                          ),
-                      ],
-                    ),
-                  ],
                   const SizedBox(height: 20),
-                  OutlinedButton.icon(
-                    key: const Key('add_second_photo_button'),
-                    onPressed: () async {
-                      Navigator.of(sheetContext).pop();
-                      await _showSecondAnglePicker();
-                    },
-                    icon: Icon(
-                      _secondaryImagePath == null
-                          ? Icons.add_a_photo_outlined
-                          : Icons.refresh_rounded,
-                    ),
-                    label: Text(
-                      _secondaryImagePath == null
-                          ? 'Add second angle'
-                          : 'Replace second angle',
-                    ),
-                  ),
+                  const _SheetLabel('Known size (optional)'),
                   const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _dimensionAxis,
+                          items: [
+                            for (final item in _axes)
+                              DropdownMenuItem(value: item, child: Text(item)),
+                          ],
+                          onChanged: (value) => update(
+                            () => _dimensionAxis = value ?? _dimensionAxis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          key: const Key('known_dimension_field'),
+                          controller: _dimensionController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          onChanged: (_) => _requestId = null,
+                          decoration: InputDecoration(
+                            suffixText: _dimensionUnit,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment(value: 'cm', label: Text('cm')),
+                          ButtonSegment(value: 'in', label: Text('in')),
+                        ],
+                        selected: {_dimensionUnit},
+                        onSelectionChanged: (value) =>
+                            update(() => _dimensionUnit = value.single),
+                        showSelectedIcon: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const _SheetLabel('Visible reference'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final item in _references)
+                        ChoiceChip(
+                          key: Key('reference_$item'),
+                          label: Text(item),
+                          selected: _referenceObject == item,
+                          onSelected: (_) =>
+                              update(() => _referenceObject = item),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                   FilledButton(
                     onPressed: () => Navigator.of(sheetContext).pop(),
                     child: const Text('Done'),
@@ -641,18 +580,19 @@ class _ScanScreenState extends State<ScanScreen> {
                   key: const ValueKey('capture'),
                   busy: _isPicking,
                   error: _error,
-                  onMeasure: _captureMeasured,
+                  onCapture: _capturePhoto,
                   onGallery: _captureFromGallery,
                 )
               : _ReviewView(
                   key: const ValueKey('review'),
                   imagePath: _imagePath!,
                   secondImagePath: _secondaryImagePath,
-                  measured: _measuredDimensions,
                   error: _error,
-                  onEditMeasurement: _editMeasurement,
-                  onClearMeasurement: () =>
-                      setState(() => _measuredDimensions = null),
+                  onAddSideView: _showSecondAnglePicker,
+                  onRemoveSideView: () => setState(() {
+                    _secondaryImagePath = null;
+                    _requestId = null;
+                  }),
                   onDetails: _showDetails,
                   onAnalyze: _analyze,
                 ),
@@ -666,14 +606,14 @@ class _CaptureView extends StatelessWidget {
   const _CaptureView({
     required this.busy,
     required this.error,
-    required this.onMeasure,
+    required this.onCapture,
     required this.onGallery,
     super.key,
   });
 
   final bool busy;
   final String? error;
-  final VoidCallback onMeasure;
+  final VoidCallback onCapture;
   final VoidCallback onGallery;
 
   @override
@@ -692,7 +632,7 @@ class _CaptureView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Measure an object',
+                    'Photograph an object',
                     style: Theme.of(context).textTheme.headlineLarge,
                   ),
                   const SizedBox(height: 24),
@@ -704,7 +644,7 @@ class _CaptureView extends StatelessWidget {
                   ],
                   FilledButton.icon(
                     key: const Key('open_camera_button'),
-                    onPressed: busy ? null : onMeasure,
+                    onPressed: busy ? null : onCapture,
                     icon: busy
                         ? const SizedBox(
                             width: 18,
@@ -712,13 +652,13 @@ class _CaptureView extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.photo_camera_outlined),
-                    label: const Text('Measure'),
+                    label: const Text('Take photo'),
                   ),
                   TextButton.icon(
                     key: const Key('gallery_button'),
                     onPressed: busy ? null : onGallery,
                     icon: const Icon(Icons.photo_library_outlined),
-                    label: const Text('Photo'),
+                    label: const Text('Choose from gallery'),
                   ),
                 ],
               ),
@@ -759,38 +699,41 @@ class _ScanFramePainter extends CustomPainter {
       border,
     );
 
-    final guide = Paint()
-      ..color = AppColors.ink.withValues(alpha: 0.09)
-      ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(size.width / 2, 18),
-      Offset(size.width / 2, size.height - 18),
-      guide,
+    final objectRect = Rect.fromCenter(
+      center: size.center(Offset.zero),
+      width: size.width * 0.28,
+      height: size.height * 0.48,
     );
-    canvas.drawLine(
-      Offset(18, size.height / 2),
-      Offset(size.width - 18, size.height / 2),
-      guide,
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(objectRect, const Radius.circular(18)),
+      Paint()..color = AppColors.navySoft,
     );
 
-    final line = Paint()
-      ..color = AppColors.ink
-      ..strokeWidth = 2.3
-      ..strokeCap = StrokeCap.round;
-    final accent = Paint()
+    final cornerPaint = Paint()
       ..color = AppColors.limeDark
-      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
       ..strokeCap = StrokeCap.round;
-    final a = Offset(size.width * 0.28, size.height * 0.58);
-    final b = Offset(size.width * 0.72, size.height * 0.58);
-    final c = Offset(size.width * 0.72, size.height * 0.30);
-    canvas.drawLine(a, b, accent);
-    canvas.drawLine(b, c, line);
-    for (final point in [a, b, c]) {
-      canvas.drawCircle(point, 8, Paint()..color = AppColors.surface);
-      canvas.drawCircle(point, 8, line..style = PaintingStyle.stroke);
-      line.style = PaintingStyle.fill;
-      canvas.drawCircle(point, 2.5, line);
+    const inset = 22.0;
+    final length = math.min(30.0, size.shortestSide * 0.16);
+    for (final origin in [
+      const Offset(inset, inset),
+      Offset(size.width - inset, inset),
+      Offset(inset, size.height - inset),
+      Offset(size.width - inset, size.height - inset),
+    ]) {
+      final xDirection = origin.dx < size.width / 2 ? 1.0 : -1.0;
+      final yDirection = origin.dy < size.height / 2 ? 1.0 : -1.0;
+      canvas.drawLine(
+        origin,
+        origin + Offset(length * xDirection, 0),
+        cornerPaint,
+      );
+      canvas.drawLine(
+        origin,
+        origin + Offset(0, length * yDirection),
+        cornerPaint,
+      );
     }
   }
 
@@ -802,10 +745,9 @@ class _ReviewView extends StatelessWidget {
   const _ReviewView({
     required this.imagePath,
     required this.secondImagePath,
-    required this.measured,
     required this.error,
-    required this.onEditMeasurement,
-    required this.onClearMeasurement,
+    required this.onAddSideView,
+    required this.onRemoveSideView,
     required this.onDetails,
     required this.onAnalyze,
     super.key,
@@ -813,10 +755,9 @@ class _ReviewView extends StatelessWidget {
 
   final String imagePath;
   final String? secondImagePath;
-  final MeasuredDimensions? measured;
   final String? error;
-  final VoidCallback onEditMeasurement;
-  final VoidCallback onClearMeasurement;
+  final VoidCallback onAddSideView;
+  final VoidCallback onRemoveSideView;
   final VoidCallback onDetails;
   final VoidCallback onAnalyze;
 
@@ -854,40 +795,12 @@ class _ReviewView extends StatelessWidget {
             ),
           ),
         ),
-        if (measured case final dimensions?) ...[
-          const SizedBox(height: 10),
-          _MeasurementRow(
-            measured: dimensions,
-            onEdit: onEditMeasurement,
-            onClear: onClearMeasurement,
-          ),
-        ],
-        if (secondImagePath != null) ...[
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              ClipRRect(
-                key: const Key('second_photo_preview'),
-                borderRadius: BorderRadius.circular(6),
-                child: Image.file(
-                  File(secondImagePath!),
-                  width: 42,
-                  height: 42,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 42,
-                    height: 42,
-                    color: AppColors.navySoft,
-                    child: const Icon(Icons.photo_outlined),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text('Second angle added'),
-            ],
-          ),
-        ],
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
+        _SideViewCard(
+          imagePath: secondImagePath,
+          onAddOrReplace: onAddSideView,
+          onRemove: onRemoveSideView,
+        ),
         if (error != null) ...[
           const SizedBox(height: 12),
           _InlineError(error!),
@@ -919,39 +832,70 @@ class _ReviewView extends StatelessWidget {
   }
 }
 
-class _MeasurementRow extends StatelessWidget {
-  const _MeasurementRow({
-    required this.measured,
-    required this.onEdit,
-    required this.onClear,
+class _SideViewCard extends StatelessWidget {
+  const _SideViewCard({
+    required this.imagePath,
+    required this.onAddOrReplace,
+    required this.onRemove,
   });
 
-  final MeasuredDimensions measured;
-  final VoidCallback onEdit;
-  final VoidCallback onClear;
+  final String? imagePath;
+  final VoidCallback onAddOrReplace;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border.all(color: AppColors.limeDark.withValues(alpha: 0.35)),
+        border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (imagePath == null)
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.navySoft,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.add_photo_alternate_outlined, size: 24),
+            )
+          else
+            ClipRRect(
+              key: const Key('second_photo_preview'),
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(
+                File(imagePath!),
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  width: 48,
+                  height: 48,
+                  color: AppColors.navySoft,
+                  child: const Icon(Icons.photo_outlined),
+                ),
+              ),
+            ),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  measured.formatSummary(),
-                  key: const Key('measured_summary'),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  imagePath == null ? 'Add side view' : 'Side view added',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  measured.sourceLabel,
+                  imagePath == null
+                      ? 'Optional · move 45–90° around the same object'
+                      : 'Another angle helps AI infer shape and volume',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(fontSize: 11),
@@ -959,16 +903,18 @@ class _MeasurementRow extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Edit dimensions',
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 20),
+          TextButton(
+            key: const Key('add_second_photo_button'),
+            onPressed: onAddOrReplace,
+            child: Text(imagePath == null ? 'Add' : 'Replace'),
           ),
-          IconButton(
-            tooltip: 'Remove dimensions',
-            onPressed: onClear,
-            icon: const Icon(Icons.close_rounded, size: 20),
-          ),
+          if (imagePath != null)
+            IconButton(
+              key: const Key('remove_second_photo_button'),
+              tooltip: 'Remove side view',
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded, size: 20),
+            ),
         ],
       ),
     );
@@ -1096,8 +1042,11 @@ class _ResultView extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _ResultFact(
-          label: 'Dimensions',
-          value: formatDimensions(measurement.dimensions, unitSystem),
+          label: 'AI visual size · L × W × H',
+          value: formatApproximateDimensions(
+            measurement.dimensions,
+            unitSystem,
+          ),
         ),
         _ResultFact(label: 'Confidence', value: measurement.confidence.name),
         const SizedBox(height: 8),
@@ -1198,6 +1147,7 @@ class _SecondAngleSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
+      maintainBottomViewPadding: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Column(
@@ -1205,10 +1155,16 @@ class _SecondAngleSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Second angle',
+              'Add a side view',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 7),
+            Text(
+              'Move 45–90° around the same object and keep the whole object '
+              'visible. This uses the same scan credit.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => Navigator.pop(context, PhotoSource.camera),
               icon: const Icon(Icons.photo_camera_outlined),

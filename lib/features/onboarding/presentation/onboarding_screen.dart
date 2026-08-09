@@ -18,10 +18,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const _pages = [
     _OnboardingData(
       eyebrow: 'Visual estimation',
-      title: 'Measure what\nyou cannot weigh.',
+      title: 'Estimate what\nyou cannot weigh.',
       description:
-          'Capture an object and get a useful weight range, dimensions, and '
-          'the assumptions behind the estimate.',
+          'Capture an object and get a useful weight range, AI-assumed size, '
+          'and the assumptions behind the estimate.',
       icon: Icons.center_focus_strong_rounded,
     ),
     _OnboardingData(
@@ -44,8 +44,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       eyebrow: 'Ads fund every scan',
       title: 'No subscription.\nNo scan packs.',
       description:
-          'Your first three AI scans are included. After that, one verified '
-          'rewarded ad earns one real AI scan.',
+          'Your first three AI scans are included. After that, finish one '
+          'rewarded ad to add one real AI scan.',
       icon: Icons.play_circle_outline_rounded,
     ),
   ];
@@ -125,7 +125,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     iconAlignment: IconAlignment.end,
                     label: Text(
                       _page == _pages.length - 1
-                          ? 'Start measuring'
+                          ? 'Start scanning'
                           : 'Continue',
                     ),
                   ),

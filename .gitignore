@@ -38,6 +38,7 @@ migrate_working_dir/
 worker/node_modules/
 .wrangler/
 eval/private_dataset/
+eval/manifest.json
 
 # Symbolication related
 app.*.symbols

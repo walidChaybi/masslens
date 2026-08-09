@@ -287,16 +287,13 @@ class AppAdService {
     _loadAppOpen();
   }
 
-  Future<bool> showRewarded({required String clientId}) async {
+  Future<bool> showRewarded({required void Function() onClientEarned}) async {
     if (!rewardedReady) {
       _loadRewarded();
       return false;
     }
     final ad = _rewarded!;
     _rewarded = null;
-    await ad.setServerSideOptions(
-      ServerSideVerificationOptions(userId: clientId),
-    );
     ad.onPaidEvent = (ad, value, precision, currency) {
       onPaidEvent?.call('rewarded', value, precision, currency);
     };
@@ -316,7 +313,9 @@ class AppAdService {
     );
     await ad.show(
       onUserEarnedReward: (_, _) {
+        if (didEarn) return;
         didEarn = true;
+        onClientEarned();
       },
     );
     return dismissed.future;

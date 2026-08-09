@@ -139,6 +139,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
   const clientId = "abcdefghijklmnopqrstuvwx";
   const seenImageCounts = [];
   const seenPrompts = [];
+  const seenDeveloperPrompts = [];
   const estimate = {
     object_label: "Ceramic mug",
     category: "Household",
@@ -147,7 +148,11 @@ test("one or two views are proxied without exposing the client identifier", asyn
     upper_bound_grams: 450,
     confidence: "medium",
     dimensions_mm: {width: 85, height: 105, depth: 85},
-    assumptions: ["No visible scale reference"],
+    assumptions: [
+      "Size: inferred from familiar mug proportions",
+      "Material: hollow ceramic with no visible contents",
+      "Uncertainty: no scale reference; add a side view",
+    ],
   };
 
   globalThis.fetch = async (url, options) => {
@@ -167,6 +172,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
     ).text;
     seenImageCounts.push(imageParts.length);
     seenPrompts.push(prompt);
+    seenDeveloperPrompts.push(body.input[0].content[0].text);
     assert.ok(imageParts.every((part) => part.detail === "low"));
     return new Response(
       JSON.stringify({
@@ -214,12 +220,13 @@ test("one or two views are proxied without exposing the client identifier", asyn
           material: "Metal",
           fillState: "Partly filled",
           referenceObject: "Standard card",
-          knownDimension: {axis: "Width", value: 12.5, unit: "cm"},
+          knownDimension: {axis: "Length", value: 12.5, unit: "cm"},
+          // A legacy client field must be tolerated but ignored completely.
           measuredDimensions: {
             widthMm: 142.4,
             heightMm: 90.1,
             depthMm: 61,
-            method: "arcore_depth",
+            method: "removed_magic_camera",
           },
         }),
       }),
@@ -231,70 +238,69 @@ test("one or two views are proxied without exposing the client identifier", asyn
     assert.deepEqual(seenImageCounts, [1, 2]);
     assert.match(seenPrompts[1], /Material: Metal/);
     assert.match(seenPrompts[1], /Fill state: Partly filled/);
-    assert.match(seenPrompts[1], /Visible reference: Standard card/);
-    assert.match(seenPrompts[1], /Width: 12\.5 cm/);
-    assert.match(seenPrompts[1], /Measured dimensions: width 142\.4 mm/);
-    assert.match(seenPrompts[1], /height 90\.1 mm, depth 61 mm/);
-    assert.match(seenPrompts[1], /method arcore_depth/);
-    assert.match(seenPrompts[1], /Preserve supplied measured axes exactly/);
-    assert.match(seenPrompts[1], /Infer the object category/);
+    assert.match(seenPrompts[1], /Claimed visible reference: Standard card/);
+    assert.match(seenPrompts[1], /Already-known side: Length: 12\.5 cm/);
+    assert.doesNotMatch(
+      seenPrompts[1],
+      /142\.4|90\.1|removed_magic_camera/i,
+    );
+    assert.match(seenPrompts[1], /45-90 degree side view/);
+    assert.match(seenDeveloperPrompts[1], /volume times/);
+    assert.match(
+      seenDeveloperPrompts[1],
+      /Return exactly three short assumptions/,
+    );
+    assert.doesNotMatch(
+      seenDeveloperPrompts[1],
+      /\bARCore\b|calibrated tracing/i,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("estimate endpoint rejects invalid measured dimensions", async () => {
-  const response = await worker.fetch(
-    new Request("https://masslens.example/estimate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
-        "X-MassLens-Request-ID": "request_identifier_000003",
-      },
-      body: JSON.stringify({
-        images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
-        measuredDimensions: {
-          widthMm: 142.4,
-          heightMm: 3,
-          method: "magic_camera",
-        },
-      }),
+test("AI estimates require positive dimensions and three evidence summaries", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({
+      output: [{
+        content: [{
+          text: JSON.stringify({
+            object_label: "Unknown object",
+            category: "Other",
+            estimate_grams: 100,
+            lower_bound_grams: 50,
+            upper_bound_grams: 150,
+            confidence: "low",
+            dimensions_mm: {width: 0, height: 10, depth: 10},
+            assumptions: ["Size: no scale reference"],
+          }),
+        }],
+      }],
     }),
-    env,
+    {status: 200, headers: {"Content-Type": "application/json"}},
   );
 
-  assert.equal(response.status, 400);
-  assert.equal((await response.json()).error.code, "invalid_request");
-});
-
-test("measured dimension validation enforces shape, bounds, and methods", async () => {
-  const invalidValues = [
-    "not-an-object",
-    {widthMm: 5001, heightMm: 90, method: "arcore_plane"},
-    {widthMm: 140, heightMm: 90, method: "visual_guess"},
-    {widthMm: 140, heightMm: 90, method: "photo_reference"},
-  ];
-
-  for (const measuredDimensions of invalidValues) {
+  try {
     const response = await worker.fetch(
       new Request("https://masslens.example/estimate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
-          "X-MassLens-Request-ID": `request_identifier_invalid_${invalidValues.indexOf(measuredDimensions)}`,
+          "X-MassLens-Request-ID": "request_identifier_invalid_ai_output",
         },
         body: JSON.stringify({
           images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
-          measuredDimensions,
         }),
       }),
       env,
     );
 
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).error.code, "invalid_request");
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).error.code, "provider_error");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 

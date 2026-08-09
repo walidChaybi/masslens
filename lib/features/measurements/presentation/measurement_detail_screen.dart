@@ -202,18 +202,18 @@ class MeasurementSummary extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _ResultSection(
-          title: 'Estimated dimensions',
+          title: 'AI visual size',
           icon: Icons.straighten_rounded,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                formatDimensions(measurement.dimensions, unitSystem),
+                formatApproximateDimensions(measurement.dimensions, unitSystem),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 5),
               Text(
-                'Width × height × depth',
+                'Length × width × height · visual assumption',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],

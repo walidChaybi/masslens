@@ -1,7 +1,0 @@
-MassLens uses the Google ARCore SDK and follows the lifecycle and rendering
-patterns demonstrated by Google's ARCore Android sample applications.
-
-ARCore Android SDK samples
-Copyright 2017 Google LLC
-Licensed under the Apache License, Version 2.0.
-https://github.com/google-ar/arcore-android-sdk

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../../measurements/domain/measurement.dart';
-import 'measured_dimensions.dart';
 
 class KnownDimensionInput {
   const KnownDimensionInput({
@@ -29,7 +28,6 @@ class EstimateRequest {
     this.fillState = 'Unknown',
     this.referenceObject = 'None',
     this.knownDimension,
-    this.measuredDimensions,
   });
 
   final String imagePath;
@@ -39,7 +37,6 @@ class EstimateRequest {
   final String fillState;
   final String referenceObject;
   final KnownDimensionInput? knownDimension;
-  final MeasuredDimensions? measuredDimensions;
 }
 
 abstract final class ScanRequestId {
