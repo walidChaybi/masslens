@@ -116,38 +116,42 @@ class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          ListView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
-            children: [
-              MeasurementSummary(
-                measurement: widget.measurement,
-                unitSystem: AppScope.of(context).unitSystem,
-              ),
-            ],
-          ),
-          Positioned(
-            left: -12000,
-            top: 0,
-            child: RepaintBoundary(
-              key: _shareCardKey,
-              child: MeasurementShareCard(
-                measurement: widget.measurement,
-                unitSystem: AppScope.of(context).unitSystem,
-                localeName: Localizations.localeOf(context).toLanguageTag(),
-                funComparisonText: widget.measurement.isFoodPlate
-                    ? null
-                    : switch (buildFunWeightComparisons(
-                        widget.measurement.estimateGrams,
-                      )) {
-                        final fun? => localizedFunWeightComparison(l10n, fun),
-                        null => null,
-                      },
+      body: SafeArea(
+        top: false,
+        maintainBottomViewPadding: true,
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 34),
+              children: [
+                MeasurementSummary(
+                  measurement: widget.measurement,
+                  unitSystem: AppScope.of(context).unitSystem,
+                ),
+              ],
+            ),
+            Positioned(
+              left: -12000,
+              top: 0,
+              child: RepaintBoundary(
+                key: _shareCardKey,
+                child: MeasurementShareCard(
+                  measurement: widget.measurement,
+                  unitSystem: AppScope.of(context).unitSystem,
+                  localeName: Localizations.localeOf(context).toLanguageTag(),
+                  funComparisonText: widget.measurement.isFoodPlate
+                      ? null
+                      : switch (buildFunWeightComparisons(
+                          widget.measurement.estimateGrams,
+                        )) {
+                          final fun? => localizedFunWeightComparison(l10n, fun),
+                          null => null,
+                        },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

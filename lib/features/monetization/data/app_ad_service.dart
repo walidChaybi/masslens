@@ -78,6 +78,7 @@ class AppAdService {
   bool _interstitialLoading = false;
   bool _interstitialShowing = false;
   bool _rewardedLoading = false;
+  bool _rewardedShowing = false;
   RewardedAd? _rewarded;
   AppOpenAd? _appOpenAd;
   InterstitialAdHandle? _interstitial;
@@ -99,12 +100,14 @@ class AppAdService {
   bool get rewardedReady =>
       canRequestAds &&
       AdMobConfig.hasRewardedConfiguration &&
-      _rewarded != null;
+      _rewarded != null &&
+      !_anyFullScreenAdShowing;
   bool get interstitialLoading => _interstitialLoading;
   bool get interstitialReady =>
       canRequestAds &&
       _hasInterstitialConfiguration &&
       _interstitial != null &&
+      !_anyFullScreenAdShowing &&
       !_interstitialShowing &&
       _interstitialCooldownElapsed(_now());
   bool get privacyOptionsRequired => _privacyOptionsRequired;
@@ -112,6 +115,9 @@ class AppAdService {
   bool get _hasInterstitialConfiguration =>
       _testInterstitialConfiguration ||
       AdMobConfig.hasInterstitialConfiguration;
+
+  bool get _anyFullScreenAdShowing =>
+      _appOpenShowing || _interstitialShowing || _rewardedShowing;
 
   Future<void> updatePlan({
     required bool adsAllowed,
@@ -251,7 +257,7 @@ class AppAdService {
     Duration timeout = const Duration(seconds: 4),
   }) async {
     if (interstitialReady) return true;
-    if (_interstitialShowing || !_interstitialCooldownElapsed(_now())) {
+    if (_anyFullScreenAdShowing || !_interstitialCooldownElapsed(_now())) {
       return false;
     }
     try {
@@ -337,7 +343,7 @@ class AppAdService {
 
   Future<bool> _showInterstitial({required String placement}) async {
     if (!canRequestAds ||
-        _interstitialShowing ||
+        _anyFullScreenAdShowing ||
         !_interstitialCooldownElapsed(_now())) {
       return false;
     }
@@ -407,7 +413,7 @@ class AppAdService {
   }
 
   Future<bool> showAppOpenAfterLongBackground(Duration backgroundTime) async {
-    if (!canRequestAds || _appOpenShowing) return false;
+    if (!canRequestAds || _anyFullScreenAdShowing) return false;
     if (!_policy.shouldShowAppOpen(
       backgroundTime: backgroundTime,
       now: DateTime.now(),
@@ -439,9 +445,14 @@ class AppAdService {
       onAdDismissedFullScreenContent: (ad) => _finishAppOpen(ad),
       onAdFailedToShowFullScreenContent: (ad, _) => _finishAppOpen(ad),
     );
-    await ad.show();
-    _lastAppOpenShownAt = DateTime.now();
-    return true;
+    try {
+      await ad.show();
+      _lastAppOpenShownAt = DateTime.now();
+      return true;
+    } on Object {
+      _finishAppOpen(ad);
+      return false;
+    }
   }
 
   void _finishAppOpen(AppOpenAd ad) {
@@ -451,12 +462,13 @@ class AppAdService {
   }
 
   Future<bool> showRewarded({required void Function() onClientEarned}) async {
-    if (!rewardedReady) {
+    if (!rewardedReady || _anyFullScreenAdShowing) {
       _loadRewarded();
       return false;
     }
     final ad = _rewarded!;
     _rewarded = null;
+    _rewardedShowing = true;
     ad.onPaidEvent = (ad, value, precision, currency) {
       onPaidEvent?.call('rewarded', value, precision, currency);
     };
@@ -465,22 +477,31 @@ class AppAdService {
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
+        _rewardedShowing = false;
         if (!dismissed.isCompleted) dismissed.complete(didEarn);
         _loadRewarded();
       },
       onAdFailedToShowFullScreenContent: (ad, _) {
         ad.dispose();
+        _rewardedShowing = false;
         if (!dismissed.isCompleted) dismissed.complete(false);
         _loadRewarded();
       },
     );
-    await ad.show(
-      onUserEarnedReward: (_, _) {
-        if (didEarn) return;
-        didEarn = true;
-        onClientEarned();
-      },
-    );
+    try {
+      await ad.show(
+        onUserEarnedReward: (_, _) {
+          if (didEarn) return;
+          didEarn = true;
+          onClientEarned();
+        },
+      );
+    } on Object {
+      ad.dispose();
+      _rewardedShowing = false;
+      if (!dismissed.isCompleted) dismissed.complete(false);
+      _loadRewarded();
+    }
     return dismissed.future;
   }
 
@@ -488,6 +509,7 @@ class AppAdService {
     _rewarded?.dispose();
     _rewarded = null;
     _rewardedLoading = false;
+    _rewardedShowing = false;
     _interstitial?.dispose();
     _interstitial = null;
     _activeInterstitial?.dispose();

@@ -12,12 +12,14 @@ Future<void> main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       systemNavigationBarColor: Color(0xFFFFFDF8),
       systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: true,
     ),
   );
 

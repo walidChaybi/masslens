@@ -29,9 +29,9 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
     widget.controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addObserver(this);
     if (widget.controller.monetization.enabled) {
-      // Only completed users wait behind the resume-ad overlay; new users go
-      // straight to onboarding while consent and inventory warm up beneath it.
-      _checkingResumeAd = _onboardingComplete;
+      // Consent and inventory warm up without blocking the first app frame.
+      // Cold launches never show an app-open ad; those are reserved for a
+      // genuine return from the background during this running session.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_initializeAdsForLaunch());
       });
@@ -54,20 +54,10 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeAdsForLaunch() async {
-    // Consent and ad inventory initialize on the very first frame so the
-    // onboarding pages can monetize immediately. Launch app-open ads remain
-    // reserved for users who already completed onboarding.
-    final allowLaunchAd = _onboardingComplete;
-    try {
-      await widget.controller.initializeMonetization();
-      final backgroundTime = await widget.controller
-          .consumePreviousBackgroundDuration();
-      if (allowLaunchAd && backgroundTime != null) {
-        await widget.controller.handleAppResumed(backgroundTime);
-      }
-    } finally {
-      if (mounted) setState(() => _checkingResumeAd = false);
-    }
+    await widget.controller.initializeMonetization();
+    // Clear a pause marker left by a killed process without turning a cold
+    // start into a second full-screen prompt immediately after UMP consent.
+    await widget.controller.consumePreviousBackgroundDuration();
   }
 
   @override

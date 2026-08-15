@@ -1315,46 +1315,50 @@ class _ScanEntrySheetState extends State<_ScanEntrySheet> {
   @override
   Widget build(BuildContext context) {
     final totals = widget.measurement.nutritionTotals;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.l10n.nutritionAddFromScanTitle,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              widget.measurement.mealLabel ?? widget.measurement.objectLabel,
-            ),
-            const SizedBox(height: 16),
-            _ReadOnlyNutrition(totals: totals),
-            const SizedBox(height: 16),
-            _DateTimeMealFields(
-              loggedAt: _loggedAt,
-              mealType: _mealType,
-              onDateChanged: (value) => setState(() => _loggedAt = value),
-              onMealChanged: (value) => setState(() => _mealType = value),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Text(_error!, style: const TextStyle(color: AppColors.coral)),
+    return SafeArea(
+      top: false,
+      maintainBottomViewPadding: true,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                context.l10n.nutritionAddFromScanTitle,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                widget.measurement.mealLabel ?? widget.measurement.objectLabel,
+              ),
+              const SizedBox(height: 16),
+              _ReadOnlyNutrition(totals: totals),
+              const SizedBox(height: 16),
+              _DateTimeMealFields(
+                loggedAt: _loggedAt,
+                mealType: _mealType,
+                onDateChanged: (value) => setState(() => _loggedAt = value),
+                onMealChanged: (value) => setState(() => _mealType = value),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(_error!, style: const TextStyle(color: AppColors.coral)),
+              ],
+              const SizedBox(height: 18),
+              FilledButton(
+                key: const Key('nutrition_save_scan_entry'),
+                onPressed: _save,
+                child: Text(context.l10n.commonSave),
+              ),
             ],
-            const SizedBox(height: 18),
-            FilledButton(
-              key: const Key('nutrition_save_scan_entry'),
-              onPressed: _save,
-              child: Text(context.l10n.commonSave),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1437,123 +1441,127 @@ class _ManualEntrySheetState extends State<_ManualEntrySheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                widget.existing == null
-                    ? l10n.nutritionAddManualTitle
-                    : l10n.nutritionEditEntryTitle,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                key: const Key('nutrition_label_field'),
-                controller: _labelController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: l10n.nutritionLabel,
-                  border: const OutlineInputBorder(),
+    return SafeArea(
+      top: false,
+      maintainBottomViewPadding: true,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  widget.existing == null
+                      ? l10n.nutritionAddManualTitle
+                      : l10n.nutritionEditEntryTitle,
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? l10n.nutritionRequiredLabel
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              _DateTimeMealFields(
-                loggedAt: _loggedAt,
-                mealType: _mealType,
-                onDateChanged: (value) => setState(() => _loggedAt = value),
-                onMealChanged: (value) => setState(() => _mealType = value),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _weightController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const Key('nutrition_label_field'),
+                  controller: _labelController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: l10n.nutritionLabel,
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? l10n.nutritionRequiredLabel
+                      : null,
                 ),
-                decoration: InputDecoration(
-                  labelText: l10n.nutritionWeightOptional,
-                  suffixText: 'g',
-                  border: const OutlineInputBorder(),
+                const SizedBox(height: 12),
+                _DateTimeMealFields(
+                  loggedAt: _loggedAt,
+                  mealType: _mealType,
+                  onDateChanged: (value) => setState(() => _loggedAt = value),
+                  onMealChanged: (value) => setState(() => _mealType = value),
                 ),
-                validator: (value) => _optionalPositiveValidator(value, l10n),
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                key: const Key('nutrition_calories_field'),
-                controller: _caloriesController,
-                label: l10n.nutritionCaloriesInput,
-                suffix: l10n.nutritionCaloriesUnit,
-              ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final fields = [
-                    _NumberField(
-                      controller: _proteinController,
-                      label: l10n.nutritionProtein,
-                      suffix: 'g',
-                    ),
-                    _NumberField(
-                      controller: _carbsController,
-                      label: l10n.nutritionCarbs,
-                      suffix: 'g',
-                    ),
-                    _NumberField(
-                      controller: _fatController,
-                      label: l10n.nutritionFat,
-                      suffix: 'g',
-                    ),
-                  ];
-                  if (constraints.maxWidth < 430) {
-                    return Column(
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: l10n.nutritionWeightOptional,
+                    suffixText: 'g',
+                    border: const OutlineInputBorder(),
+                  ),
+                  validator: (value) => _optionalPositiveValidator(value, l10n),
+                ),
+                const SizedBox(height: 12),
+                _NumberField(
+                  key: const Key('nutrition_calories_field'),
+                  controller: _caloriesController,
+                  label: l10n.nutritionCaloriesInput,
+                  suffix: l10n.nutritionCaloriesUnit,
+                ),
+                const SizedBox(height: 12),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final fields = [
+                      _NumberField(
+                        controller: _proteinController,
+                        label: l10n.nutritionProtein,
+                        suffix: 'g',
+                      ),
+                      _NumberField(
+                        controller: _carbsController,
+                        label: l10n.nutritionCarbs,
+                        suffix: 'g',
+                      ),
+                      _NumberField(
+                        controller: _fatController,
+                        label: l10n.nutritionFat,
+                        suffix: 'g',
+                      ),
+                    ];
+                    if (constraints.maxWidth < 430) {
+                      return Column(
+                        children: [
+                          fields[0],
+                          const SizedBox(height: 10),
+                          fields[1],
+                          const SizedBox(height: 10),
+                          fields[2],
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        fields[0],
-                        const SizedBox(height: 10),
-                        fields[1],
-                        const SizedBox(height: 10),
-                        fields[2],
+                        Expanded(child: fields[0]),
+                        const SizedBox(width: 8),
+                        Expanded(child: fields[1]),
+                        const SizedBox(width: 8),
+                        Expanded(child: fields[2]),
                       ],
                     );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: fields[0]),
-                      const SizedBox(width: 8),
-                      Expanded(child: fields[1]),
-                      const SizedBox(width: 8),
-                      Expanded(child: fields[2]),
-                    ],
-                  );
-                },
-              ),
-              if (_formError != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _formError!,
-                  style: const TextStyle(color: AppColors.coral),
+                  },
+                ),
+                if (_formError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _formError!,
+                    style: const TextStyle(color: AppColors.coral),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                FilledButton(
+                  key: const Key('nutrition_save_manual_entry'),
+                  onPressed: _save,
+                  child: Text(l10n.commonSave),
                 ),
               ],
-              const SizedBox(height: 18),
-              FilledButton(
-                key: const Key('nutrition_save_manual_entry'),
-                onPressed: _save,
-                child: Text(l10n.commonSave),
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -148,180 +148,184 @@ class _RewardedScanBodyState extends State<_RewardedScanBody> {
         monetization.canRequestAds &&
         monetization.rewardedAdReady &&
         !monetization.rewardStartBlocked;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        22,
-        8,
-        22,
-        24 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MassLensLogo(compact: true),
-          const SizedBox(height: 18),
-          Eyebrow(l10n.rewardAdsFundAnalysis),
-          const SizedBox(height: 8),
-          Text(
-            l10n.rewardHeadline,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            l10n.rewardBody,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.inkMuted, height: 1.45),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border.all(color: AppColors.line),
-              borderRadius: BorderRadius.circular(20),
+    return SafeArea(
+      top: false,
+      maintainBottomViewPadding: true,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          22,
+          8,
+          22,
+          24 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const MassLensLogo(compact: true),
+            const SizedBox(height: 18),
+            Eyebrow(l10n.rewardAdsFundAnalysis),
+            const SizedBox(height: 8),
+            Text(
+              l10n.rewardHeadline,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
-            child: Row(
-              children: [
-                const Icon(Icons.confirmation_number_outlined),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        usageLabel,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        breakdownLabel,
-                        style: const TextStyle(
-                          color: AppColors.inkMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  l10n.rewardMaxBalance(access.rewardBalanceCap),
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 10),
+            Text(
+              l10n.rewardBody,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.inkMuted, height: 1.45),
             ),
-          ),
-          const SizedBox(height: 18),
-          if (monetization.hasPendingReward) ...[
+            const SizedBox(height: 20),
             Container(
-              key: const Key('reward_sync_pending'),
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.lime.withValues(alpha: 0.18),
-                border: Border.all(
-                  color: AppColors.limeDark.withValues(alpha: 0.35),
-                ),
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.surface,
+                border: Border.all(color: AppColors.line),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.sync_rounded, size: 22),
-                  const SizedBox(width: 10),
+                  const Icon(Icons.confirmation_number_outlined),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n.rewardSyncPending,
+                          usageLabel,
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
-                          l10n.rewardSafeToClose,
+                          breakdownLabel,
                           style: const TextStyle(
                             color: AppColors.inkMuted,
-                            fontSize: 11.5,
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  TextButton(
-                    key: const Key('check_reward_status'),
-                    onPressed: busy ? null : _check,
-                    child: Text(
-                      _checking ? l10n.rewardChecking : l10n.rewardCheck,
+                  Text(
+                    l10n.rewardMaxBalance(access.rewardBalanceCap),
+                    style: const TextStyle(
+                      color: AppColors.inkMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
+            if (monetization.hasPendingReward) ...[
+              Container(
+                key: const Key('reward_sync_pending'),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                decoration: BoxDecoration(
+                  color: AppColors.lime.withValues(alpha: 0.18),
+                  border: Border.all(
+                    color: AppColors.limeDark.withValues(alpha: 0.35),
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.sync_rounded, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.rewardSyncPending,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            l10n.rewardSafeToClose,
+                            style: const TextStyle(
+                              color: AppColors.inkMuted,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('check_reward_status'),
+                      onPressed: busy ? null : _check,
+                      child: Text(
+                        _checking ? l10n.rewardChecking : l10n.rewardCheck,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('watch_ad_for_scan'),
+                onPressed: canWatch ? _watch : null,
+                icon: Icon(
+                  busy
+                      ? Icons.shield_outlined
+                      : monetization.rewardStartBlocked
+                      ? Icons.schedule_rounded
+                      : Icons.play_circle_outline_rounded,
+                ),
+                label: Text(
+                  busy
+                      ? l10n.rewardAdding
+                      : monetization.rewardStartBlocked
+                      ? _retryText(context, retryAfter)
+                      : !monetization.canRequestAds
+                      ? l10n.rewardUnavailable
+                      : monetization.rewardedAdReady
+                      ? l10n.rewardWatchForOne
+                      : l10n.rewardLoading,
+                ),
+              ),
+            ),
+            if (!access.adsEnabled) ...[
+              const SizedBox(height: 12),
+              Text(
+                access.legacyScans > 0
+                    ? l10n.rewardUseLegacyFirst
+                    : l10n.rewardAccessStateUnavailable,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
+              ),
+            ] else if (!monetization.canRequestAds) ...[
+              const SizedBox(height: 12),
+              Text(
+                l10n.rewardConsentUnavailable,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
+              ),
+              if (monetization.privacyOptionsRequired)
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () => monetization.showPrivacyOptions(),
+                  child: Text(l10n.rewardPrivacyChoices),
+                ),
+            ] else if (!monetization.rewardedAdReady && !busy) ...[
+              const SizedBox(height: 10),
+              TextButton.icon(
+                key: const Key('retry_rewarded_ad'),
+                onPressed: _retryAd,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(l10n.rewardTryLoadingAgain),
+              ),
+            ],
           ],
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              key: const Key('watch_ad_for_scan'),
-              onPressed: canWatch ? _watch : null,
-              icon: Icon(
-                busy
-                    ? Icons.shield_outlined
-                    : monetization.rewardStartBlocked
-                    ? Icons.schedule_rounded
-                    : Icons.play_circle_outline_rounded,
-              ),
-              label: Text(
-                busy
-                    ? l10n.rewardAdding
-                    : monetization.rewardStartBlocked
-                    ? _retryText(context, retryAfter)
-                    : !monetization.canRequestAds
-                    ? l10n.rewardUnavailable
-                    : monetization.rewardedAdReady
-                    ? l10n.rewardWatchForOne
-                    : l10n.rewardLoading,
-              ),
-            ),
-          ),
-          if (!access.adsEnabled) ...[
-            const SizedBox(height: 12),
-            Text(
-              access.legacyScans > 0
-                  ? l10n.rewardUseLegacyFirst
-                  : l10n.rewardAccessStateUnavailable,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
-            ),
-          ] else if (!monetization.canRequestAds) ...[
-            const SizedBox(height: 12),
-            Text(
-              l10n.rewardConsentUnavailable,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
-            ),
-            if (monetization.privacyOptionsRequired)
-              TextButton(
-                onPressed: busy
-                    ? null
-                    : () => monetization.showPrivacyOptions(),
-                child: Text(l10n.rewardPrivacyChoices),
-              ),
-          ] else if (!monetization.rewardedAdReady && !busy) ...[
-            const SizedBox(height: 10),
-            TextButton.icon(
-              key: const Key('retry_rewarded_ad'),
-              onPressed: _retryAd,
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(l10n.rewardTryLoadingAgain),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
