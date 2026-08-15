@@ -9,6 +9,8 @@ import '../core/services/installation_id_store.dart';
 import '../features/measurements/data/measurement_store.dart';
 import '../features/measurements/domain/measurement.dart';
 import '../features/monetization/application/monetization_controller.dart';
+import '../features/nutrition/application/nutrition_diary_controller.dart';
+import '../features/nutrition/data/nutrition_log_store.dart';
 
 class AppController extends ChangeNotifier {
   AppController({
@@ -20,6 +22,7 @@ class AppController extends ChangeNotifier {
     UnitSystem unitSystem = UnitSystem.metric,
     DateTime? previousBackgroundedAt,
     MonetizationController? monetizationController,
+    NutritionDiaryController? nutritionDiaryController,
     AppReviewService? appReviewService,
   }) : _measurementStore = measurementStore,
        _measurements = List<Measurement>.from(measurements),
@@ -29,9 +32,12 @@ class AppController extends ChangeNotifier {
        _unitSystem = unitSystem,
        _previousBackgroundedAt = previousBackgroundedAt,
        _appReviewService = appReviewService ?? PlayAppReviewService(),
+       nutritionDiary =
+           nutritionDiaryController ?? NutritionDiaryController.empty(),
        monetization =
            monetizationController ?? MonetizationController.disabled() {
     monetization.addListener(notifyListeners);
+    nutritionDiary.addListener(notifyListeners);
   }
 
   static const _onboardingKey = 'mass_lens.onboarding_complete';
@@ -49,6 +55,7 @@ class AppController extends ChangeNotifier {
   final MeasurementStore _measurementStore;
   final AppReviewService _appReviewService;
   final MonetizationController monetization;
+  final NutritionDiaryController nutritionDiary;
   final List<Measurement> _measurements;
   bool _onboardingComplete;
   bool _onboardingReviewPromptHandled;
@@ -65,6 +72,7 @@ class AppController extends ChangeNotifier {
 
   static Future<AppController> bootstrap({
     MeasurementStore store = const MeasurementStore(),
+    NutritionLogStore nutritionStore = const NutritionLogStore(),
   }) async {
     var onboardingComplete = false;
     var onboardingReviewPromptHandled = false;
@@ -109,9 +117,11 @@ class AppController extends ChangeNotifier {
       // Defaults keep the app operational if preferences are unavailable.
     }
 
+    final measurements = await store.load();
+    final nutritionEntries = await nutritionStore.load();
     return AppController(
       measurementStore: store,
-      measurements: await store.load(),
+      measurements: measurements,
       onboardingComplete: kDebugMode && _forceOnboarding
           ? false
           : onboardingComplete,
@@ -120,6 +130,10 @@ class AppController extends ChangeNotifier {
       unitSystem: unitSystem,
       previousBackgroundedAt: previousBackgroundedAt,
       monetizationController: MonetizationController.create(),
+      nutritionDiaryController: NutritionDiaryController(
+        store: nutritionStore,
+        entries: nutritionEntries,
+      ),
     );
   }
 
@@ -291,6 +305,9 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     monetization
+      ..removeListener(notifyListeners)
+      ..dispose();
+    nutritionDiary
       ..removeListener(notifyListeners)
       ..dispose();
     super.dispose();

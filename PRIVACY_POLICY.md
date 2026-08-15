@@ -30,6 +30,11 @@ or saved history.
 Results are saved only when you choose Save. Saved result data and a private
 image copy remain in the app's local storage on your device. You can delete one
 saved result from its detail screen or delete all saved history in Settings.
+The optional Nutrition & Trends diary is also stored only on your device. It
+contains entries you add manually or explicitly copy from a saved Food Scale
+result; entries are never added automatically or sent to MassLens, OpenAI, or
+USDA. Nutrition entries can be edited, deleted individually, or cleared
+separately in Settings without deleting saved scans.
 Uninstalling the app also removes its local data, subject to Android backup
 settings controlled by you or the device.
 
@@ -62,9 +67,10 @@ and supporting ads.
 
 You may avoid AI processing by using only the Bluetooth reader or simulator,
 decline to save a result, remove saved history in Settings, change available ad
-privacy choices, or uninstall the app. For access, deletion, or privacy questions
-that cannot be handled on-device, contact [PRIVACY CONTACT EMAIL]. Include no
-sensitive health information or photos in your request.
+privacy choices, clear the separate local nutrition diary, or uninstall the
+app. For access, deletion, or privacy questions that cannot be handled
+on-device, contact [PRIVACY CONTACT EMAIL]. Include no sensitive health
+information or photos in your request.
 
 ## Children, security, and changes
 

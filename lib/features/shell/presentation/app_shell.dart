@@ -11,16 +11,25 @@ import '../../guide/presentation/guide_screen.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../measurements/domain/measurement.dart';
+import '../../nutrition/presentation/nutrition_screen.dart';
 import '../../scale/presentation/digital_scale_screen.dart';
 import '../../scan/presentation/scan_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 
-enum _AppDestination { digitalScale, aiScan, history, guide, settings }
+enum _AppDestination {
+  digitalScale,
+  aiScan,
+  nutrition,
+  history,
+  guide,
+  settings,
+}
 
 extension on _AppDestination {
   String label(AppLocalizations l10n) => switch (this) {
     _AppDestination.digitalScale => l10n.shellDigitalScale,
     _AppDestination.aiScan => l10n.shellAiWeightScan,
+    _AppDestination.nutrition => l10n.shellNutrition,
     _AppDestination.history => l10n.shellHistory,
     _AppDestination.guide => l10n.shellCaptureGuide,
     _AppDestination.settings => l10n.shellSettings,
@@ -139,7 +148,9 @@ class _AppShellState extends State<AppShell> {
         onMeasure: (mode) => _openScan(scanMode: mode),
         onGallery: (mode) => _openScan(scanMode: mode, startWithGallery: true),
         onViewHistory: () => _selectDestination(_AppDestination.history),
+        onOpenNutrition: () => _selectDestination(_AppDestination.nutrition),
       ),
+      const NutritionScreen(),
       HistoryScreen(onScan: _openScan),
       GuideScreen(onScan: _openScan),
       const SettingsScreen(),
@@ -204,6 +215,12 @@ class _AppShellState extends State<AppShell> {
               icon: const Icon(Icons.center_focus_strong_outlined),
               selectedIcon: const Icon(Icons.center_focus_strong_rounded),
               label: Text(l10n.shellAiWeightScan),
+            ),
+            NavigationDrawerDestination(
+              key: const Key('nav_nutrition'),
+              icon: const Icon(Icons.insights_outlined),
+              selectedIcon: const Icon(Icons.insights_rounded),
+              label: Text(l10n.shellNutrition),
             ),
             NavigationDrawerDestination(
               key: const Key('nav_history'),

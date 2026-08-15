@@ -417,10 +417,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homeScanFood => 'Escanear plato';
 
   @override
+  String get nutritionHomeTitle => 'Nutrición y tendencias';
+
+  @override
+  String get nutritionHomeBody =>
+      'Registra calorías y macros en este dispositivo';
+
+  @override
+  String nutritionHomeTodayCalories(int count) {
+    return '$count kcal registradas hoy';
+  }
+
+  @override
   String get shellDigitalScale => 'Báscula digital';
 
   @override
   String get shellAiWeightScan => 'Escaneo de peso por IA';
+
+  @override
+  String get shellNutrition => 'Nutrición';
 
   @override
   String get shellHistory => 'Historial';
@@ -447,6 +462,222 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get shellExitBody => '¿Seguro que quieres salir de la aplicación?';
+
+  @override
+  String get nutritionEyebrow => 'Registro diario privado';
+
+  @override
+  String get nutritionTitle => 'Nutrición y tendencias';
+
+  @override
+  String get nutritionLocalBadge => 'En el dispositivo';
+
+  @override
+  String get nutritionDayTab => 'Día';
+
+  @override
+  String get nutritionTrendsTab => 'Tendencias';
+
+  @override
+  String get nutritionPreviousDay => 'Día anterior';
+
+  @override
+  String get nutritionNextDay => 'Día siguiente';
+
+  @override
+  String get nutritionToday => 'Hoy';
+
+  @override
+  String get nutritionCaloriesUnit => 'kcal';
+
+  @override
+  String nutritionKcal(String value) {
+    return '$value kcal';
+  }
+
+  @override
+  String nutritionGrams(String value) {
+    return '$value g';
+  }
+
+  @override
+  String get nutritionProtein => 'Proteína';
+
+  @override
+  String get nutritionCarbs => 'Carbohidratos';
+
+  @override
+  String get nutritionFat => 'Grasa';
+
+  @override
+  String get nutritionProteinShort => 'P';
+
+  @override
+  String get nutritionCarbsShort => 'C';
+
+  @override
+  String get nutritionFatShort => 'G';
+
+  @override
+  String nutritionMacroCompact(int protein, int carbs, int fat) {
+    return 'P $protein g · C $carbs g · G $fat g';
+  }
+
+  @override
+  String nutritionMacroRingSemantics(
+    int calories,
+    int protein,
+    int carbs,
+    int fat,
+  ) {
+    return '$calories calorías, $protein gramos de proteína, $carbs gramos de carbohidratos y $fat gramos de grasa';
+  }
+
+  @override
+  String get nutritionPartialNotice =>
+      'Total parcial: al menos un alimento no tenía una coincidencia nutricional completa de USDA.';
+
+  @override
+  String get nutritionTrendPartialNotice =>
+      'Este periodo incluye totales parciales de alimentos sin coincidencia completa.';
+
+  @override
+  String get nutritionPartialShort => 'Parcial';
+
+  @override
+  String get nutritionMealsTitle => 'Comidas';
+
+  @override
+  String get nutritionAddFood => 'Añadir';
+
+  @override
+  String get nutritionNoEntriesTitle => 'Nada registrado este día';
+
+  @override
+  String get nutritionNoEntriesBody =>
+      'Añade un resultado de Food Scale guardado o introduce calorías y macros manualmente.';
+
+  @override
+  String get nutritionFromScans => 'Desde escaneos de comida';
+
+  @override
+  String get nutritionFromScansBody =>
+      'Copiar la nutrición corregida de un plato guardado';
+
+  @override
+  String get nutritionManual => 'Entrada manual';
+
+  @override
+  String get nutritionManualBody =>
+      'Introduce las calorías y macros de una comida';
+
+  @override
+  String get nutritionNoScansTitle => 'No hay escaneos disponibles';
+
+  @override
+  String get nutritionNoScansBody =>
+      'Guarda un escaneo de Comida y macros con nutrición USDA y vuelve aquí.';
+
+  @override
+  String get nutritionChooseScan => 'Elige un escaneo guardado';
+
+  @override
+  String get nutritionAddFromScanTitle => 'Añadir comida escaneada';
+
+  @override
+  String get nutritionAddManualTitle => 'Añadir nutrición manualmente';
+
+  @override
+  String get nutritionEditEntryTitle => 'Editar entrada nutricional';
+
+  @override
+  String get nutritionBreakfast => 'Desayuno';
+
+  @override
+  String get nutritionLunch => 'Almuerzo';
+
+  @override
+  String get nutritionDinner => 'Cena';
+
+  @override
+  String get nutritionSnack => 'Tentempié';
+
+  @override
+  String get nutritionMeal => 'Comida';
+
+  @override
+  String get nutritionLabel => 'Nombre del alimento o comida';
+
+  @override
+  String get nutritionWeightOptional => 'Peso (opcional)';
+
+  @override
+  String get nutritionCaloriesInput => 'Calorías';
+
+  @override
+  String get nutritionRequiredLabel =>
+      'Introduce un nombre de alimento o comida.';
+
+  @override
+  String get nutritionInvalidNumber => 'Introduce un número positivo válido.';
+
+  @override
+  String get nutritionAtLeastOneValue =>
+      'Introduce calorías o al menos un macro.';
+
+  @override
+  String get nutritionFutureDate =>
+      'No se puede registrar nutrición en el futuro.';
+
+  @override
+  String get nutritionEdit => 'Editar';
+
+  @override
+  String get nutritionEntryActions => 'Acciones de la entrada nutricional';
+
+  @override
+  String get nutritionDeleteTitle => '¿Eliminar la entrada?';
+
+  @override
+  String nutritionDeleteBody(String label) {
+    return '¿Quitar «$label» del registro nutricional local?';
+  }
+
+  @override
+  String get nutritionTrendsTitle => 'Resumen nutricional';
+
+  @override
+  String get nutritionSevenDays => '7 días';
+
+  @override
+  String get nutritionThirtyDays => '30 días';
+
+  @override
+  String get nutritionAverageLoggedDays =>
+      'Promedio de kcal en días registrados';
+
+  @override
+  String get nutritionLoggedDays => 'Días registrados';
+
+  @override
+  String get nutritionCaloriesTrend => 'Calorías diarias';
+
+  @override
+  String get nutritionMacroTrend => 'Tendencia de macros (gramos)';
+
+  @override
+  String nutritionCaloriesChartSemantics(int days, int calories) {
+    return 'Gráfico de calorías de $days días con $calories calorías totales';
+  }
+
+  @override
+  String nutritionMacrosChartSemantics(int days) {
+    return 'Gráfico de proteína, carbohidratos y grasa de $days días';
+  }
+
+  @override
+  String get nutritionDisclaimer =>
+      'Guardado solo en este dispositivo. Los valores nutricionales son aproximados y no constituyen consejo médico ni dietético.';
 
   @override
   String get guideEyebrow => 'Mejor entrada, mejor intervalo';
@@ -673,6 +904,180 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo abrir la política de privacidad.';
 
   @override
+  String get legalTitle => 'Información legal';
+
+  @override
+  String get legalSettingsBody =>
+      'Privacidad, condiciones de uso y tratamiento de datos';
+
+  @override
+  String get legalIntroTitle => 'Políticas claras y transparentes';
+
+  @override
+  String get legalIntroBody =>
+      'Cómo trata MassLens tus datos y las reglas aplicables cuando usas la aplicación.';
+
+  @override
+  String get legalPrivacyPolicy => 'Privacidad';
+
+  @override
+  String get legalTermsOfUse => 'Condiciones';
+
+  @override
+  String get legalLastUpdated => '15 ago 2026';
+
+  @override
+  String get legalPublishedPolicy => 'Ver la política publicada';
+
+  @override
+  String get legalFooter => 'MassLens · Documentos legales';
+
+  @override
+  String get legalPrivacyScopeTitle => 'Ámbito y proveedor de MassLens';
+
+  @override
+  String get legalPrivacyScopeBody =>
+      'MassLens es ofrecida por el desarrollador identificado en su ficha de Google Play («nosotros» o «nuestro»). Esta política explica cómo se trata la información en la aplicación Android MassLens y su servicio de escaneo. MassLens no exige una cuenta ni solicita directamente tu nombre, correo electrónico, perfil o ubicación precisa.';
+
+  @override
+  String get legalPrivacyPhotosTitle => 'Fotos y análisis con IA';
+
+  @override
+  String get legalPrivacyPhotosBody =>
+      'Una foto solo se procesa cuando eliges Cámara o Galería e inicias un escaneo de IA. Antes de enviarla, MassLens corrige la orientación, cambia el tamaño, vuelve a codificarla como JPEG y elimina los metadatos EXIF y GPS integrados. La foto, un segundo ángulo opcional y el contexto del escaneo se envían por HTTPS mediante el servicio Cloudflare de MassLens a OpenAI para identificar objetos o alimentos visibles y estimar intervalos de peso. OpenAI recibe la instrucción de no almacenar la respuesta. Las fotos no se guardan en la base de datos del Worker de MassLens.';
+
+  @override
+  String get legalPrivacyNutritionTitle =>
+      'Escaneos de alimentos y datos del USDA';
+
+  @override
+  String get legalPrivacyNutritionBody =>
+      'En los escaneos de Alimentos y macros, la IA devuelve nombres de alimentos, intervalos de peso aproximados y términos genéricos de búsqueda en inglés; no crea valores nutricionales. El servidor solo envía texto de búsqueda normalizado a USDA FoodData Central para obtener calorías y macros. El USDA nunca recibe tus fotos, el identificador de instalación ni el historial local. Todos los pesos, calorías y macros son estimaciones y pueden estar incompletos.';
+
+  @override
+  String get legalPrivacyLocalTitle => 'Información guardada en tu dispositivo';
+
+  @override
+  String get legalPrivacyLocalBody =>
+      'Los resultados y una copia privada de la imagen solo se guardan cuando eliges Guardar. Las preferencias, el historial local de escaneos y las entradas de Nutrición y tendencias se almacenan dentro de la aplicación en tu dispositivo. Las entradas nutricionales solo se añaden cuando importas expresamente un escaneo de alimentos guardado o introduces valores manualmente; no se cargan. La información de dispositivos Bluetooth solo se usa para encontrar y conectar básculas compatibles y no se envía a MassLens. El comportamiento de las copias de seguridad de Android puede depender de los ajustes del dispositivo.';
+
+  @override
+  String get legalPrivacyServiceTitle => 'Datos del servicio y conservación';
+
+  @override
+  String get legalPrivacyServiceBody =>
+      'MassLens crea un identificador de instalación aleatorio para gestionar los escaneos iniciales, créditos obtenidos con anuncios, reintentos y prevención de abusos. El servicio lo convierte en hash antes de usarlo en la base de datos y registra identificadores de solicitud, estado de créditos y recompensas, eventos técnicos limitados y totales diarios anónimos, como el modo de escaneo completado y el coste de IA. El JSON de un resultado completado, nunca la foto, puede conservarse hasta 24 horas para repetir una solicitud sin doble cobro. Los registros de créditos y prevención de abusos se conservan mientras sean necesarios para esas funciones. Los proveedores de alojamiento y red pueden tratar direcciones IP y registros de seguridad rutinarios.';
+
+  @override
+  String get legalPrivacyAdsTitle => 'Publicidad y consentimiento';
+
+  @override
+  String get legalPrivacyAdsBody =>
+      'MassLens usa Google Mobile Ads para conceder créditos de escaneo con recompensa y mostrar otros anuncios. Google y sus socios publicitarios pueden tratar identificadores publicitarios, información del dispositivo, ubicación aproximada deducida de señales de red, diagnósticos, opciones de consentimiento e interacciones con anuncios según sus propias políticas. Cuando sea obligatorio, la aplicación solicitará tu consentimiento. Si Google ofrece opciones de privacidad para ti, podrás revisarlas en Ajustes.';
+
+  @override
+  String get legalPrivacySharingTitle => 'Proveedores, transferencias y venta';
+
+  @override
+  String get legalPrivacySharingBody =>
+      'La información solo se comparte cuando es necesario con Cloudflare para ofrecer la API, OpenAI para analizar fotos, USDA FoodData Central para búsquedas nutricionales genéricas y Google para publicidad y consentimiento. Estos proveedores pueden tratar información en países distintos al tuyo conforme a sus propias condiciones y garantías. MassLens no vende tu historial local de escaneos ni tu diario nutricional y no los usa para publicidad o análisis nutricional a nivel de usuario.';
+
+  @override
+  String get legalPrivacyChoicesTitle => 'Tus opciones y la eliminación';
+
+  @override
+  String get legalPrivacyChoicesBody =>
+      'Puedes denegar los permisos de cámara o Bluetooth, usar el simulador o una báscula Bluetooth compatible sin IA, cancelar antes del análisis, no guardar resultados, eliminar escaneos individuales, borrar todo el historial de estimaciones, borrar Nutrición y tendencias por separado, revisar las opciones de privacidad publicitaria disponibles o desinstalar la aplicación. La desinstalación elimina los datos locales, sujeto a los ajustes de copia de seguridad de Android. Para solicitudes que no puedan completarse en el dispositivo, utiliza el contacto del desarrollador en la ficha de Google Play de MassLens. No envíes fotos ni información sanitaria sensible con tu solicitud.';
+
+  @override
+  String get legalPrivacySecurityTitle => 'Seguridad y menores';
+
+  @override
+  String get legalPrivacySecurityBody =>
+      'MassLens usa HTTPS, eliminación de metadatos, identificadores de instalación convertidos en hash y controles de acceso diseñados para reducir riesgos. Ningún almacenamiento o transmisión por Internet puede garantizarse como totalmente seguro. MassLens no está dirigida a menores que no hayan alcanzado la edad mínima de consentimiento digital de su país y no solicitamos conscientemente perfiles personales a menores.';
+
+  @override
+  String get legalPrivacyChangesTitle => 'Cambios y contacto';
+
+  @override
+  String get legalPrivacyChangesBody =>
+      'Esta política puede cambiar cuando cambien MassLens, la ley aplicable o sus proveedores. La fecha de actualización se modificará cuando haya cambios importantes. La versión HTTPS publicada en el enlace anterior es la destinada a la ficha de Google Play. Para cualquier pregunta, utiliza el contacto del desarrollador que aparece en dicha ficha.';
+
+  @override
+  String get legalTermsAcceptanceTitle => 'Aceptación y requisitos';
+
+  @override
+  String get legalTermsAcceptanceBody =>
+      'Al instalar o usar MassLens, aceptas estas Condiciones de uso y la Política de privacidad. Si no las aceptas, no uses la aplicación. Debes tener capacidad legal para aceptar estas condiciones donde vivas; de lo contrario, un progenitor o tutor legal deberá revisarlas y aceptarlas por ti. Eres responsable de cumplir las leyes aplicables.';
+
+  @override
+  String get legalTermsServiceTitle => 'Qué ofrece el servicio';
+
+  @override
+  String get legalTermsServiceBody =>
+      'MassLens ofrece lecturas de básculas Bluetooth compatibles, un simulador táctil claramente identificado, estimaciones visuales asistidas por IA para objetos y platos de comida, nutrición aproximada basada en el USDA, historial local y un diario nutricional local opcional. Algunas funciones pueden requerir un dispositivo compatible, conexión a Internet, permisos, disponibilidad de anuncios o un crédito de escaneo restante.';
+
+  @override
+  String get legalTermsEstimatesTitle => 'Estimaciones, nutrición y seguridad';
+
+  @override
+  String get legalTermsEstimatesBody =>
+      'Los escaneos de IA son estimaciones visuales, no lecturas de una báscula física. Los resultados pueden ser inexactos, incompletos o inadecuados para un objeto o comida concretos. MassLens no es un dispositivo médico ni ofrece asesoramiento médico, dietético, sobre alergias, dosificación, comercio regulado, envíos o seguridad. Nunca confíes en ella para medicamentos, comercio regulado, alérgenos, materiales peligrosos u otras decisiones críticas. Usa una báscula calibrada o un profesional cualificado cuando la precisión sea importante.';
+
+  @override
+  String get legalTermsContentTitle => 'Tus fotos y uso aceptable';
+
+  @override
+  String get legalTermsContentBody =>
+      'Conservas tus derechos sobre las fotos y la información que envías. Concedes a MassLens y a sus proveedores necesarios un permiso limitado para tratarlas únicamente con el fin de ofrecer el escaneo solicitado, mantener la seguridad y permitir los reintentos descritos en la Política de privacidad. Debes tener derecho a usar las imágenes enviadas. No envíes contenido ilegal, imágenes íntimas, documentos confidenciales, imágenes que vulneren la privacidad o derechos de otras personas, código malicioso ni contenido ajeno al análisis legítimo de objetos o alimentos.';
+
+  @override
+  String get legalTermsCreditsTitle => 'Créditos de escaneo y publicidad';
+
+  @override
+  String get legalTermsCreditsBody =>
+      'Una instalación nueva puede recibir un número limitado de escaneos iniciales. Un anuncio con recompensa completado puede conceder un crédito tras la confirmación de la aplicación y el servicio. Los créditos no tienen valor monetario, no pueden transferirse y pueden limitarse para evitar abusos. La disponibilidad de anuncios no está garantizada. Los escaneos válidos que fallen suelen reembolsarse, pero el acceso puede retrasarse por interrupciones, controles antifraude o errores técnicos. Los formatos de anuncios y reglas de créditos pueden cambiar con un aviso razonable.';
+
+  @override
+  String get legalTermsThirdPartyTitle =>
+      'Datos locales y servicios de terceros';
+
+  @override
+  String get legalTermsThirdPartyBody =>
+      'Los resultados y entradas nutricionales guardados se almacenan localmente y pueden perderse si los eliminas, borras los datos de la aplicación, desinstalas, cambias de dispositivo o pierdes el dispositivo. Eres responsable de cualquier copia de seguridad que necesites. MassLens depende de Cloudflare, OpenAI, USDA FoodData Central, Google Mobile Ads, Google Play y fabricantes de dispositivos. Sus servicios, contenidos y disponibilidad se rigen por sus propias condiciones; MassLens no los controla.';
+
+  @override
+  String get legalTermsLicenseTitle => 'Licencia y propiedad intelectual';
+
+  @override
+  String get legalTermsLicenseBody =>
+      'Recibes una licencia limitada, personal, revocable, no exclusiva e intransferible para usar MassLens con fines lícitos y no comerciales. La aplicación, su diseño, código, marca y materiales originales siguen siendo propiedad de sus respectivos titulares. No puedes copiar, vender, sublicenciar, realizar ingeniería inversa salvo que la ley lo permita expresamente, eludir controles de seguridad o créditos, sobrecargar o extraer datos del servicio ni usarlo para crear un conjunto de datos o servicio competidor.';
+
+  @override
+  String get legalTermsAvailabilityTitle =>
+      'Disponibilidad, cambios y uso indebido';
+
+  @override
+  String get legalTermsAvailabilityBody =>
+      'MassLens puede cambiar, suspender o retirar funciones para mejorar la aplicación, cumplir requisitos legales o de seguridad, gestionar costes o responder a cambios de terceros. No se promete disponibilidad continua y sin errores. El acceso puede limitarse o bloquearse cuando sea razonablemente necesario para impedir fraude, abuso automatizado, ataques, uso ilícito o daños al servicio o a otras personas.';
+
+  @override
+  String get legalTermsLiabilityTitle =>
+      'Exclusiones y limitación de responsabilidad';
+
+  @override
+  String get legalTermsLiabilityBody =>
+      'En la máxima medida permitida por la ley, MassLens se ofrece «tal cual» y «según disponibilidad», sin garantías de exactitud, idoneidad para un fin concreto, funcionamiento ininterrumpido o resultados sin errores. El desarrollador no responde de pérdidas indirectas, incidentales, especiales, consecuentes o ejemplares derivadas de confiar en estimaciones, perder datos locales, servicios de terceros, anuncios o no poder usar la aplicación. Nada de estas condiciones excluye derechos o responsabilidades que no puedan excluirse legalmente en tu país.';
+
+  @override
+  String get legalTermsChangesTitle =>
+      'Actualizaciones, separabilidad y contacto';
+
+  @override
+  String get legalTermsChangesBody =>
+      'Estas condiciones pueden actualizarse cuando cambien MassLens o los requisitos aplicables. Seguir usando la aplicación después de que una actualización entre en vigor supone aceptar las condiciones revisadas cuando la ley lo permita. Si una disposición no es exigible, las demás seguirán vigentes. La legislación obligatoria de protección al consumidor no se ve afectada. Para preguntas o avisos legales, utiliza el contacto del desarrollador en la ficha de Google Play de MassLens.';
+
+  @override
   String get settingsClearHistory => 'Borrar el historial de estimaciones';
 
   @override
@@ -718,7 +1123,47 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se ha borrado el historial de estimaciones.';
 
   @override
-  String get settingsVersion => 'MVP 1.0.0';
+  String get settingsClearNutrition => 'Borrar historial nutricional';
+
+  @override
+  String get settingsNoNutritionEntries => 'No hay entradas nutricionales';
+
+  @override
+  String settingsNutritionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entradas nutricionales',
+      one: '1 entrada nutricional',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsClearNutritionTitle => '¿Borrar el historial nutricional?';
+
+  @override
+  String settingsClearNutritionBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Se eliminarán las $count entradas nutricionales guardadas en este dispositivo. Los escaneos no cambiarán.',
+      one:
+          'Se eliminará la entrada nutricional guardada en este dispositivo. Los escaneos no cambiarán.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsClearNutritionAction => 'Borrar nutrición';
+
+  @override
+  String get settingsNutritionCleared =>
+      'Se ha borrado el historial nutricional.';
+
+  @override
+  String get settingsVersion => 'Versión 1.1.0';
 
   @override
   String get settingsSafetyBody =>

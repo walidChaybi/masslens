@@ -18,12 +18,14 @@ class HomeScreen extends StatelessWidget {
     required this.onMeasure,
     required this.onGallery,
     required this.onViewHistory,
+    this.onOpenNutrition = _noop,
     super.key,
   });
 
   final ValueChanged<ScanMode> onMeasure;
   final ValueChanged<ScanMode> onGallery;
   final VoidCallback onViewHistory;
+  final VoidCallback onOpenNutrition;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,8 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _HomeCapturePanel(onMeasure: onMeasure, onGallery: onGallery),
+          const SizedBox(height: 14),
+          _NutritionEntryCard(onTap: onOpenNutrition),
           if (recent != null) ...[
             const SizedBox(height: 24),
             Row(
@@ -100,6 +104,72 @@ class HomeScreen extends StatelessWidget {
             onRewardedAd: () => showRewardedScanSheet(context),
           ),
         ],
+      ),
+    );
+  }
+}
+
+void _noop() {}
+
+class _NutritionEntryCard extends StatelessWidget {
+  const _NutritionEntryCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = AppScope.of(
+      context,
+    ).nutritionDiary.daySummary(DateTime.now());
+    final l10n = context.l10n;
+    return Card(
+      key: const Key('home_nutrition_button'),
+      color: AppColors.ink,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.lime,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.insights_rounded, color: AppColors.ink),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.nutritionHomeTitle,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      summary.hasEntries
+                          ? l10n.nutritionHomeTodayCalories(
+                              summary.totals.caloriesKcal.round(),
+                            )
+                          : l10n.nutritionHomeBody,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded, color: AppColors.lime),
+            ],
+          ),
+        ),
       ),
     );
   }

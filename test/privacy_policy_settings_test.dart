@@ -7,7 +7,7 @@ import 'package:mass_lens/features/settings/presentation/settings_screen.dart';
 import 'package:mass_lens/l10n/l10n.dart';
 
 void main() {
-  testWidgets('settings exposes the required privacy policy link', (
+  testWidgets('settings opens legal center and published privacy link', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 800));
@@ -30,9 +30,20 @@ void main() {
       ),
     );
 
-    final policyLink = find.text('Privacy policy');
-    await tester.scrollUntilVisible(policyLink, 300);
-    await tester.tap(policyLink);
+    final legalLink = find.text('Legal');
+    await tester.scrollUntilVisible(legalLink, 300);
+    await tester.tap(legalLink);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Privacy policy'), findsWidgets);
+    expect(find.text('Terms of use'), findsOneWidget);
+    expect(find.text('Photos and AI analysis'), findsOneWidget);
+
+    final publishedLink = find.byKey(
+      const Key('open_published_privacy_policy'),
+    );
+    await tester.scrollUntilVisible(publishedLink, 300);
+    await tester.tap(publishedLink);
     await tester.pump();
 
     expect(

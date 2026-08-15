@@ -1,44 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/display_labels.dart';
+import '../../legal/presentation/legal_screen.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../../scan/data/estimate_repository_factory.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  static const _privacyPolicyUrl = String.fromEnvironment(
-    'MASSLENS_PRIVACY_URL',
-  );
-
-  Future<void> _openPrivacyPolicy(BuildContext context) async {
-    final l10n = context.l10n;
-    final uri = Uri.tryParse(_privacyPolicyUrl);
-    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.settingsPrivacyPolicyUnavailable)),
-      );
-      return;
-    }
-    var opened = false;
-    try {
-      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } on Object {
-      // The user still receives the same actionable message if no browser or
-      // platform URL handler is available.
-    }
-    if (!opened && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.settingsPrivacyPolicyOpenFailed)),
-      );
-    }
-  }
 
   Future<void> _clearHistory(BuildContext context) async {
     final controller = AppScope.of(context);
@@ -70,6 +43,40 @@ class SettingsScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(l10n.settingsHistoryCleared),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _clearNutritionHistory(BuildContext context) async {
+    final controller = AppScope.of(context);
+    final l10n = context.l10n;
+    final count = controller.nutritionDiary.entries.length;
+    if (count == 0) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.settingsClearNutritionTitle),
+        content: Text(l10n.settingsClearNutritionBody(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            child: Text(l10n.settingsClearNutritionAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await controller.nutritionDiary.clear();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.settingsNutritionCleared),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -194,11 +201,17 @@ class SettingsScreen extends StatelessWidget {
           _SettingsCard(
             children: [
               _ActionRow(
-                icon: Icons.policy_outlined,
-                title: l10n.settingsPrivacyPolicy,
-                subtitle: l10n.settingsPrivacyPolicyBody,
+                icon: Icons.gavel_rounded,
+                title: l10n.legalTitle,
+                subtitle: l10n.legalSettingsBody,
                 color: AppColors.ink,
-                onTap: () => _openPrivacyPolicy(context),
+                onTap: () {
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const LegalScreen(),
+                    ),
+                  );
+                },
               ),
               const Divider(),
               _SettingRow(
@@ -225,6 +238,18 @@ class SettingsScreen extends StatelessWidget {
                     : l10n.settingsSavedCount(controller.measurements.length),
                 color: AppColors.coral,
                 onTap: () => _clearHistory(context),
+              ),
+              const Divider(),
+              _ActionRow(
+                icon: Icons.no_meals_outlined,
+                title: l10n.settingsClearNutrition,
+                subtitle: controller.nutritionDiary.entries.isEmpty
+                    ? l10n.settingsNoNutritionEntries
+                    : l10n.settingsNutritionCount(
+                        controller.nutritionDiary.entries.length,
+                      ),
+                color: AppColors.coral,
+                onTap: () => _clearNutritionHistory(context),
               ),
             ],
           ),

@@ -414,10 +414,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeScanFood => 'Scan food plate';
 
   @override
+  String get nutritionHomeTitle => 'Nutrition & Trends';
+
+  @override
+  String get nutritionHomeBody =>
+      'Track daily calories and macros on this device';
+
+  @override
+  String nutritionHomeTodayCalories(int count) {
+    return '$count kcal logged today';
+  }
+
+  @override
   String get shellDigitalScale => 'Digital Scale';
 
   @override
   String get shellAiWeightScan => 'AI Weight Scan';
+
+  @override
+  String get shellNutrition => 'Nutrition';
 
   @override
   String get shellHistory => 'History';
@@ -444,6 +459,219 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shellExitBody => 'Are you sure you want to exit the app?';
+
+  @override
+  String get nutritionEyebrow => 'Private daily log';
+
+  @override
+  String get nutritionTitle => 'Nutrition & Trends';
+
+  @override
+  String get nutritionLocalBadge => 'On device';
+
+  @override
+  String get nutritionDayTab => 'Day';
+
+  @override
+  String get nutritionTrendsTab => 'Trends';
+
+  @override
+  String get nutritionPreviousDay => 'Previous day';
+
+  @override
+  String get nutritionNextDay => 'Next day';
+
+  @override
+  String get nutritionToday => 'Today';
+
+  @override
+  String get nutritionCaloriesUnit => 'kcal';
+
+  @override
+  String nutritionKcal(String value) {
+    return '$value kcal';
+  }
+
+  @override
+  String nutritionGrams(String value) {
+    return '$value g';
+  }
+
+  @override
+  String get nutritionProtein => 'Protein';
+
+  @override
+  String get nutritionCarbs => 'Carbohydrates';
+
+  @override
+  String get nutritionFat => 'Fat';
+
+  @override
+  String get nutritionProteinShort => 'P';
+
+  @override
+  String get nutritionCarbsShort => 'C';
+
+  @override
+  String get nutritionFatShort => 'F';
+
+  @override
+  String nutritionMacroCompact(int protein, int carbs, int fat) {
+    return 'P $protein g · C $carbs g · F $fat g';
+  }
+
+  @override
+  String nutritionMacroRingSemantics(
+    int calories,
+    int protein,
+    int carbs,
+    int fat,
+  ) {
+    return '$calories calories, $protein grams protein, $carbs grams carbohydrates, and $fat grams fat';
+  }
+
+  @override
+  String get nutritionPartialNotice =>
+      'Partial total: at least one food had no complete USDA nutrition match.';
+
+  @override
+  String get nutritionTrendPartialNotice =>
+      'This period includes partial totals from food scans with unmatched components.';
+
+  @override
+  String get nutritionPartialShort => 'Partial';
+
+  @override
+  String get nutritionMealsTitle => 'Meals';
+
+  @override
+  String get nutritionAddFood => 'Add food';
+
+  @override
+  String get nutritionNoEntriesTitle => 'Nothing logged for this day';
+
+  @override
+  String get nutritionNoEntriesBody =>
+      'Add a saved Food Scale result or enter calories and macros manually.';
+
+  @override
+  String get nutritionFromScans => 'From Food Scans';
+
+  @override
+  String get nutritionFromScansBody =>
+      'Copy corrected nutrition from a saved food plate';
+
+  @override
+  String get nutritionManual => 'Manual entry';
+
+  @override
+  String get nutritionManualBody =>
+      'Enter a meal\'s calories and macros yourself';
+
+  @override
+  String get nutritionNoScansTitle => 'No food scans available';
+
+  @override
+  String get nutritionNoScansBody =>
+      'Save a Food & macros scan containing USDA nutrition, then return here to log it.';
+
+  @override
+  String get nutritionChooseScan => 'Choose a saved food scan';
+
+  @override
+  String get nutritionAddFromScanTitle => 'Add scanned meal';
+
+  @override
+  String get nutritionAddManualTitle => 'Add nutrition manually';
+
+  @override
+  String get nutritionEditEntryTitle => 'Edit nutrition entry';
+
+  @override
+  String get nutritionBreakfast => 'Breakfast';
+
+  @override
+  String get nutritionLunch => 'Lunch';
+
+  @override
+  String get nutritionDinner => 'Dinner';
+
+  @override
+  String get nutritionSnack => 'Snack';
+
+  @override
+  String get nutritionMeal => 'Meal';
+
+  @override
+  String get nutritionLabel => 'Food or meal name';
+
+  @override
+  String get nutritionWeightOptional => 'Weight (optional)';
+
+  @override
+  String get nutritionCaloriesInput => 'Calories';
+
+  @override
+  String get nutritionRequiredLabel => 'Enter a food or meal name.';
+
+  @override
+  String get nutritionInvalidNumber => 'Enter a valid positive number.';
+
+  @override
+  String get nutritionAtLeastOneValue =>
+      'Enter calories or at least one macro value.';
+
+  @override
+  String get nutritionFutureDate => 'Nutrition cannot be logged in the future.';
+
+  @override
+  String get nutritionEdit => 'Edit';
+
+  @override
+  String get nutritionEntryActions => 'Nutrition entry actions';
+
+  @override
+  String get nutritionDeleteTitle => 'Delete nutrition entry?';
+
+  @override
+  String nutritionDeleteBody(String label) {
+    return 'Remove “$label” from the local nutrition log?';
+  }
+
+  @override
+  String get nutritionTrendsTitle => 'Nutrition overview';
+
+  @override
+  String get nutritionSevenDays => '7 days';
+
+  @override
+  String get nutritionThirtyDays => '30 days';
+
+  @override
+  String get nutritionAverageLoggedDays => 'Average kcal on logged days';
+
+  @override
+  String get nutritionLoggedDays => 'Logged days';
+
+  @override
+  String get nutritionCaloriesTrend => 'Daily calories';
+
+  @override
+  String get nutritionMacroTrend => 'Macro trend (grams)';
+
+  @override
+  String nutritionCaloriesChartSemantics(int days, int calories) {
+    return 'Calories chart for $days days with $calories total calories';
+  }
+
+  @override
+  String nutritionMacrosChartSemantics(int days) {
+    return 'Protein, carbohydrate, and fat trend chart for $days days';
+  }
+
+  @override
+  String get nutritionDisclaimer =>
+      'Stored only on this device. Nutrition values are approximate and are not medical advice or dietary guidance.';
 
   @override
   String get guideEyebrow => 'Better input, better range';
@@ -668,6 +896,177 @@ class AppLocalizationsEn extends AppLocalizations {
       'The privacy policy could not be opened.';
 
   @override
+  String get legalTitle => 'Legal';
+
+  @override
+  String get legalSettingsBody =>
+      'Privacy policy, Terms of Use, and data handling';
+
+  @override
+  String get legalIntroTitle => 'Clear, honest policies';
+
+  @override
+  String get legalIntroBody =>
+      'How MassLens handles your data and the rules that apply when you use the app.';
+
+  @override
+  String get legalPrivacyPolicy => 'Privacy policy';
+
+  @override
+  String get legalTermsOfUse => 'Terms of use';
+
+  @override
+  String get legalLastUpdated => '15 Aug 2026';
+
+  @override
+  String get legalPublishedPolicy => 'View published privacy policy';
+
+  @override
+  String get legalFooter => 'MassLens · Legal documents';
+
+  @override
+  String get legalPrivacyScopeTitle => 'Scope and who provides MassLens';
+
+  @override
+  String get legalPrivacyScopeBody =>
+      'MassLens is provided by the developer identified on its Google Play listing (\"we\", \"us\", or \"our\"). This policy explains how information is handled in the MassLens Android app and its scan service. MassLens does not require an account and does not directly ask for your name, email address, profile, or precise location.';
+
+  @override
+  String get legalPrivacyPhotosTitle => 'Photos and AI analysis';
+
+  @override
+  String get legalPrivacyPhotosBody =>
+      'A photo is processed only when you choose Camera or Gallery and start an AI scan. Before upload, MassLens corrects orientation, resizes the image, re-encodes it as JPEG, and removes embedded EXIF and GPS metadata. The photo, an optional second angle, and scan context are sent over HTTPS through the MassLens Cloudflare service to OpenAI to identify visible objects or food and estimate weight ranges. OpenAI is instructed not to store the response. Photos are not stored in the MassLens Worker database.';
+
+  @override
+  String get legalPrivacyNutritionTitle => 'Food scans and USDA data';
+
+  @override
+  String get legalPrivacyNutritionBody =>
+      'For Food & macros scans, the AI returns food labels, approximate weight ranges, and generic English search terms; it does not create nutrient values. The server sends only normalized food search text to USDA FoodData Central to find calories and macros. USDA never receives your photos, installation identifier, or local history. All food weights, calories, and macros are estimates and may be incomplete.';
+
+  @override
+  String get legalPrivacyLocalTitle => 'Information stored on your device';
+
+  @override
+  String get legalPrivacyLocalBody =>
+      'Scan results and a private image copy are saved only when you choose Save. Preferences, local scan history, and Nutrition & Trends entries are stored inside the app on your device. Nutrition entries are added only when you explicitly import a saved food scan or enter values manually; they are not uploaded. Bluetooth device information is used only to find and connect to compatible scales and is not sent to MassLens. Android backup behavior may depend on your device settings.';
+
+  @override
+  String get legalPrivacyServiceTitle => 'Service data and retention';
+
+  @override
+  String get legalPrivacyServiceBody =>
+      'MassLens creates a random installation identifier to manage starter scans, rewarded scan credits, retries, and abuse prevention. The service hashes it before database use and records request identifiers, credit state, reward state, limited technical events, and anonymous daily totals such as completed scan mode and AI cost. A completed result JSON, never the photo, may be retained for up to 24 hours for idempotent retries. Credit and anti-abuse records are kept as needed to operate those features. Hosting and network providers may process IP addresses and routine security logs.';
+
+  @override
+  String get legalPrivacyAdsTitle => 'Advertising and consent';
+
+  @override
+  String get legalPrivacyAdsBody =>
+      'MassLens uses Google Mobile Ads for rewarded scan credits and other ad placements. Google and its advertising partners may process advertising identifiers, device information, approximate location derived from network signals, diagnostics, consent choices, and ad interactions under their own policies. Where required, the app requests consent. If Google makes privacy options available for you, they can be reviewed from Settings.';
+
+  @override
+  String get legalPrivacySharingTitle =>
+      'Service providers, transfers, and sale';
+
+  @override
+  String get legalPrivacySharingBody =>
+      'Information is shared only as needed with Cloudflare for API delivery, OpenAI for photo analysis, USDA FoodData Central for generic nutrition searches, and Google for advertising and consent. These providers may process information in countries other than yours under their own terms and safeguards. MassLens does not sell your local scan history or nutrition diary and does not use them for user-level nutrition advertising or analytics.';
+
+  @override
+  String get legalPrivacyChoicesTitle => 'Your choices and deletion';
+
+  @override
+  String get legalPrivacyChoicesBody =>
+      'You can deny camera or Bluetooth permission, use the simulator or compatible Bluetooth scale without AI, cancel before analysis, decline to save results, delete individual scans, clear all estimate history, clear Nutrition & Trends separately, review available ad privacy choices, or uninstall the app. Uninstalling removes app-local data subject to Android backup settings. For privacy requests that cannot be completed on-device, use the developer contact details on the MassLens Google Play listing. Do not send photos or sensitive health information with your request.';
+
+  @override
+  String get legalPrivacySecurityTitle => 'Security and children';
+
+  @override
+  String get legalPrivacySecurityBody =>
+      'MassLens uses HTTPS, metadata removal, hashed installation identifiers, and access controls designed to reduce risk. No storage or internet transmission can be guaranteed completely secure. MassLens is not directed to children below the minimum digital-consent age in their country, and we do not knowingly request personal profiles from children.';
+
+  @override
+  String get legalPrivacyChangesTitle => 'Changes and contact';
+
+  @override
+  String get legalPrivacyChangesBody =>
+      'This policy may change when MassLens, applicable law, or its service providers change. The last-updated date will be revised for material updates. The published HTTPS version linked above is the version intended for the Google Play listing. Questions may be sent using the developer contact shown on that listing.';
+
+  @override
+  String get legalTermsAcceptanceTitle => 'Acceptance and eligibility';
+
+  @override
+  String get legalTermsAcceptanceBody =>
+      'By installing or using MassLens, you agree to these Terms of Use and the Privacy Policy. If you do not agree, do not use the app. You must be legally able to accept these terms where you live; otherwise, a parent or legal guardian must review and accept them for you. You are responsible for complying with applicable laws.';
+
+  @override
+  String get legalTermsServiceTitle => 'What the service provides';
+
+  @override
+  String get legalTermsServiceBody =>
+      'MassLens provides compatible Bluetooth-scale readings, a clearly labeled touch simulator, AI-assisted visual estimates for objects and food plates, USDA-based approximate nutrition, local history, and an optional local nutrition diary. Features may require a supported device, internet access, permissions, ad availability, or a remaining scan credit.';
+
+  @override
+  String get legalTermsEstimatesTitle => 'Estimates, nutrition, and safety';
+
+  @override
+  String get legalTermsEstimatesBody =>
+      'AI scans are visual estimates, not physical scale readings. Results may be inaccurate, incomplete, or unsuitable for a particular item or meal. MassLens is not a medical device and does not provide medical, dietary, allergy, dosing, legal-trade, shipping, or safety advice. Never rely on it for medication, regulated commerce, allergens, hazardous materials, or other safety-critical decisions. Use a calibrated scale or qualified professional when accuracy matters.';
+
+  @override
+  String get legalTermsContentTitle => 'Your photos and acceptable use';
+
+  @override
+  String get legalTermsContentBody =>
+      'You keep your rights in photos and information you submit. You give MassLens and its necessary service providers a limited permission to process them only to deliver the requested scan, maintain security, and provide retries as described in the Privacy Policy. You must have the right to use submitted images. Do not submit illegal content, intimate imagery, confidential documents, images that violate another person\'s privacy or rights, malicious code, or content unrelated to legitimate object or food analysis.';
+
+  @override
+  String get legalTermsCreditsTitle => 'Scan credits and advertising';
+
+  @override
+  String get legalTermsCreditsBody =>
+      'A new installation may receive a limited number of starter scans. A completed rewarded advertisement may grant a scan credit after confirmation by the app and service. Credits have no cash value, cannot be transferred, and may be limited to prevent abuse. Ad availability is not guaranteed. Failed qualifying scans are normally refunded, but access may be delayed by outages, fraud checks, or technical errors. Advertising formats and credit rules may change with reasonable notice.';
+
+  @override
+  String get legalTermsThirdPartyTitle => 'Local data and third-party services';
+
+  @override
+  String get legalTermsThirdPartyBody =>
+      'Saved results and nutrition entries are stored locally and may be lost if you delete them, clear app data, uninstall, change devices, or lose the device. You are responsible for any backup you require. MassLens relies on services from Cloudflare, OpenAI, USDA FoodData Central, Google Mobile Ads, Google Play, and device manufacturers. Their services, content, and availability are governed by their own terms; MassLens does not control them.';
+
+  @override
+  String get legalTermsLicenseTitle => 'License and intellectual property';
+
+  @override
+  String get legalTermsLicenseBody =>
+      'You receive a limited, personal, revocable, non-exclusive, non-transferable license to use MassLens for lawful, non-commercial purposes. The app, design, code, branding, and original materials remain the property of their respective owners. You may not copy, sell, sublicense, reverse engineer except where law expressly permits, bypass security or credit controls, overload the service, scrape it, or use it to build a competing dataset or service.';
+
+  @override
+  String get legalTermsAvailabilityTitle => 'Availability, changes, and misuse';
+
+  @override
+  String get legalTermsAvailabilityBody =>
+      'MassLens may change, suspend, or discontinue features to improve the app, address security or legal requirements, manage costs, or respond to third-party changes. Continuous, error-free availability is not promised. Access may be limited or blocked when reasonably necessary to prevent fraud, automated abuse, attacks, unlawful use, or harm to the service or others.';
+
+  @override
+  String get legalTermsLiabilityTitle =>
+      'Disclaimers and limitation of liability';
+
+  @override
+  String get legalTermsLiabilityBody =>
+      'To the fullest extent permitted by law, MassLens is provided \"as is\" and \"as available\" without warranties of accuracy, fitness for a particular purpose, uninterrupted operation, or error-free results. The developer is not liable for indirect, incidental, special, consequential, or exemplary losses arising from reliance on estimates, loss of local data, third-party services, ads, or inability to use the app. Nothing in these terms excludes rights or liability that cannot legally be excluded in your country.';
+
+  @override
+  String get legalTermsChangesTitle => 'Updates, severability, and contact';
+
+  @override
+  String get legalTermsChangesBody =>
+      'These terms may be updated when MassLens or applicable requirements change. Continuing to use the app after an update takes effect means you accept the revised terms where permitted by law. If one provision is unenforceable, the remaining provisions continue to apply. Applicable mandatory consumer law remains unaffected. For questions or legal notices, use the developer contact details on the MassLens Google Play listing.';
+
+  @override
   String get settingsClearHistory => 'Clear estimate history';
 
   @override
@@ -712,7 +1111,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsHistoryCleared => 'Estimate history cleared.';
 
   @override
-  String get settingsVersion => 'MVP 1.0.0';
+  String get settingsClearNutrition => 'Clear nutrition history';
+
+  @override
+  String get settingsNoNutritionEntries => 'No nutrition entries';
+
+  @override
+  String settingsNutritionCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count nutrition entries',
+      one: '1 nutrition entry',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsClearNutritionTitle => 'Clear nutrition history?';
+
+  @override
+  String settingsClearNutritionBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'All $count nutrition entries stored on this device will be deleted. Saved scans are unchanged.',
+      one:
+          'The nutrition entry stored on this device will be deleted. Saved scans are unchanged.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsClearNutritionAction => 'Clear nutrition';
+
+  @override
+  String get settingsNutritionCleared => 'Nutrition history cleared.';
+
+  @override
+  String get settingsVersion => 'Version 1.1.0';
 
   @override
   String get settingsSafetyBody =>

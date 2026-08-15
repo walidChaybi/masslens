@@ -856,6 +856,24 @@ abstract class AppLocalizations {
   /// **'Scan food plate'**
   String get homeScanFood;
 
+  /// No description provided for @nutritionHomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition & Trends'**
+  String get nutritionHomeTitle;
+
+  /// No description provided for @nutritionHomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Track daily calories and macros on this device'**
+  String get nutritionHomeBody;
+
+  /// No description provided for @nutritionHomeTodayCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} kcal logged today'**
+  String nutritionHomeTodayCalories(int count);
+
   /// No description provided for @shellDigitalScale.
   ///
   /// In en, this message translates to:
@@ -867,6 +885,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'AI Weight Scan'**
   String get shellAiWeightScan;
+
+  /// No description provided for @shellNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition'**
+  String get shellNutrition;
 
   /// No description provided for @shellHistory.
   ///
@@ -915,6 +939,383 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Are you sure you want to exit the app?'**
   String get shellExitBody;
+
+  /// No description provided for @nutritionEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Private daily log'**
+  String get nutritionEyebrow;
+
+  /// No description provided for @nutritionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition & Trends'**
+  String get nutritionTitle;
+
+  /// No description provided for @nutritionLocalBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'On device'**
+  String get nutritionLocalBadge;
+
+  /// No description provided for @nutritionDayTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get nutritionDayTab;
+
+  /// No description provided for @nutritionTrendsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Trends'**
+  String get nutritionTrendsTab;
+
+  /// No description provided for @nutritionPreviousDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day'**
+  String get nutritionPreviousDay;
+
+  /// No description provided for @nutritionNextDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day'**
+  String get nutritionNextDay;
+
+  /// No description provided for @nutritionToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get nutritionToday;
+
+  /// No description provided for @nutritionCaloriesUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'kcal'**
+  String get nutritionCaloriesUnit;
+
+  /// No description provided for @nutritionKcal.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kcal'**
+  String nutritionKcal(String value);
+
+  /// No description provided for @nutritionGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} g'**
+  String nutritionGrams(String value);
+
+  /// No description provided for @nutritionProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein'**
+  String get nutritionProtein;
+
+  /// No description provided for @nutritionCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbohydrates'**
+  String get nutritionCarbs;
+
+  /// No description provided for @nutritionFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat'**
+  String get nutritionFat;
+
+  /// No description provided for @nutritionProteinShort.
+  ///
+  /// In en, this message translates to:
+  /// **'P'**
+  String get nutritionProteinShort;
+
+  /// No description provided for @nutritionCarbsShort.
+  ///
+  /// In en, this message translates to:
+  /// **'C'**
+  String get nutritionCarbsShort;
+
+  /// No description provided for @nutritionFatShort.
+  ///
+  /// In en, this message translates to:
+  /// **'F'**
+  String get nutritionFatShort;
+
+  /// No description provided for @nutritionMacroCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'P {protein} g · C {carbs} g · F {fat} g'**
+  String nutritionMacroCompact(int protein, int carbs, int fat);
+
+  /// No description provided for @nutritionMacroRingSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'{calories} calories, {protein} grams protein, {carbs} grams carbohydrates, and {fat} grams fat'**
+  String nutritionMacroRingSemantics(
+    int calories,
+    int protein,
+    int carbs,
+    int fat,
+  );
+
+  /// No description provided for @nutritionPartialNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial total: at least one food had no complete USDA nutrition match.'**
+  String get nutritionPartialNotice;
+
+  /// No description provided for @nutritionTrendPartialNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'This period includes partial totals from food scans with unmatched components.'**
+  String get nutritionTrendPartialNotice;
+
+  /// No description provided for @nutritionPartialShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial'**
+  String get nutritionPartialShort;
+
+  /// No description provided for @nutritionMealsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Meals'**
+  String get nutritionMealsTitle;
+
+  /// No description provided for @nutritionAddFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Add food'**
+  String get nutritionAddFood;
+
+  /// No description provided for @nutritionNoEntriesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing logged for this day'**
+  String get nutritionNoEntriesTitle;
+
+  /// No description provided for @nutritionNoEntriesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a saved Food Scale result or enter calories and macros manually.'**
+  String get nutritionNoEntriesBody;
+
+  /// No description provided for @nutritionFromScans.
+  ///
+  /// In en, this message translates to:
+  /// **'From Food Scans'**
+  String get nutritionFromScans;
+
+  /// No description provided for @nutritionFromScansBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy corrected nutrition from a saved food plate'**
+  String get nutritionFromScansBody;
+
+  /// No description provided for @nutritionManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual entry'**
+  String get nutritionManual;
+
+  /// No description provided for @nutritionManualBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a meal\'s calories and macros yourself'**
+  String get nutritionManualBody;
+
+  /// No description provided for @nutritionNoScansTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No food scans available'**
+  String get nutritionNoScansTitle;
+
+  /// No description provided for @nutritionNoScansBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a Food & macros scan containing USDA nutrition, then return here to log it.'**
+  String get nutritionNoScansBody;
+
+  /// No description provided for @nutritionChooseScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a saved food scan'**
+  String get nutritionChooseScan;
+
+  /// No description provided for @nutritionAddFromScanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add scanned meal'**
+  String get nutritionAddFromScanTitle;
+
+  /// No description provided for @nutritionAddManualTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add nutrition manually'**
+  String get nutritionAddManualTitle;
+
+  /// No description provided for @nutritionEditEntryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit nutrition entry'**
+  String get nutritionEditEntryTitle;
+
+  /// No description provided for @nutritionBreakfast.
+  ///
+  /// In en, this message translates to:
+  /// **'Breakfast'**
+  String get nutritionBreakfast;
+
+  /// No description provided for @nutritionLunch.
+  ///
+  /// In en, this message translates to:
+  /// **'Lunch'**
+  String get nutritionLunch;
+
+  /// No description provided for @nutritionDinner.
+  ///
+  /// In en, this message translates to:
+  /// **'Dinner'**
+  String get nutritionDinner;
+
+  /// No description provided for @nutritionSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Snack'**
+  String get nutritionSnack;
+
+  /// No description provided for @nutritionMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal'**
+  String get nutritionMeal;
+
+  /// No description provided for @nutritionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Food or meal name'**
+  String get nutritionLabel;
+
+  /// No description provided for @nutritionWeightOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (optional)'**
+  String get nutritionWeightOptional;
+
+  /// No description provided for @nutritionCaloriesInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories'**
+  String get nutritionCaloriesInput;
+
+  /// No description provided for @nutritionRequiredLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a food or meal name.'**
+  String get nutritionRequiredLabel;
+
+  /// No description provided for @nutritionInvalidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid positive number.'**
+  String get nutritionInvalidNumber;
+
+  /// No description provided for @nutritionAtLeastOneValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter calories or at least one macro value.'**
+  String get nutritionAtLeastOneValue;
+
+  /// No description provided for @nutritionFutureDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition cannot be logged in the future.'**
+  String get nutritionFutureDate;
+
+  /// No description provided for @nutritionEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get nutritionEdit;
+
+  /// No description provided for @nutritionEntryActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition entry actions'**
+  String get nutritionEntryActions;
+
+  /// No description provided for @nutritionDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete nutrition entry?'**
+  String get nutritionDeleteTitle;
+
+  /// No description provided for @nutritionDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove “{label}” from the local nutrition log?'**
+  String nutritionDeleteBody(String label);
+
+  /// No description provided for @nutritionTrendsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition overview'**
+  String get nutritionTrendsTitle;
+
+  /// No description provided for @nutritionSevenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get nutritionSevenDays;
+
+  /// No description provided for @nutritionThirtyDays.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get nutritionThirtyDays;
+
+  /// No description provided for @nutritionAverageLoggedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Average kcal on logged days'**
+  String get nutritionAverageLoggedDays;
+
+  /// No description provided for @nutritionLoggedDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged days'**
+  String get nutritionLoggedDays;
+
+  /// No description provided for @nutritionCaloriesTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily calories'**
+  String get nutritionCaloriesTrend;
+
+  /// No description provided for @nutritionMacroTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Macro trend (grams)'**
+  String get nutritionMacroTrend;
+
+  /// No description provided for @nutritionCaloriesChartSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories chart for {days} days with {calories} total calories'**
+  String nutritionCaloriesChartSemantics(int days, int calories);
+
+  /// No description provided for @nutritionMacrosChartSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein, carbohydrate, and fat trend chart for {days} days'**
+  String nutritionMacrosChartSemantics(int days);
+
+  /// No description provided for @nutritionDisclaimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored only on this device. Nutrition values are approximate and are not medical advice or dietary guidance.'**
+  String get nutritionDisclaimer;
 
   /// No description provided for @guideEyebrow.
   ///
@@ -1324,6 +1725,300 @@ abstract class AppLocalizations {
   /// **'The privacy policy could not be opened.'**
   String get settingsPrivacyPolicyOpenFailed;
 
+  /// No description provided for @legalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal'**
+  String get legalTitle;
+
+  /// No description provided for @legalSettingsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy, Terms of Use, and data handling'**
+  String get legalSettingsBody;
+
+  /// No description provided for @legalIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear, honest policies'**
+  String get legalIntroTitle;
+
+  /// No description provided for @legalIntroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'How MassLens handles your data and the rules that apply when you use the app.'**
+  String get legalIntroBody;
+
+  /// No description provided for @legalPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get legalPrivacyPolicy;
+
+  /// No description provided for @legalTermsOfUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of use'**
+  String get legalTermsOfUse;
+
+  /// No description provided for @legalLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'15 Aug 2026'**
+  String get legalLastUpdated;
+
+  /// No description provided for @legalPublishedPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'View published privacy policy'**
+  String get legalPublishedPolicy;
+
+  /// No description provided for @legalFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens · Legal documents'**
+  String get legalFooter;
+
+  /// No description provided for @legalPrivacyScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope and who provides MassLens'**
+  String get legalPrivacyScopeTitle;
+
+  /// No description provided for @legalPrivacyScopeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens is provided by the developer identified on its Google Play listing (\"we\", \"us\", or \"our\"). This policy explains how information is handled in the MassLens Android app and its scan service. MassLens does not require an account and does not directly ask for your name, email address, profile, or precise location.'**
+  String get legalPrivacyScopeBody;
+
+  /// No description provided for @legalPrivacyPhotosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos and AI analysis'**
+  String get legalPrivacyPhotosTitle;
+
+  /// No description provided for @legalPrivacyPhotosBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A photo is processed only when you choose Camera or Gallery and start an AI scan. Before upload, MassLens corrects orientation, resizes the image, re-encodes it as JPEG, and removes embedded EXIF and GPS metadata. The photo, an optional second angle, and scan context are sent over HTTPS through the MassLens Cloudflare service to OpenAI to identify visible objects or food and estimate weight ranges. OpenAI is instructed not to store the response. Photos are not stored in the MassLens Worker database.'**
+  String get legalPrivacyPhotosBody;
+
+  /// No description provided for @legalPrivacyNutritionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Food scans and USDA data'**
+  String get legalPrivacyNutritionTitle;
+
+  /// No description provided for @legalPrivacyNutritionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'For Food & macros scans, the AI returns food labels, approximate weight ranges, and generic English search terms; it does not create nutrient values. The server sends only normalized food search text to USDA FoodData Central to find calories and macros. USDA never receives your photos, installation identifier, or local history. All food weights, calories, and macros are estimates and may be incomplete.'**
+  String get legalPrivacyNutritionBody;
+
+  /// No description provided for @legalPrivacyLocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Information stored on your device'**
+  String get legalPrivacyLocalTitle;
+
+  /// No description provided for @legalPrivacyLocalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan results and a private image copy are saved only when you choose Save. Preferences, local scan history, and Nutrition & Trends entries are stored inside the app on your device. Nutrition entries are added only when you explicitly import a saved food scan or enter values manually; they are not uploaded. Bluetooth device information is used only to find and connect to compatible scales and is not sent to MassLens. Android backup behavior may depend on your device settings.'**
+  String get legalPrivacyLocalBody;
+
+  /// No description provided for @legalPrivacyServiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service data and retention'**
+  String get legalPrivacyServiceTitle;
+
+  /// No description provided for @legalPrivacyServiceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens creates a random installation identifier to manage starter scans, rewarded scan credits, retries, and abuse prevention. The service hashes it before database use and records request identifiers, credit state, reward state, limited technical events, and anonymous daily totals such as completed scan mode and AI cost. A completed result JSON, never the photo, may be retained for up to 24 hours for idempotent retries. Credit and anti-abuse records are kept as needed to operate those features. Hosting and network providers may process IP addresses and routine security logs.'**
+  String get legalPrivacyServiceBody;
+
+  /// No description provided for @legalPrivacyAdsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Advertising and consent'**
+  String get legalPrivacyAdsTitle;
+
+  /// No description provided for @legalPrivacyAdsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens uses Google Mobile Ads for rewarded scan credits and other ad placements. Google and its advertising partners may process advertising identifiers, device information, approximate location derived from network signals, diagnostics, consent choices, and ad interactions under their own policies. Where required, the app requests consent. If Google makes privacy options available for you, they can be reviewed from Settings.'**
+  String get legalPrivacyAdsBody;
+
+  /// No description provided for @legalPrivacySharingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Service providers, transfers, and sale'**
+  String get legalPrivacySharingTitle;
+
+  /// No description provided for @legalPrivacySharingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Information is shared only as needed with Cloudflare for API delivery, OpenAI for photo analysis, USDA FoodData Central for generic nutrition searches, and Google for advertising and consent. These providers may process information in countries other than yours under their own terms and safeguards. MassLens does not sell your local scan history or nutrition diary and does not use them for user-level nutrition advertising or analytics.'**
+  String get legalPrivacySharingBody;
+
+  /// No description provided for @legalPrivacyChoicesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your choices and deletion'**
+  String get legalPrivacyChoicesTitle;
+
+  /// No description provided for @legalPrivacyChoicesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You can deny camera or Bluetooth permission, use the simulator or compatible Bluetooth scale without AI, cancel before analysis, decline to save results, delete individual scans, clear all estimate history, clear Nutrition & Trends separately, review available ad privacy choices, or uninstall the app. Uninstalling removes app-local data subject to Android backup settings. For privacy requests that cannot be completed on-device, use the developer contact details on the MassLens Google Play listing. Do not send photos or sensitive health information with your request.'**
+  String get legalPrivacyChoicesBody;
+
+  /// No description provided for @legalPrivacySecurityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security and children'**
+  String get legalPrivacySecurityTitle;
+
+  /// No description provided for @legalPrivacySecurityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens uses HTTPS, metadata removal, hashed installation identifiers, and access controls designed to reduce risk. No storage or internet transmission can be guaranteed completely secure. MassLens is not directed to children below the minimum digital-consent age in their country, and we do not knowingly request personal profiles from children.'**
+  String get legalPrivacySecurityBody;
+
+  /// No description provided for @legalPrivacyChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes and contact'**
+  String get legalPrivacyChangesTitle;
+
+  /// No description provided for @legalPrivacyChangesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This policy may change when MassLens, applicable law, or its service providers change. The last-updated date will be revised for material updates. The published HTTPS version linked above is the version intended for the Google Play listing. Questions may be sent using the developer contact shown on that listing.'**
+  String get legalPrivacyChangesBody;
+
+  /// No description provided for @legalTermsAcceptanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Acceptance and eligibility'**
+  String get legalTermsAcceptanceTitle;
+
+  /// No description provided for @legalTermsAcceptanceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'By installing or using MassLens, you agree to these Terms of Use and the Privacy Policy. If you do not agree, do not use the app. You must be legally able to accept these terms where you live; otherwise, a parent or legal guardian must review and accept them for you. You are responsible for complying with applicable laws.'**
+  String get legalTermsAcceptanceBody;
+
+  /// No description provided for @legalTermsServiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What the service provides'**
+  String get legalTermsServiceTitle;
+
+  /// No description provided for @legalTermsServiceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens provides compatible Bluetooth-scale readings, a clearly labeled touch simulator, AI-assisted visual estimates for objects and food plates, USDA-based approximate nutrition, local history, and an optional local nutrition diary. Features may require a supported device, internet access, permissions, ad availability, or a remaining scan credit.'**
+  String get legalTermsServiceBody;
+
+  /// No description provided for @legalTermsEstimatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimates, nutrition, and safety'**
+  String get legalTermsEstimatesTitle;
+
+  /// No description provided for @legalTermsEstimatesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'AI scans are visual estimates, not physical scale readings. Results may be inaccurate, incomplete, or unsuitable for a particular item or meal. MassLens is not a medical device and does not provide medical, dietary, allergy, dosing, legal-trade, shipping, or safety advice. Never rely on it for medication, regulated commerce, allergens, hazardous materials, or other safety-critical decisions. Use a calibrated scale or qualified professional when accuracy matters.'**
+  String get legalTermsEstimatesBody;
+
+  /// No description provided for @legalTermsContentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photos and acceptable use'**
+  String get legalTermsContentTitle;
+
+  /// No description provided for @legalTermsContentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You keep your rights in photos and information you submit. You give MassLens and its necessary service providers a limited permission to process them only to deliver the requested scan, maintain security, and provide retries as described in the Privacy Policy. You must have the right to use submitted images. Do not submit illegal content, intimate imagery, confidential documents, images that violate another person\'s privacy or rights, malicious code, or content unrelated to legitimate object or food analysis.'**
+  String get legalTermsContentBody;
+
+  /// No description provided for @legalTermsCreditsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan credits and advertising'**
+  String get legalTermsCreditsTitle;
+
+  /// No description provided for @legalTermsCreditsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A new installation may receive a limited number of starter scans. A completed rewarded advertisement may grant a scan credit after confirmation by the app and service. Credits have no cash value, cannot be transferred, and may be limited to prevent abuse. Ad availability is not guaranteed. Failed qualifying scans are normally refunded, but access may be delayed by outages, fraud checks, or technical errors. Advertising formats and credit rules may change with reasonable notice.'**
+  String get legalTermsCreditsBody;
+
+  /// No description provided for @legalTermsThirdPartyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local data and third-party services'**
+  String get legalTermsThirdPartyTitle;
+
+  /// No description provided for @legalTermsThirdPartyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved results and nutrition entries are stored locally and may be lost if you delete them, clear app data, uninstall, change devices, or lose the device. You are responsible for any backup you require. MassLens relies on services from Cloudflare, OpenAI, USDA FoodData Central, Google Mobile Ads, Google Play, and device manufacturers. Their services, content, and availability are governed by their own terms; MassLens does not control them.'**
+  String get legalTermsThirdPartyBody;
+
+  /// No description provided for @legalTermsLicenseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'License and intellectual property'**
+  String get legalTermsLicenseTitle;
+
+  /// No description provided for @legalTermsLicenseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You receive a limited, personal, revocable, non-exclusive, non-transferable license to use MassLens for lawful, non-commercial purposes. The app, design, code, branding, and original materials remain the property of their respective owners. You may not copy, sell, sublicense, reverse engineer except where law expressly permits, bypass security or credit controls, overload the service, scrape it, or use it to build a competing dataset or service.'**
+  String get legalTermsLicenseBody;
+
+  /// No description provided for @legalTermsAvailabilityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Availability, changes, and misuse'**
+  String get legalTermsAvailabilityTitle;
+
+  /// No description provided for @legalTermsAvailabilityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'MassLens may change, suspend, or discontinue features to improve the app, address security or legal requirements, manage costs, or respond to third-party changes. Continuous, error-free availability is not promised. Access may be limited or blocked when reasonably necessary to prevent fraud, automated abuse, attacks, unlawful use, or harm to the service or others.'**
+  String get legalTermsAvailabilityBody;
+
+  /// No description provided for @legalTermsLiabilityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disclaimers and limitation of liability'**
+  String get legalTermsLiabilityTitle;
+
+  /// No description provided for @legalTermsLiabilityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'To the fullest extent permitted by law, MassLens is provided \"as is\" and \"as available\" without warranties of accuracy, fitness for a particular purpose, uninterrupted operation, or error-free results. The developer is not liable for indirect, incidental, special, consequential, or exemplary losses arising from reliance on estimates, loss of local data, third-party services, ads, or inability to use the app. Nothing in these terms excludes rights or liability that cannot legally be excluded in your country.'**
+  String get legalTermsLiabilityBody;
+
+  /// No description provided for @legalTermsChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates, severability, and contact'**
+  String get legalTermsChangesTitle;
+
+  /// No description provided for @legalTermsChangesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'These terms may be updated when MassLens or applicable requirements change. Continuing to use the app after an update takes effect means you accept the revised terms where permitted by law. If one provision is unenforceable, the remaining provisions continue to apply. Applicable mandatory consumer law remains unaffected. For questions or legal notices, use the developer contact details on the MassLens Google Play listing.'**
+  String get legalTermsChangesBody;
+
   /// No description provided for @settingsClearHistory.
   ///
   /// In en, this message translates to:
@@ -1372,10 +2067,52 @@ abstract class AppLocalizations {
   /// **'Estimate history cleared.'**
   String get settingsHistoryCleared;
 
+  /// No description provided for @settingsClearNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear nutrition history'**
+  String get settingsClearNutrition;
+
+  /// No description provided for @settingsNoNutritionEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'No nutrition entries'**
+  String get settingsNoNutritionEntries;
+
+  /// No description provided for @settingsNutritionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 nutrition entry} other{{count} nutrition entries}}'**
+  String settingsNutritionCount(int count);
+
+  /// No description provided for @settingsClearNutritionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear nutrition history?'**
+  String get settingsClearNutritionTitle;
+
+  /// No description provided for @settingsClearNutritionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The nutrition entry stored on this device will be deleted. Saved scans are unchanged.} other{All {count} nutrition entries stored on this device will be deleted. Saved scans are unchanged.}}'**
+  String settingsClearNutritionBody(int count);
+
+  /// No description provided for @settingsClearNutritionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear nutrition'**
+  String get settingsClearNutritionAction;
+
+  /// No description provided for @settingsNutritionCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition history cleared.'**
+  String get settingsNutritionCleared;
+
   /// No description provided for @settingsVersion.
   ///
   /// In en, this message translates to:
-  /// **'MVP 1.0.0'**
+  /// **'Version 1.1.0'**
   String get settingsVersion;
 
   /// No description provided for @settingsSafetyBody.
