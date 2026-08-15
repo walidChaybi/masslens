@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
@@ -11,6 +12,33 @@ import '../../scan/data/estimate_repository_factory.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  static const _privacyPolicyUrl = String.fromEnvironment(
+    'MASSLENS_PRIVACY_URL',
+  );
+
+  Future<void> _openPrivacyPolicy(BuildContext context) async {
+    final l10n = context.l10n;
+    final uri = Uri.tryParse(_privacyPolicyUrl);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.settingsPrivacyPolicyUnavailable)),
+      );
+      return;
+    }
+    var opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on Object {
+      // The user still receives the same actionable message if no browser or
+      // platform URL handler is available.
+    }
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.settingsPrivacyPolicyOpenFailed)),
+      );
+    }
+  }
 
   Future<void> _clearHistory(BuildContext context) async {
     final controller = AppScope.of(context);
@@ -165,6 +193,14 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
+              _ActionRow(
+                icon: Icons.policy_outlined,
+                title: l10n.settingsPrivacyPolicy,
+                subtitle: l10n.settingsPrivacyPolicyBody,
+                color: AppColors.ink,
+                onTap: () => _openPrivacyPolicy(context),
+              ),
+              const Divider(),
               _SettingRow(
                 icon: Icons.lock_outline_rounded,
                 title: l10n.settingsSavedPhotos,

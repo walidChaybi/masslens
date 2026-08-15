@@ -15,6 +15,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get commonCancel => 'Cancelar';
 
   @override
+  String get commonNo => 'No';
+
+  @override
+  String get commonOk => 'OK';
+
+  @override
   String get commonClose => 'Cerrar';
 
   @override
@@ -34,6 +40,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get commonSaved => 'Guardado';
+
+  @override
+  String get commonShare => 'Compartir';
 
   @override
   String get commonStartOver => 'Empezar de nuevo';
@@ -147,6 +156,40 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get referenceStandardCard => 'Tarjeta estándar';
+
+  @override
+  String get referenceCoin => 'Moneda';
+
+  @override
+  String get scanReferenceTip =>
+      'Consejo: para mayor precisión, coloca una moneda (o una tarjeta) junto al objeto.';
+
+  @override
+  String get funUnitAaBattery => 'pila AA';
+
+  @override
+  String get funUnitSmartphone => 'teléfono';
+
+  @override
+  String get funUnitBaguette => 'baguette';
+
+  @override
+  String get funUnitSodaCan => 'lata de refresco';
+
+  @override
+  String get funUnitSoccerBall => 'balón de fútbol';
+
+  @override
+  String get funUnitCat => 'gato';
+
+  @override
+  String get funUnitWatermelon => 'sandía';
+
+  @override
+  String get funUnitCarTire => 'neumático de coche';
+
+  @override
+  String get funUnitWashingMachine => 'lavadora';
 
   @override
   String get axisLength => 'Longitud';
@@ -303,6 +346,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingReadyCta => 'Empezar';
 
   @override
+  String get onboardingReviewTitle => 'Ayuda a crecer a MassLens';
+
+  @override
+  String get onboardingReviewBody =>
+      '¿Te gustaría dejar una reseña sincera en Google Play? Solo lleva un momento y nos ayuda a mejorar.';
+
+  @override
+  String get onboardingReviewLater => 'Ahora no';
+
+  @override
+  String get onboardingReviewAction => 'Escribir reseña';
+
+  @override
   String get onboardingScanAccessLabel => 'Acceso a escaneos';
 
   @override
@@ -348,6 +404,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get homePhoto => 'Foto';
 
   @override
+  String get homeModeObject => 'Objeto';
+
+  @override
+  String get homeModeFoodMacros => 'Comida y macros';
+
+  @override
+  String get homeFoodModeHint =>
+      'Fotografía un plato completo para estimar el peso, las calorías y los macros de cada alimento.';
+
+  @override
+  String get homeScanFood => 'Escanear plato';
+
+  @override
   String get shellDigitalScale => 'Báscula digital';
 
   @override
@@ -372,6 +441,12 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get shellMeasurementNotice =>
       'Las lecturas por Bluetooth son mediciones. El modo táctil es un simulador; los escaneos de IA son estimaciones visuales reales.';
+
+  @override
+  String get shellExitTitle => '¿Salir de MassLens?';
+
+  @override
+  String get shellExitBody => '¿Seguro que quieres salir de la aplicación?';
 
   @override
   String get guideEyebrow => 'Mejor entrada, mejor intervalo';
@@ -581,6 +656,21 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsReviewConsent => 'Revisar o cambiar el consentimiento';
+
+  @override
+  String get settingsPrivacyPolicy => 'Política de privacidad';
+
+  @override
+  String get settingsPrivacyPolicyBody =>
+      'Cómo se tratan las fotos, el historial local, el análisis de IA y las búsquedas de USDA';
+
+  @override
+  String get settingsPrivacyPolicyUnavailable =>
+      'Añade la URL de privacidad en la configuración de publicación.';
+
+  @override
+  String get settingsPrivacyPolicyOpenFailed =>
+      'No se pudo abrir la política de privacidad.';
 
   @override
   String get settingsClearHistory => 'Borrar el historial de estimaciones';
@@ -822,6 +912,136 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get scanCloudFailure =>
       'No se pudo completar el análisis de IA. Comprueba la conexión e inténtalo de nuevo; no se creó ningún resultado ficticio.';
+
+  @override
+  String get scanNoFoodDetected =>
+      'No se encontró comida visible. Encuadra un plato completo e inténtalo de nuevo; el escaneo fue reembolsado.';
+
+  @override
+  String get scanNutritionUnavailable =>
+      'Los datos nutricionales de USDA no están disponibles temporalmente. Inténtalo más tarde; el escaneo fue reembolsado.';
+
+  @override
+  String get scanNutritionNoMatch =>
+      'No se encontró una coincidencia nutricional completa de USDA. Prueba con una foto más clara; el escaneo fue reembolsado.';
+
+  @override
+  String get scanFoodScale => 'Báscula de alimentos';
+
+  @override
+  String get scanPhotographMeal => 'Fotografía un plato completo';
+
+  @override
+  String get scanConfirmMeal => 'Confirma que se vea toda la comida';
+
+  @override
+  String get scanAnalyzeMeal => 'Analizar comida y macros';
+
+  @override
+  String get scanFoodOptionalDetails => 'Detalles opcionales del plato';
+
+  @override
+  String get scanContainer => 'Tipo de recipiente';
+
+  @override
+  String get scanContainerUnknown => 'Desconocido';
+
+  @override
+  String get scanContainerPlate => 'Plato';
+
+  @override
+  String get scanContainerBowl => 'Bol';
+
+  @override
+  String get scanContainerCup => 'Taza';
+
+  @override
+  String get scanContainerTray => 'Bandeja';
+
+  @override
+  String get scanContainerNone => 'Sin recipiente';
+
+  @override
+  String get scanPlateDiameter => 'Diámetro del plato o bol (opcional)';
+
+  @override
+  String get scanFoodReferenceTip =>
+      'Una moneda, tarjeta, regla o diámetro conocido puede reducir el rango de peso.';
+
+  @override
+  String get scanProgressIdentifyFood => 'Identificando alimentos visibles…';
+
+  @override
+  String get scanProgressMatchUsda => 'Buscando datos nutricionales de USDA…';
+
+  @override
+  String get scanProgressNutrition => 'Calculando calorías y macros…';
+
+  @override
+  String get scanFoodTotalWeight => 'Peso neto estimado de la comida';
+
+  @override
+  String get scanFoodComponents => 'Componentes de la comida';
+
+  @override
+  String get scanNutrition => 'Nutrición';
+
+  @override
+  String get scanCalories => 'Calorías';
+
+  @override
+  String get scanProtein => 'Proteínas';
+
+  @override
+  String get scanCarbs => 'Carbohidratos';
+
+  @override
+  String get scanFat => 'Grasas';
+
+  @override
+  String get scanEditAmount => 'Corregir cantidad';
+
+  @override
+  String get scanRemoveItem => 'Eliminar detección falsa';
+
+  @override
+  String get scanAmountGrams => 'Cantidad en gramos';
+
+  @override
+  String get scanOriginalAiRange => 'Rango original de IA';
+
+  @override
+  String get scanUsdaSource => 'Fuente USDA';
+
+  @override
+  String get scanNutritionMissing =>
+      'Solo peso — sin datos nutricionales completos de USDA';
+
+  @override
+  String get scanPartialTotal => 'Total parcial';
+
+  @override
+  String get scanCompleteTotal => 'Total completo';
+
+  @override
+  String get scanFoodDisclaimer =>
+      'Estimación aproximada a partir de una foto. No es un dispositivo médico ni consejo dietético.';
+
+  @override
+  String get scanFoodEditTitle => 'Corregir cantidad';
+
+  @override
+  String get scanFoodEditBody =>
+      'Los totales usarán tu cantidad; el rango original de IA seguirá visible.';
+
+  @override
+  String get scanFoodAmountPositive => 'Introduce una cantidad mayor que cero.';
+
+  @override
+  String get scanFoodAtLeastOne => 'Mantén al menos un componente de comida.';
+
+  @override
+  String get scanRemove => 'Eliminar';
 
   @override
   String get scaleWatchAdGetScan => 'Ver anuncio · +1 escaneo';

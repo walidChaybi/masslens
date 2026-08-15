@@ -30,15 +30,21 @@ class CloudflareEstimateRepository implements EstimateRepository {
         'mimeType': prepared.mimeType,
       });
     }
+    final trimmedContainerType = request.containerType?.trim();
+    final containerType = trimmedContainerType?.isNotEmpty == true
+        ? trimmedContainerType
+        : null;
 
     final payload = await _postJson(
       uri,
       {
         'images': images,
+        'scanMode': request.scanMode.wireValue,
         'material': request.material,
         'fillState': request.fillState,
         'referenceObject': request.referenceObject,
         'responseLocale': request.responseLocale,
+        'containerType': ?containerType,
         if (request.knownDimension case final knownDimension?)
           'knownDimension': knownDimension.toJson(),
       },
@@ -52,6 +58,7 @@ class CloudflareEstimateRepository implements EstimateRepository {
       payload,
       request.imagePath,
       analysisLocale: request.responseLocale,
+      scanMode: request.scanMode,
     );
   }
 
@@ -152,6 +159,9 @@ class CloudflareEstimateException implements Exception {
 
   bool get isScanLimitReached =>
       statusCode == 402 || code == 'scan_limit_reached';
+  bool get isNoFoodDetected => code == 'no_food_detected';
+  bool get isNutritionUnavailable => code == 'nutrition_service_unavailable';
+  bool get isNutritionNotFound => code == 'nutrition_not_found';
 
   @override
   String toString() => message;

@@ -1,3 +1,4 @@
 OPENAI_API_KEY=replace_with_a_development_key
+USDA_FDC_API_KEY=replace_with_a_data_gov_key
 ADMOB_REWARDED_AD_UNIT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy
 MAX_DAILY_AI_COST_MICROS=5000000

@@ -15,6 +15,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonCancel => 'Cancel';
 
   @override
+  String get commonNo => 'No';
+
+  @override
+  String get commonOk => 'OK';
+
+  @override
   String get commonClose => 'Close';
 
   @override
@@ -34,6 +40,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonSaved => 'Saved';
+
+  @override
+  String get commonShare => 'Share';
 
   @override
   String get commonStartOver => 'Start over';
@@ -147,6 +156,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get referenceStandardCard => 'Standard card';
+
+  @override
+  String get referenceCoin => 'Coin';
+
+  @override
+  String get scanReferenceTip =>
+      'Tip: for best accuracy, place a coin (or a card) next to the object.';
+
+  @override
+  String get funUnitAaBattery => 'AA battery';
+
+  @override
+  String get funUnitSmartphone => 'smartphone';
+
+  @override
+  String get funUnitBaguette => 'baguette';
+
+  @override
+  String get funUnitSodaCan => 'soda can';
+
+  @override
+  String get funUnitSoccerBall => 'soccer ball';
+
+  @override
+  String get funUnitCat => 'cat';
+
+  @override
+  String get funUnitWatermelon => 'watermelon';
+
+  @override
+  String get funUnitCarTire => 'car tire';
+
+  @override
+  String get funUnitWashingMachine => 'washing machine';
 
   @override
   String get axisLength => 'Length';
@@ -300,6 +343,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingReadyCta => 'Let’s go';
 
   @override
+  String get onboardingReviewTitle => 'Help MassLens grow';
+
+  @override
+  String get onboardingReviewBody =>
+      'Would you like to leave an honest review on Google Play? It takes a moment and helps us improve.';
+
+  @override
+  String get onboardingReviewLater => 'Not now';
+
+  @override
+  String get onboardingReviewAction => 'Review app';
+
+  @override
   String get onboardingScanAccessLabel => 'Scan access';
 
   @override
@@ -345,6 +401,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePhoto => 'Photo';
 
   @override
+  String get homeModeObject => 'Object';
+
+  @override
+  String get homeModeFoodMacros => 'Food & macros';
+
+  @override
+  String get homeFoodModeHint =>
+      'Photograph one whole plate to estimate each food\'s weight, calories and macros.';
+
+  @override
+  String get homeScanFood => 'Scan food plate';
+
+  @override
   String get shellDigitalScale => 'Digital Scale';
 
   @override
@@ -369,6 +438,12 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shellMeasurementNotice =>
       'Bluetooth readings are measurements. Touch mode is a simulator; AI scans are real visual estimates.';
+
+  @override
+  String get shellExitTitle => 'Exit MassLens?';
+
+  @override
+  String get shellExitBody => 'Are you sure you want to exit the app?';
 
   @override
   String get guideEyebrow => 'Better input, better range';
@@ -576,6 +651,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsReviewConsent => 'Review or change consent';
+
+  @override
+  String get settingsPrivacyPolicy => 'Privacy policy';
+
+  @override
+  String get settingsPrivacyPolicyBody =>
+      'How photos, local history, AI analysis and USDA food searches are handled';
+
+  @override
+  String get settingsPrivacyPolicyUnavailable =>
+      'Add the privacy-policy URL in the release configuration.';
+
+  @override
+  String get settingsPrivacyPolicyOpenFailed =>
+      'The privacy policy could not be opened.';
 
   @override
   String get settingsClearHistory => 'Clear estimate history';
@@ -816,6 +906,136 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scanCloudFailure =>
       'The AI analysis could not be completed. Check the connection and try again; no fabricated result was created.';
+
+  @override
+  String get scanNoFoodDetected =>
+      'No visible food was found. Try again with one whole plate in frame; the scan was refunded.';
+
+  @override
+  String get scanNutritionUnavailable =>
+      'USDA nutrition data is temporarily unavailable. Try again later; the scan was refunded.';
+
+  @override
+  String get scanNutritionNoMatch =>
+      'No complete USDA nutrition match was found for this meal. Try a clearer photo; the scan was refunded.';
+
+  @override
+  String get scanFoodScale => 'Food Scale';
+
+  @override
+  String get scanPhotographMeal => 'Photograph one whole plate';
+
+  @override
+  String get scanConfirmMeal => 'Confirm the whole meal is visible';
+
+  @override
+  String get scanAnalyzeMeal => 'Analyze food & macros';
+
+  @override
+  String get scanFoodOptionalDetails => 'Optional plate details';
+
+  @override
+  String get scanContainer => 'Container type';
+
+  @override
+  String get scanContainerUnknown => 'Unknown';
+
+  @override
+  String get scanContainerPlate => 'Plate';
+
+  @override
+  String get scanContainerBowl => 'Bowl';
+
+  @override
+  String get scanContainerCup => 'Cup';
+
+  @override
+  String get scanContainerTray => 'Tray';
+
+  @override
+  String get scanContainerNone => 'No container';
+
+  @override
+  String get scanPlateDiameter => 'Plate or bowl diameter (optional)';
+
+  @override
+  String get scanFoodReferenceTip =>
+      'A visible coin, card, ruler, or known plate diameter can narrow the weight range.';
+
+  @override
+  String get scanProgressIdentifyFood => 'Identifying visible foods…';
+
+  @override
+  String get scanProgressMatchUsda => 'Matching USDA nutrition data…';
+
+  @override
+  String get scanProgressNutrition => 'Calculating calories and macros…';
+
+  @override
+  String get scanFoodTotalWeight => 'Estimated net food weight';
+
+  @override
+  String get scanFoodComponents => 'Food components';
+
+  @override
+  String get scanNutrition => 'Nutrition';
+
+  @override
+  String get scanCalories => 'Calories';
+
+  @override
+  String get scanProtein => 'Protein';
+
+  @override
+  String get scanCarbs => 'Carbs';
+
+  @override
+  String get scanFat => 'Fat';
+
+  @override
+  String get scanEditAmount => 'Correct amount';
+
+  @override
+  String get scanRemoveItem => 'Remove false detection';
+
+  @override
+  String get scanAmountGrams => 'Amount in grams';
+
+  @override
+  String get scanOriginalAiRange => 'Original AI range';
+
+  @override
+  String get scanUsdaSource => 'USDA source';
+
+  @override
+  String get scanNutritionMissing =>
+      'Weight only — no complete USDA nutrition match';
+
+  @override
+  String get scanPartialTotal => 'Partial total';
+
+  @override
+  String get scanCompleteTotal => 'Complete total';
+
+  @override
+  String get scanFoodDisclaimer =>
+      'Approximate photo-based estimate. Not a medical device or dietary advice.';
+
+  @override
+  String get scanFoodEditTitle => 'Correct food amount';
+
+  @override
+  String get scanFoodEditBody =>
+      'Nutrition totals will use your amount; the original AI range stays visible.';
+
+  @override
+  String get scanFoodAmountPositive => 'Enter an amount greater than zero.';
+
+  @override
+  String get scanFoodAtLeastOne => 'Keep at least one food component.';
+
+  @override
+  String get scanRemove => 'Remove';
 
   @override
   String get scaleWatchAdGetScan => 'Watch ad · Get +1 scan';

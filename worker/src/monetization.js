@@ -148,8 +148,19 @@ export async function reserveScan(env, clientIdHash, requestId) {
   return {kind, requestId};
 }
 
-export async function completeScan(env, clientIdHash, reservation, estimate) {
-  if (!reservation || reservation.kind === "disabled") return;
+export async function completeScan(
+  env,
+  clientIdHash,
+  reservation,
+  estimate,
+  scanMode = "object",
+) {
+  if (!reservation) return;
+  const metricMode = scanMode === "food_plate" ? "food_plate" : "object";
+  if (reservation.kind === "disabled") {
+    await safeMetric(env, "scan_completed_mode", metricMode, 1, 0);
+    return;
+  }
   const db = requireDatabase(env);
   const now = Date.now();
   await db.prepare(
@@ -164,7 +175,10 @@ export async function completeScan(env, clientIdHash, reservation, estimate) {
     reservation.requestId,
     clientIdHash,
   ).run();
-  await safeMetric(env, "scan_completed", reservation.kind, 1, 0);
+  await Promise.all([
+    safeMetric(env, "scan_completed", reservation.kind, 1, 0),
+    safeMetric(env, "scan_completed_mode", metricMode, 1, 0),
+  ]);
 }
 
 export async function refundScan(env, clientIdHash, reservation) {
@@ -315,13 +329,17 @@ export function accessPayload({
     analysisModel: env.OPENAI_MODEL || "gpt-5-nano",
     adPolicy: {
       interstitialEvery: readPositiveInteger(env.INTERSTITIAL_EVERY, 2),
+      historyInterstitialEvery: readPositiveInteger(
+        env.HISTORY_INTERSTITIAL_EVERY,
+        2,
+      ),
       interstitialCooldownSeconds: readPositiveInteger(
         env.INTERSTITIAL_COOLDOWN_SECONDS,
         180,
       ),
       appOpenCooldownSeconds: readPositiveInteger(
         env.APP_OPEN_COOLDOWN_SECONDS,
-        14400,
+        900,
       ),
     },
   };
@@ -741,8 +759,14 @@ async function recordAdRevenue(request, env, clientIdHash) {
       "rewarded",
       "interstitial",
       "onboarding_interstitial",
+      "onboarding_intro",
+      "onboarding_framing",
+      "onboarding_light",
+      "onboarding_ready",
       "drawer_ai_scan_interstitial",
       "drawer_digital_scale_interstitial",
+      "drawer_history_interstitial",
+      "history_detail_interstitial",
       "app_open",
     ].includes(placement) ||
     !/^[A-Z]{3}$/.test(currencyCode) ||

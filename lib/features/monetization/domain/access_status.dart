@@ -1,12 +1,19 @@
 class AdPolicy {
   const AdPolicy({
     this.interstitialEvery = 2,
+    this.historyInterstitialEvery = 2,
     this.interstitialCooldownSeconds = 180,
     this.appOpenCooldownSeconds = 14400,
   });
 
   factory AdPolicy.fromJson(Map<String, Object?> json) => AdPolicy(
     interstitialEvery: _boundedInt(json['interstitialEvery'], 1, 100, 2),
+    historyInterstitialEvery: _boundedInt(
+      json['historyInterstitialEvery'],
+      2,
+      100,
+      2,
+    ),
     interstitialCooldownSeconds: _boundedInt(
       json['interstitialCooldownSeconds'],
       30,
@@ -22,6 +29,7 @@ class AdPolicy {
   );
 
   final int interstitialEvery;
+  final int historyInterstitialEvery;
   final int interstitialCooldownSeconds;
   final int appOpenCooldownSeconds;
 
@@ -35,6 +43,10 @@ class AdPolicy {
       (lastShownAt == null ||
           now.difference(lastShownAt) >=
               Duration(seconds: interstitialCooldownSeconds));
+
+  bool isHistoryInterstitialBreak(int completedDetailViews) =>
+      completedDetailViews > 0 &&
+      completedDetailViews % historyInterstitialEvery == 0;
 
   bool shouldShowAppOpen({
     required Duration backgroundTime,

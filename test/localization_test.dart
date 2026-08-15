@@ -27,6 +27,15 @@ void main() {
     expect(en.onboardingHeroTitle, 'Know more at a glance');
     expect(fr.onboardingHeroTitle, 'Des informations en un clin d’œil');
     expect(es.onboardingHeroTitle, 'Más información de un vistazo');
+    expect(en.onboardingReviewAction, 'Review app');
+    expect(fr.onboardingReviewAction, 'Donner un avis');
+    expect(es.onboardingReviewAction, 'Escribir reseña');
+    expect(en.homeModeFoodMacros, 'Food & macros');
+    expect(fr.homeModeFoodMacros, 'Aliments et macros');
+    expect(es.homeModeFoodMacros, 'Comida y macros');
+    expect(en.scanFoodScale, 'Food Scale');
+    expect(fr.scanFoodScale, 'Balance alimentaire');
+    expect(es.scanFoodScale, 'Báscula de alimentos');
     expect(en.accessScansLeft(1), '1 scan left');
     expect(fr.accessScansLeft(2), '2 scans restants');
     expect(es.accessScansLeft(0), 'No hay escaneos disponibles');
@@ -76,8 +85,8 @@ void main() {
         (
           name: 'home',
           screen: HomeScreen(
-            onMeasure: () {},
-            onGallery: () {},
+            onMeasure: (_) {},
+            onGallery: (_) {},
             onViewHistory: () {},
           ),
           visibleText: l10n.homeAiWeight,
@@ -91,6 +100,11 @@ void main() {
           name: 'scan',
           screen: ScanScreen(autoStart: false),
           visibleText: l10n.scanPhotographObject,
+        ),
+        (
+          name: 'food scan',
+          screen: ScanScreen(autoStart: false, scanMode: ScanMode.foodPlate),
+          visibleText: l10n.scanPhotographMeal,
         ),
         (
           name: 'measurement detail',

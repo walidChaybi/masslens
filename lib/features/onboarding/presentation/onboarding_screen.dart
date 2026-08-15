@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/l10n.dart';
+import '../../monetization/data/app_ad_service.dart';
+import '../../monetization/presentation/native_ad_card.dart';
 
 const _onboardingCanvas = Color(0xFFF7F8FC);
 const _onboardingInk = Color(0xFF090B10);
@@ -91,9 +93,31 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
     if (_page == 4) {
-      setState(() => _completionBusy = true);
-      await AppScope.of(context).completeOnboarding();
+      await _finishOnboarding();
     }
+  }
+
+  Future<void> _finishOnboarding() async {
+    if (_completionBusy || !mounted) return;
+    setState(() => _completionBusy = true);
+    final controller = AppScope.of(context);
+    // The explicit "let's go" tap is the transition into the app, which is
+    // where the single onboarding interstitial belongs. A missing ad never
+    // blocks entry.
+    await controller.monetization.showOnboardingCompletionInterstitial();
+    if (!mounted) return;
+    if (!controller.onboardingReviewPromptHandled) {
+      final requestReview = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const _OnboardingReviewDialog(),
+      );
+      if (!mounted) return;
+      await controller.handleOnboardingReview(
+        requestReview: requestReview ?? false,
+      );
+    }
+    if (mounted) await controller.completeOnboarding();
   }
 
   void _handlePageChanged(int page) {
@@ -128,18 +152,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       const Duration(milliseconds: 1200),
     );
     final controller = AppScope.of(context);
-    var interstitialReady = false;
     try {
       await controller.initializeMonetization();
-      if (!mounted || run != _preparationRun) return;
-      setState(() {
-        _scanAccessFinished = true;
-        _scanAccessReady = controller.monetization.access.isAuthoritative;
-      });
-      interstitialReady = await controller.monetization
-          .waitForOnboardingInterstitial(timeout: const Duration(seconds: 2));
     } on Object {
-      interstitialReady = false;
+      // The status rows below reflect whatever state initialization reached.
     }
 
     if (!mounted || run != _preparationRun) return;
@@ -150,19 +166,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _adSupportReady = controller.monetization.canRequestAds;
     });
     await minimumDisplay;
-    if (!mounted || run != _preparationRun || _page != 3) return;
-
-    if (interstitialReady && !controller.onboardingInterstitialShown) {
-      await controller.markOnboardingInterstitialShown();
-      if (mounted && run == _preparationRun && _page == 3) {
-        final shown = await controller.monetization
-            .showOnboardingInterstitial();
-        if (!shown) {
-          await controller.clearOnboardingInterstitialShownAfterFailedDisplay();
-        }
-      }
-    }
-
     if (!mounted || run != _preparationRun || _page != 3) return;
     setState(() {
       _preparing = false;
@@ -182,6 +185,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final monetization = AppScope.of(context).monetization;
+    final adsEnabled = monetization.canRequestNativeAds;
+    final PaidAdReporter reportPaidAd = monetization.reportPaidAd;
     return PopScope<void>(
       canPop: _page == 0,
       onPopInvokedWithResult: (didPop, _) {
@@ -207,6 +213,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     action: context.l10n.onboardingHeroCta,
                     visual: const _HeroVisual(),
                     onPressed: _advance,
+                    adEnabled: adsEnabled,
+                    adPlacement: 'onboarding_intro',
+                    onAdPaidEvent: reportPaidAd,
                   ),
                   _ContentPage(
                     key: const Key('onboarding_page_2'),
@@ -216,6 +225,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     action: context.l10n.onboardingFramingCta,
                     visual: const _FramingVisual(),
                     onPressed: _advance,
+                    adEnabled: adsEnabled,
+                    adPlacement: 'onboarding_framing',
+                    onAdPaidEvent: reportPaidAd,
                   ),
                   _ContentPage(
                     key: const Key('onboarding_page_3'),
@@ -225,6 +237,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     action: context.l10n.onboardingLightCta,
                     visual: const _LightingVisual(),
                     onPressed: _advance,
+                    adEnabled: adsEnabled,
+                    adPlacement: 'onboarding_light',
+                    onAdPaidEvent: reportPaidAd,
                   ),
                   _PreparingPage(
                     key: const Key('onboarding_page_4'),
@@ -243,6 +258,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     visual: const _ReadyVisual(),
                     onPressed: _completionBusy ? null : _advance,
                     actionBusy: _completionBusy,
+                    adEnabled: adsEnabled,
+                    adPlacement: 'onboarding_ready',
+                    onAdPaidEvent: reportPaidAd,
                   ),
                 ],
               ),
@@ -263,6 +281,9 @@ class _ContentPage extends StatelessWidget {
     required this.visual,
     required this.onPressed,
     this.actionBusy = false,
+    this.adEnabled = false,
+    this.adPlacement,
+    this.onAdPaidEvent,
     super.key,
   });
 
@@ -273,20 +294,28 @@ class _ContentPage extends StatelessWidget {
   final Widget visual;
   final VoidCallback? onPressed;
   final bool actionBusy;
+  final bool adEnabled;
+  final String? adPlacement;
+  final PaidAdReporter? onAdPaidEvent;
 
   @override
   Widget build(BuildContext context) {
+    final placement = adPlacement;
+    final showAd = adEnabled && placement != null;
     return Semantics(
       label: context.l10n.onboardingStepOfTotal(step, 5),
       explicitChildNodes: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxHeight < 700;
-          final visualHeight = switch (step) {
+          var visualHeight = switch (step) {
             1 => compact ? 250.0 : 430.0,
             5 => compact ? 220.0 : 360.0,
             _ => compact ? 270.0 : 400.0,
           };
+          // The visual gives up space for the native ad so the continue
+          // button stays above the fold.
+          if (showAd) visualHeight -= compact ? 70.0 : 120.0;
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 22),
             child: ConstrainedBox(
@@ -320,6 +349,15 @@ class _ContentPage extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
+                    if (showAd) ...[
+                      const SizedBox(height: 18),
+                      NativeAdCard(
+                        enabled: adEnabled,
+                        placement: placement,
+                        height: compact ? 88 : 108,
+                        onPaidEvent: onAdPaidEvent,
+                      ),
+                    ],
                     const SizedBox(height: 26),
                     _OnboardingButton(
                       key: const Key('onboarding_continue'),
@@ -372,6 +410,50 @@ class _OnboardingButton extends StatelessWidget {
                 ),
               )
             : Text(label),
+      ),
+    );
+  }
+}
+
+class _OnboardingReviewDialog extends StatelessWidget {
+  const _OnboardingReviewDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope<void>(
+      canPop: false,
+      child: AlertDialog(
+        key: const Key('onboarding_review_prompt'),
+        icon: const Icon(
+          Icons.star_rounded,
+          color: Color(0xFFFFB020),
+          size: 38,
+        ),
+        title: Text(
+          context.l10n.onboardingReviewTitle,
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          context.l10n.onboardingReviewBody,
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(
+            key: const Key('onboarding_review_later'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.onboardingReviewLater),
+          ),
+          FilledButton(
+            key: const Key('onboarding_review_now'),
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(context.l10n.onboardingReviewAction),
+          ),
+        ],
       ),
     );
   }

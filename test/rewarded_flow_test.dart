@@ -328,8 +328,8 @@ void main() {
           theme: buildAppTheme(),
           home: Scaffold(
             body: HomeScreen(
-              onMeasure: () {},
-              onGallery: () {},
+              onMeasure: (_) {},
+              onGallery: (_) {},
               onViewHistory: () {},
             ),
           ),

@@ -190,13 +190,15 @@ test("an idempotent retry replays the original result language", async () => {
   }
 });
 
-test("onboarding and drawer interstitial paid events are accepted", async () => {
+test("onboarding, drawer, and history interstitial events are accepted", async () => {
   const sqlite = createDatabase();
   try {
     for (const placement of [
       "onboarding_interstitial",
       "drawer_ai_scan_interstitial",
       "drawer_digital_scale_interstitial",
+      "drawer_history_interstitial",
+      "history_detail_interstitial",
     ]) {
       const response = await worker.fetch(
         new Request("https://masslens.example/metrics/ad-revenue", {

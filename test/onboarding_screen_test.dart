@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_library;
 import 'package:mass_lens/app/app_controller.dart';
 import 'package:mass_lens/app/mass_lens_app.dart';
+import 'package:mass_lens/core/services/app_review_service.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
 import 'package:mass_lens/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:mass_lens/l10n/generated/app_localizations.dart';
@@ -50,12 +51,53 @@ void main() {
 
     await tester.ensureVisible(find.byKey(const Key('onboarding_continue')));
     await tester.tap(find.byKey(const Key('onboarding_continue')));
-    await tester.tap(find.byKey(const Key('onboarding_continue')));
+    await tester.pump();
+    expect(find.byKey(const Key('onboarding_review_prompt')), findsOneWidget);
+    expect(find.text('Help MassLens grow'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('onboarding_review_later')));
     await tester.pumpAndSettle();
     expect(controller.onboardingComplete, isTrue);
     expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool('mass_lens.onboarding_complete'), isTrue);
+    expect(
+      preferences.getBool('mass_lens.onboarding_review_prompt_handled'),
+      isTrue,
+    );
+  });
+
+  testWidgets('review choice invokes Google Play once and never gates entry', (
+    tester,
+  ) async {
+    final review = _FakeAppReviewService();
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      appReviewService: review,
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(MassLensApp(controller: controller));
+    await tester.pump();
+
+    await _reachReadyPage(tester);
+    final continueButton = find.byKey(const Key('onboarding_continue'));
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pump();
+
+    expect(find.byKey(const Key('onboarding_review_prompt')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('onboarding_review_now')));
+    await tester.pumpAndSettle();
+
+    expect(review.requestCount, 1);
+    expect(controller.onboardingReviewPromptHandled, isTrue);
+    expect(controller.onboardingComplete, isTrue);
+    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+
+    expect(
+      await controller.handleOnboardingReview(requestReview: true),
+      isFalse,
+    );
+    expect(review.requestCount, 1);
   });
 
   testWidgets('Android Back returns to the preceding educational page', (
@@ -184,34 +226,21 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test('onboarding interstitial display guard persists idempotently', () async {
-    final controller = AppController(
-      measurementStore: const _FakeMeasurementStore(),
-    );
-    addTearDown(controller.dispose);
-    await controller.markOnboardingInterstitialShown();
-    await controller.markOnboardingInterstitialShown();
-
-    expect(controller.onboardingInterstitialShown, isTrue);
-    final preferences = await SharedPreferences.getInstance();
-    expect(
-      preferences.getBool('mass_lens.onboarding_interstitial_shown'),
-      isTrue,
-    );
-  });
-
-  test('onboarding interstitial guard survives a process relaunch', () async {
+  test('onboarding review decision survives a process relaunch', () async {
+    final review = _FakeAppReviewService();
     final first = AppController(
       measurementStore: const _FakeMeasurementStore(),
+      appReviewService: review,
     );
-    await first.markOnboardingInterstitialShown();
+    await first.handleOnboardingReview(requestReview: false);
     first.dispose();
 
     final relaunched = await AppController.bootstrap(
       store: const _FakeMeasurementStore(),
     );
     addTearDown(relaunched.dispose);
-    expect(relaunched.onboardingInterstitialShown, isTrue);
+    expect(relaunched.onboardingReviewPromptHandled, isTrue);
+    expect(review.requestCount, 0);
   });
 
   test('original onboarding artwork is optimized and cutouts keep alpha', () {
@@ -244,6 +273,25 @@ Future<void> _tapContinue(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 450));
 }
 
+Future<void> _reachReadyPage(WidgetTester tester) async {
+  await _tapContinue(tester);
+  await _tapContinue(tester);
+  await _tapContinue(tester);
+  await tester.pump(const Duration(milliseconds: 1700));
+  await tester.pump(const Duration(milliseconds: 500));
+  expect(find.byKey(const Key('onboarding_page_5')), findsOneWidget);
+}
+
 class _FakeMeasurementStore extends MeasurementStore {
   const _FakeMeasurementStore();
+}
+
+class _FakeAppReviewService implements AppReviewService {
+  int requestCount = 0;
+
+  @override
+  Future<bool> requestReview() async {
+    requestCount += 1;
+    return true;
+  }
 }

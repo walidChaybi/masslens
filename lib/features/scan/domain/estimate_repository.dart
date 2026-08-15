@@ -23,21 +23,25 @@ class EstimateRequest {
   const EstimateRequest({
     required this.imagePath,
     this.requestId = '',
+    this.scanMode = ScanMode.object,
     this.secondaryImagePath,
     this.material = 'Unknown',
     this.fillState = 'Unknown',
     this.referenceObject = 'None',
     this.knownDimension,
+    this.containerType,
     this.responseLocale = 'en',
   });
 
   final String imagePath;
   final String requestId;
+  final ScanMode scanMode;
   final String? secondaryImagePath;
   final String material;
   final String fillState;
   final String referenceObject;
   final KnownDimensionInput? knownDimension;
+  final String? containerType;
   final String responseLocale;
 }
 

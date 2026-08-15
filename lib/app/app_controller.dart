@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/services/app_review_service.dart';
 import '../core/services/installation_id_store.dart';
 import '../features/measurements/data/measurement_store.dart';
 import '../features/measurements/domain/measurement.dart';
@@ -14,16 +15,20 @@ class AppController extends ChangeNotifier {
     required MeasurementStore measurementStore,
     List<Measurement> measurements = const [],
     bool onboardingComplete = false,
-    bool onboardingInterstitialShown = false,
+    bool onboardingReviewPromptHandled = false,
+    bool postScanReviewRequested = false,
     UnitSystem unitSystem = UnitSystem.metric,
     DateTime? previousBackgroundedAt,
     MonetizationController? monetizationController,
+    AppReviewService? appReviewService,
   }) : _measurementStore = measurementStore,
        _measurements = List<Measurement>.from(measurements),
        _onboardingComplete = onboardingComplete,
-       _onboardingInterstitialShown = onboardingInterstitialShown,
+       _onboardingReviewPromptHandled = onboardingReviewPromptHandled,
+       _postScanReviewRequested = postScanReviewRequested,
        _unitSystem = unitSystem,
        _previousBackgroundedAt = previousBackgroundedAt,
+       _appReviewService = appReviewService ?? PlayAppReviewService(),
        monetization =
            monetizationController ?? MonetizationController.disabled() {
     monetization.addListener(notifyListeners);
@@ -31,8 +36,10 @@ class AppController extends ChangeNotifier {
 
   static const _onboardingKey = 'mass_lens.onboarding_complete';
   static const _onboardingSeenKey = 'mass_lens.onboarding_seen';
-  static const _onboardingInterstitialKey =
-      'mass_lens.onboarding_interstitial_shown';
+  static const _onboardingReviewPromptKey =
+      'mass_lens.onboarding_review_prompt_handled';
+  static const _postScanReviewRequestedKey =
+      'mass_lens.post_scan_review_requested';
   static const _forceOnboarding = bool.fromEnvironment(
     'MASSLENS_FORCE_ONBOARDING',
   );
@@ -40,24 +47,28 @@ class AppController extends ChangeNotifier {
   static const _backgroundedAtKey = 'mass_lens.backgrounded_at_ms';
 
   final MeasurementStore _measurementStore;
+  final AppReviewService _appReviewService;
   final MonetizationController monetization;
   final List<Measurement> _measurements;
   bool _onboardingComplete;
-  bool _onboardingInterstitialShown;
+  bool _onboardingReviewPromptHandled;
+  bool _postScanReviewRequested;
   UnitSystem _unitSystem;
   DateTime? _previousBackgroundedAt;
   Future<void> _backgroundPersistence = Future<void>.value();
 
   List<Measurement> get measurements => List.unmodifiable(_measurements);
   bool get onboardingComplete => _onboardingComplete;
-  bool get onboardingInterstitialShown => _onboardingInterstitialShown;
+  bool get onboardingReviewPromptHandled => _onboardingReviewPromptHandled;
+  bool get postScanReviewRequested => _postScanReviewRequested;
   UnitSystem get unitSystem => _unitSystem;
 
   static Future<AppController> bootstrap({
     MeasurementStore store = const MeasurementStore(),
   }) async {
     var onboardingComplete = false;
-    var onboardingInterstitialShown = false;
+    var onboardingReviewPromptHandled = false;
+    var postScanReviewRequested = false;
     var unitSystem = UnitSystem.metric;
     DateTime? previousBackgroundedAt;
     try {
@@ -81,8 +92,10 @@ class AppController extends ChangeNotifier {
         await preferences.setBool(_onboardingKey, false);
         await preferences.setBool(_onboardingSeenKey, true);
       }
-      onboardingInterstitialShown =
-          preferences.getBool(_onboardingInterstitialKey) ?? false;
+      onboardingReviewPromptHandled =
+          preferences.getBool(_onboardingReviewPromptKey) ?? false;
+      postScanReviewRequested =
+          preferences.getBool(_postScanReviewRequestedKey) ?? false;
       unitSystem = UnitSystem.values.byName(
         preferences.getString(_unitKey) ?? UnitSystem.metric.name,
       );
@@ -102,7 +115,8 @@ class AppController extends ChangeNotifier {
       onboardingComplete: kDebugMode && _forceOnboarding
           ? false
           : onboardingComplete,
-      onboardingInterstitialShown: onboardingInterstitialShown,
+      onboardingReviewPromptHandled: onboardingReviewPromptHandled,
+      postScanReviewRequested: postScanReviewRequested,
       unitSystem: unitSystem,
       previousBackgroundedAt: previousBackgroundedAt,
       monetizationController: MonetizationController.create(),
@@ -177,28 +191,56 @@ class AppController extends ChangeNotifier {
     unawaited(monetization.initialize());
   }
 
-  Future<void> markOnboardingInterstitialShown() async {
-    if (_onboardingInterstitialShown) return;
-    _onboardingInterstitialShown = true;
+  /// Records the one-time onboarding prompt before invoking Google Play.
+  ///
+  /// The review UI is optional and quota-controlled by Google. Persisting the
+  /// decision first prevents a relaunch or double tap from asking twice, while
+  /// a platform failure still lets onboarding finish normally.
+  Future<bool> handleOnboardingReview({required bool requestReview}) async {
+    if (_onboardingReviewPromptHandled) return false;
+    _onboardingReviewPromptHandled = true;
     notifyListeners();
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.setBool(_onboardingInterstitialKey, true);
+      await preferences.setBool(_onboardingReviewPromptKey, true);
     } on Object {
-      // The in-memory guard still prevents a duplicate in this session.
+      // The in-memory guard still prevents duplicates during this launch.
     }
+    if (!requestReview) return false;
+    return _appReviewService.requestReview().timeout(
+      const Duration(seconds: 4),
+      onTimeout: () => false,
+    );
   }
 
-  Future<void> clearOnboardingInterstitialShownAfterFailedDisplay() async {
-    if (!_onboardingInterstitialShown) return;
-    _onboardingInterstitialShown = false;
+  /// Requests the native Google in-app review sheet after the user has
+  /// successfully completed enough scans.
+  ///
+  /// This is intentionally fire-and-forget friendly: missing Play Store,
+  /// review quota, or plugin errors never block scans or navigation.
+  Future<void> maybeRequestPostScanReview() async {
+    if (_postScanReviewRequested) return;
+    if (monetization.completedScanCount < 3) return;
+
+    // Persist first so a crash/quota no-op never results in repeat prompts.
+    _postScanReviewRequested = true;
     notifyListeners();
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.remove(_onboardingInterstitialKey);
+      await preferences.setBool(_postScanReviewRequestedKey, true);
     } on Object {
-      // A stale true is safer than replaying an ad that may have appeared.
+      // Offline or missing storage still keeps the in-memory guard.
     }
+
+    unawaited(() async {
+      try {
+        await _appReviewService.requestReview().timeout(
+          const Duration(seconds: 4),
+        );
+      } on Object {
+        // Best effort only.
+      }
+    }());
   }
 
   Future<void> setUnitSystem(UnitSystem value) async {
@@ -217,6 +259,14 @@ class AppController extends ChangeNotifier {
     if (_measurements.any((item) => item.id == measurement.id)) return;
     final persisted = await _measurementStore.persistImage(measurement);
     _measurements.insert(0, persisted);
+    notifyListeners();
+    await _measurementStore.saveAll(_measurements);
+  }
+
+  Future<void> updateMeasurement(Measurement measurement) async {
+    final index = _measurements.indexWhere((item) => item.id == measurement.id);
+    if (index == -1) return;
+    _measurements[index] = measurement;
     notifyListeners();
     await _measurementStore.saveAll(_measurements);
   }

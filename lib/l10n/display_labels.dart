@@ -1,3 +1,4 @@
+import '../features/measurements/domain/fun_weight_comparisons.dart';
 import '../features/measurements/domain/measurement.dart';
 import '../features/monetization/domain/access_status.dart';
 import 'generated/app_localizations.dart';
@@ -51,8 +52,31 @@ String localizedReferenceObject(AppLocalizations l10n, String value) =>
       'None' => l10n.referenceNone,
       'Ruler' => l10n.referenceRuler,
       'Standard card' => l10n.referenceStandardCard,
+      'Coin' => l10n.referenceCoin,
       _ => value,
     };
+
+String localizedFunWeightUnit(AppLocalizations l10n, FunWeightUnit unit) =>
+    switch (unit) {
+      FunWeightUnit.aaBattery => l10n.funUnitAaBattery,
+      FunWeightUnit.smartphone => l10n.funUnitSmartphone,
+      FunWeightUnit.baguette => l10n.funUnitBaguette,
+      FunWeightUnit.sodaCan => l10n.funUnitSodaCan,
+      FunWeightUnit.soccerBall => l10n.funUnitSoccerBall,
+      FunWeightUnit.cat => l10n.funUnitCat,
+      FunWeightUnit.watermelon => l10n.funUnitWatermelon,
+      FunWeightUnit.carTire => l10n.funUnitCarTire,
+      FunWeightUnit.washingMachine => l10n.funUnitWashingMachine,
+    };
+
+String localizedFunWeightComparison(
+  AppLocalizations l10n,
+  FunWeightComparison comparison,
+) =>
+    comparison.parts
+        .map((part) =>
+            '≈ ${part.quantityText} × ${localizedFunWeightUnit(l10n, part.unit)}')
+        .join(', ');
 
 String localizedDimensionAxis(AppLocalizations l10n, String value) =>
     switch (value) {

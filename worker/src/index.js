@@ -8,6 +8,15 @@ import {
   refundScan,
   reserveScan,
 } from "./monetization.js";
+import {
+  enrichFoodEstimate,
+  foodDeveloperPrompt,
+  foodLocalizedTexts,
+  foodRequestPrompt,
+  foodResponseFormat,
+  NutritionError,
+  validateFoodEstimate,
+} from "./food.js";
 
 const maxRequestCharacters = 17 * 1024 * 1024;
 const maxImageBase64Characters = 8 * 1024 * 1024;
@@ -42,10 +51,17 @@ const fillStateChoices = [
   "Partly filled",
   "Full",
 ];
-const referenceObjectChoices = ["None", "Ruler", "Standard card"];
-const dimensionAxisChoices = ["Length", "Width", "Height", "Depth"];
+const referenceObjectChoices = ["None", "Ruler", "Standard card", "Coin"];
+const dimensionAxisChoices = [
+  "Length",
+  "Width",
+  "Height",
+  "Depth",
+  "Diameter",
+];
 const dimensionUnitChoices = ["cm", "in"];
 const responseLocaleChoices = ["en", "fr", "es"];
+const scanModeChoices = ["object", "food_plate"];
 const mimeTypeChoices = [
   "image/jpeg",
   "image/png",
@@ -58,7 +74,11 @@ export default {
     try {
       return await routeRequest(request, env);
     } catch (error) {
-      if (error instanceof ApiError || error instanceof MonetizationError) {
+      if (
+        error instanceof ApiError ||
+        error instanceof MonetizationError ||
+        error instanceof NutritionError
+      ) {
         return errorResponse(error.status, error.code, error.message);
       }
 
@@ -108,6 +128,18 @@ async function routeRequest(request, env) {
   const requestId = readRequestId(request);
   await enforceRateLimits(request, env, clientId);
   const data = await readRequestJson(request);
+  const scanMode = readChoice(
+    data.scanMode ?? "object",
+    "scanMode",
+    scanModeChoices,
+  );
+  if (scanMode === "food_plate" && !env.USDA_FDC_API_KEY) {
+    throw new ApiError(
+      503,
+      "nutrition_service_not_configured",
+      "Nutrition data is not configured.",
+    );
+  }
   const responseLocale = readChoice(
     data.responseLocale ?? "en",
     "responseLocale",
@@ -141,6 +173,7 @@ async function routeRequest(request, env) {
     referenceObjectChoices,
   );
   const knownDimension = readKnownDimension(data.knownDimension);
+  const containerType = readOptionalText(data.containerType, "containerType");
   const images = readImages(data);
   const clientIdHash = await hashIdentifier(clientId);
   const reservation = await reserveScan(env, clientIdHash, requestId);
@@ -159,17 +192,18 @@ async function routeRequest(request, env) {
   try {
     await enforceDailyAiCostLimit(env);
     const result = await requestOpenAi(env, {
+      scanMode,
       category,
       structure,
       material,
       fillState,
       referenceObject,
       knownDimension,
+      containerType,
       images,
       responseLocale,
       safetyIdentifier: clientIdHash,
     });
-    await completeScan(env, clientIdHash, reservation, result.estimate);
     try {
       await recordAiUsage(env, result.usage);
     } catch (error) {
@@ -177,7 +211,11 @@ async function routeRequest(request, env) {
         name: error instanceof Error ? error.name : "UnknownError",
       });
     }
-    return jsonResponse(result.estimate, 200, {
+    const estimate = scanMode === "food_plate"
+      ? await enrichFoodEstimate(env, result.estimate)
+      : result.estimate;
+    await completeScan(env, clientIdHash, reservation, estimate, scanMode);
+    return jsonResponse(estimate, 200, {
       "X-MassLens-AI-Model": result.usage.model,
       "X-MassLens-Input-Tokens": String(result.usage.inputTokens),
       "X-MassLens-Output-Tokens": String(result.usage.outputTokens),
@@ -191,6 +229,7 @@ async function routeRequest(request, env) {
 function productionConfigurationErrors(env) {
   const errors = [];
   if (!env.OPENAI_API_KEY) errors.push("OPENAI_API_KEY is missing");
+  if (!env.USDA_FDC_API_KEY) errors.push("USDA_FDC_API_KEY is missing");
   if (!env.DB) errors.push("D1 database binding is missing");
   if (env.SCAN_ACCESS_ENFORCED !== "true") {
     errors.push("SCAN_ACCESS_ENFORCED must be true");
@@ -267,6 +306,19 @@ function readChoice(value, name, choices) {
     throw new ApiError(400, "invalid_request", `Invalid ${name}.`);
   }
   return value;
+}
+
+function readOptionalText(value, name) {
+  if (value === undefined || value === null || value === "") return null;
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    value.length > 80 ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  ) {
+    throw new ApiError(400, "invalid_request", `Invalid ${name}.`);
+  }
+  return value.trim();
 }
 
 function readKnownDimension(value) {
@@ -364,20 +416,83 @@ function readImages(data) {
   return images;
 }
 
-async function requestOpenAi(
+// Small models sometimes copy packaging or engraved text (Korean on Samsung
+// products, Chinese on shipping labels, ...) into the answer despite the
+// language instruction. Detect those scripts so we can retry once.
+const foreignScriptPattern = new RegExp(
+  "[\\p{Script=Han}\\p{Script=Hangul}\\p{Script=Hiragana}" +
+    "\\p{Script=Katakana}\\p{Script=Cyrillic}\\p{Script=Arabic}" +
+    "\\p{Script=Hebrew}\\p{Script=Thai}\\p{Script=Devanagari}]",
+  "u",
+);
+
+function estimateUsesForeignScript(estimate, scanMode) {
+  const texts = scanMode === "food_plate"
+    ? foodLocalizedTexts(estimate)
+    : [
+      estimate.object_label,
+      ...(Array.isArray(estimate.assumptions) ? estimate.assumptions : []),
+    ];
+  return texts.some(
+    (text) => typeof text === "string" && foreignScriptPattern.test(text),
+  );
+}
+
+async function requestOpenAi(env, params) {
+  const first = await callOpenAi(env, params);
+  if (!estimateUsesForeignScript(first.estimate, params.scanMode)) return first;
+
+  console.warn("AI estimate used a foreign script; retrying once", {
+    responseLocale: params.responseLocale,
+  });
+  let second;
+  try {
+    second = await callOpenAi(env, params, {retryForLanguage: true});
+  } catch {
+    // The first estimate is still numerically usable; wrong-language text
+    // beats a failed scan.
+    return first;
+  }
+
+  return {
+    estimate: estimateUsesForeignScript(second.estimate, params.scanMode)
+      ? first.estimate
+      : second.estimate,
+    usage: {
+      model: second.usage.model,
+      inputTokens: first.usage.inputTokens + second.usage.inputTokens,
+      outputTokens: first.usage.outputTokens + second.usage.outputTokens,
+    },
+  };
+}
+
+async function callOpenAi(
   env,
   {
+    scanMode,
     category,
     structure,
     material,
     fillState,
     referenceObject,
     knownDimension,
+    containerType,
     images,
     responseLocale,
     safetyIdentifier,
   },
+  {retryForLanguage = false} = {},
 ) {
+  const language = responseLocaleInstructions[responseLocale].language;
+  const localizedFields = scanMode === "food_plate"
+    ? "meal_label, item labels, or the assumptions"
+    : "object_label or the assumptions";
+  const retryInstruction = `
+IMPORTANT: A previous attempt wrote ${localizedFields} in the
+wrong language by copying text visible in the photos. Write every
+human-readable value strictly in ${language}, translating any product or
+packaging text.`;
+  const isFood = scanMode === "food_plate";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -389,10 +504,14 @@ async function requestOpenAi(
       reasoning: {effort: env.OPENAI_REASONING_EFFORT || "minimal"},
       safety_identifier: safetyIdentifier,
       store: false,
-      max_output_tokens: Number(env.OPENAI_MAX_OUTPUT_TOKENS || 800),
+      max_output_tokens: Number(
+        isFood
+          ? env.OPENAI_FOOD_MAX_OUTPUT_TOKENS || 1600
+          : env.OPENAI_MAX_OUTPUT_TOKENS || 800,
+      ),
       text: {
         verbosity: "low",
-        format: responseFormat,
+        format: isFood ? foodResponseFormat : responseFormat,
       },
       input: [
         {
@@ -400,7 +519,13 @@ async function requestOpenAi(
           content: [
             {
               type: "input_text",
-              text: developerPrompt(responseLocale),
+              text: retryForLanguage
+                ? (isFood
+                  ? foodDeveloperPrompt(responseLocale)
+                  : developerPrompt(responseLocale)) + retryInstruction
+                : isFood
+                  ? foodDeveloperPrompt(responseLocale)
+                  : developerPrompt(responseLocale),
             },
           ],
         },
@@ -409,22 +534,33 @@ async function requestOpenAi(
           content: [
             {
               type: "input_text",
-              text: requestPrompt({
-                category,
-                structure,
-                material,
-                fillState,
-                referenceObject,
-                knownDimension,
-                imageCount: images.length,
-              }),
+              text: isFood
+                ? foodRequestPrompt({
+                  containerType,
+                  referenceObject,
+                  knownDimension,
+                  imageCount: images.length,
+                })
+                : requestPrompt({
+                  category,
+                  structure,
+                  material,
+                  fillState,
+                  referenceObject,
+                  knownDimension,
+                  imageCount: images.length,
+                }),
             },
             ...images.flatMap((image, index) => [
               {
                 type: "input_text",
                 text: index === 0
-                  ? "Primary view of the object:"
-                  : "Second angle of the same physical object:",
+                  ? isFood
+                    ? "Primary view of the whole meal:"
+                    : "Primary view of the object:"
+                  : isFood
+                    ? "Second angle of the same meal:"
+                    : "Second angle of the same physical object:",
               },
               {
                 type: "input_image",
@@ -470,7 +606,7 @@ async function requestOpenAi(
   }
 
   return {
-    estimate: extractStructuredPayload(decoded),
+    estimate: extractStructuredPayload(decoded, scanMode),
     usage: {
       model: env.OPENAI_MODEL || "gpt-5-nano",
       inputTokens: Number(decoded.usage?.input_tokens || 0),
@@ -479,15 +615,15 @@ async function requestOpenAi(
   };
 }
 
-function extractStructuredPayload(response) {
+function extractStructuredPayload(response, scanMode) {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
-    return parseEstimate(response.output_text);
+    return parseEstimate(response.output_text, scanMode);
   }
 
   for (const item of response.output || []) {
     for (const block of item.content || []) {
       if (typeof block.text === "string" && block.text.trim()) {
-        return parseEstimate(block.text);
+        return parseEstimate(block.text, scanMode);
       }
     }
   }
@@ -499,7 +635,7 @@ function extractStructuredPayload(response) {
   );
 }
 
-function parseEstimate(text) {
+function parseEstimate(text, scanMode) {
   let estimate;
   try {
     estimate = JSON.parse(text);
@@ -511,7 +647,11 @@ function parseEstimate(text) {
     );
   }
 
-  validateEstimate(estimate);
+  if (scanMode === "food_plate") {
+    validateFoodEstimate(estimate);
+  } else {
+    validateEstimate(estimate);
+  }
   return estimate;
 }
 
@@ -719,6 +859,10 @@ function developerPrompt(responseLocale) {
   return `${baseDeveloperPrompt}
 Output language rules:
 - Write object_label and all three assumptions in ${locale.language}.
+- Photos often show packaging, engraved, or on-screen text in other languages
+  (for example Korean on Samsung products). Never copy that text into
+  object_label or the assumptions; translate it and answer in
+  ${locale.language} only, using its standard alphabet.
 - Begin the three assumptions, in order, with ${locale.prefixes}
 - Keep every JSON property name and the category and confidence values as the
   schema's exact canonical English tokens. Never translate those tokens.

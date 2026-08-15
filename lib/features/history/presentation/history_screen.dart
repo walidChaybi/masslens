@@ -39,6 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               .toList();
 
     return SafeArea(
+      key: const Key('history_screen'),
       child: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -122,13 +123,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     MeasurementCard(
                       measurement: visible[index],
                       unitSystem: controller.unitSystem,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MeasurementDetailScreen(
-                            measurement: visible[index],
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MeasurementDetailScreen(
+                              measurement: visible[index],
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                        if (!mounted) return;
+                        await controller.monetization.onHistoryDetailClosed();
+                      },
                     ),
                     const SizedBox(height: 11),
                     if (index == 1) ...[

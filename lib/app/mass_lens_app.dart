@@ -28,8 +28,10 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
     _onboardingComplete = widget.controller.onboardingComplete;
     widget.controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addObserver(this);
-    if (widget.controller.monetization.enabled && _onboardingComplete) {
-      _checkingResumeAd = true;
+    if (widget.controller.monetization.enabled) {
+      // Only completed users wait behind the resume-ad overlay; new users go
+      // straight to onboarding while consent and inventory warm up beneath it.
+      _checkingResumeAd = _onboardingComplete;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_initializeAdsForLaunch());
       });
@@ -52,9 +54,9 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeAdsForLaunch() async {
-    // New users initialize consent and ad inventory on the explicit
-    // "Almost ready" step, so an SDK-owned consent form never interrupts the
-    // educational pages. Completed users still initialize on launch.
+    // Consent and ad inventory initialize on the very first frame so the
+    // onboarding pages can monetize immediately. Launch app-open ads remain
+    // reserved for users who already completed onboarding.
     final allowLaunchAd = _onboardingComplete;
     try {
       await widget.controller.initializeMonetization();

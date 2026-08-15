@@ -306,9 +306,9 @@ class AppAdService {
     return _showInterstitial(placement: 'interstitial');
   }
 
-  /// Shows at the explicit transition out of onboarding. It intentionally
-  /// bypasses completed-scan cadence while sharing the regular interstitial's
-  /// inventory, in-flight guard, and cooldown.
+  /// Shows on the final onboarding button, at the explicit transition into
+  /// the app. It bypasses completed-scan cadence while sharing the regular
+  /// interstitial's inventory, in-flight guard, and cooldown.
   Future<bool> showOnboardingInterstitial() =>
       _showInterstitial(placement: 'onboarding_interstitial');
 
@@ -320,6 +320,20 @@ class AppAdService {
             ? 'drawer_ai_scan_interstitial'
             : 'drawer_digital_scale_interstitial',
       );
+
+  /// History is another content destination, but it is kept separate from
+  /// settings and help so utility navigation stays interruption-free.
+  Future<bool> showDrawerHistoryInterstitial() =>
+      _showInterstitial(placement: 'drawer_history_interstitial');
+
+  /// A second saved-result close is a genuine content break. Failed/no-fill
+  /// attempts remain silent and the shared cooldown still caps frequency.
+  Future<bool> showHistoryDetailInterstitial(int completedDetailViews) {
+    if (!_policy.isHistoryInterstitialBreak(completedDetailViews)) {
+      return Future<bool>.value(false);
+    }
+    return _showInterstitial(placement: 'history_detail_interstitial');
+  }
 
   Future<bool> _showInterstitial({required String placement}) async {
     if (!canRequestAds ||

@@ -56,6 +56,9 @@ void main() {
     expect(find.text('You’re ready to scan'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('onboarding_continue')));
     await tester.tap(find.byKey(const Key('onboarding_continue')));
+    await tester.pump();
+    expect(find.byKey(const Key('onboarding_review_prompt')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('onboarding_review_later')));
     await tester.pumpAndSettle();
 
     expect(controller.onboardingComplete, isTrue);
@@ -491,8 +494,8 @@ void main() {
             theme: buildAppTheme(),
             home: Scaffold(
               body: HomeScreen(
-                onMeasure: () {},
-                onGallery: () {},
+                onMeasure: (_) {},
+                onGallery: (_) {},
                 onViewHistory: () {},
               ),
             ),

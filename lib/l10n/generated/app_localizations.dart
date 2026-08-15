@@ -112,6 +112,18 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get commonCancel;
 
+  /// No description provided for @commonNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get commonNo;
+
+  /// No description provided for @commonOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get commonOk;
+
   /// No description provided for @commonClose.
   ///
   /// In en, this message translates to:
@@ -153,6 +165,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Saved'**
   String get commonSaved;
+
+  /// No description provided for @commonShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get commonShare;
 
   /// No description provided for @commonStartOver.
   ///
@@ -375,6 +393,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Standard card'**
   String get referenceStandardCard;
+
+  /// No description provided for @referenceCoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Coin'**
+  String get referenceCoin;
+
+  /// No description provided for @scanReferenceTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip: for best accuracy, place a coin (or a card) next to the object.'**
+  String get scanReferenceTip;
+
+  /// No description provided for @funUnitAaBattery.
+  ///
+  /// In en, this message translates to:
+  /// **'AA battery'**
+  String get funUnitAaBattery;
+
+  /// No description provided for @funUnitSmartphone.
+  ///
+  /// In en, this message translates to:
+  /// **'smartphone'**
+  String get funUnitSmartphone;
+
+  /// No description provided for @funUnitBaguette.
+  ///
+  /// In en, this message translates to:
+  /// **'baguette'**
+  String get funUnitBaguette;
+
+  /// No description provided for @funUnitSodaCan.
+  ///
+  /// In en, this message translates to:
+  /// **'soda can'**
+  String get funUnitSodaCan;
+
+  /// No description provided for @funUnitSoccerBall.
+  ///
+  /// In en, this message translates to:
+  /// **'soccer ball'**
+  String get funUnitSoccerBall;
+
+  /// No description provided for @funUnitCat.
+  ///
+  /// In en, this message translates to:
+  /// **'cat'**
+  String get funUnitCat;
+
+  /// No description provided for @funUnitWatermelon.
+  ///
+  /// In en, this message translates to:
+  /// **'watermelon'**
+  String get funUnitWatermelon;
+
+  /// No description provided for @funUnitCarTire.
+  ///
+  /// In en, this message translates to:
+  /// **'car tire'**
+  String get funUnitCarTire;
+
+  /// No description provided for @funUnitWashingMachine.
+  ///
+  /// In en, this message translates to:
+  /// **'washing machine'**
+  String get funUnitWashingMachine;
 
   /// No description provided for @axisLength.
   ///
@@ -652,6 +736,30 @@ abstract class AppLocalizations {
   /// **'Let’s go'**
   String get onboardingReadyCta;
 
+  /// No description provided for @onboardingReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help MassLens grow'**
+  String get onboardingReviewTitle;
+
+  /// No description provided for @onboardingReviewBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Would you like to leave an honest review on Google Play? It takes a moment and helps us improve.'**
+  String get onboardingReviewBody;
+
+  /// No description provided for @onboardingReviewLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get onboardingReviewLater;
+
+  /// No description provided for @onboardingReviewAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review app'**
+  String get onboardingReviewAction;
+
   /// No description provided for @onboardingScanAccessLabel.
   ///
   /// In en, this message translates to:
@@ -724,6 +832,30 @@ abstract class AppLocalizations {
   /// **'Photo'**
   String get homePhoto;
 
+  /// No description provided for @homeModeObject.
+  ///
+  /// In en, this message translates to:
+  /// **'Object'**
+  String get homeModeObject;
+
+  /// No description provided for @homeModeFoodMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Food & macros'**
+  String get homeModeFoodMacros;
+
+  /// No description provided for @homeFoodModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph one whole plate to estimate each food\'s weight, calories and macros.'**
+  String get homeFoodModeHint;
+
+  /// No description provided for @homeScanFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan food plate'**
+  String get homeScanFood;
+
   /// No description provided for @shellDigitalScale.
   ///
   /// In en, this message translates to:
@@ -771,6 +903,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Bluetooth readings are measurements. Touch mode is a simulator; AI scans are real visual estimates.'**
   String get shellMeasurementNotice;
+
+  /// No description provided for @shellExitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit MassLens?'**
+  String get shellExitTitle;
+
+  /// No description provided for @shellExitBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to exit the app?'**
+  String get shellExitBody;
 
   /// No description provided for @guideEyebrow.
   ///
@@ -1155,6 +1299,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review or change consent'**
   String get settingsReviewConsent;
+
+  /// No description provided for @settingsPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get settingsPrivacyPolicy;
+
+  /// No description provided for @settingsPrivacyPolicyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'How photos, local history, AI analysis and USDA food searches are handled'**
+  String get settingsPrivacyPolicyBody;
+
+  /// No description provided for @settingsPrivacyPolicyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Add the privacy-policy URL in the release configuration.'**
+  String get settingsPrivacyPolicyUnavailable;
+
+  /// No description provided for @settingsPrivacyPolicyOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The privacy policy could not be opened.'**
+  String get settingsPrivacyPolicyOpenFailed;
 
   /// No description provided for @settingsClearHistory.
   ///
@@ -1563,6 +1731,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The AI analysis could not be completed. Check the connection and try again; no fabricated result was created.'**
   String get scanCloudFailure;
+
+  /// No description provided for @scanNoFoodDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'No visible food was found. Try again with one whole plate in frame; the scan was refunded.'**
+  String get scanNoFoodDetected;
+
+  /// No description provided for @scanNutritionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'USDA nutrition data is temporarily unavailable. Try again later; the scan was refunded.'**
+  String get scanNutritionUnavailable;
+
+  /// No description provided for @scanNutritionNoMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No complete USDA nutrition match was found for this meal. Try a clearer photo; the scan was refunded.'**
+  String get scanNutritionNoMatch;
+
+  /// No description provided for @scanFoodScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Food Scale'**
+  String get scanFoodScale;
+
+  /// No description provided for @scanPhotographMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph one whole plate'**
+  String get scanPhotographMeal;
+
+  /// No description provided for @scanConfirmMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the whole meal is visible'**
+  String get scanConfirmMeal;
+
+  /// No description provided for @scanAnalyzeMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze food & macros'**
+  String get scanAnalyzeMeal;
+
+  /// No description provided for @scanFoodOptionalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional plate details'**
+  String get scanFoodOptionalDetails;
+
+  /// No description provided for @scanContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Container type'**
+  String get scanContainer;
+
+  /// No description provided for @scanContainerUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get scanContainerUnknown;
+
+  /// No description provided for @scanContainerPlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate'**
+  String get scanContainerPlate;
+
+  /// No description provided for @scanContainerBowl.
+  ///
+  /// In en, this message translates to:
+  /// **'Bowl'**
+  String get scanContainerBowl;
+
+  /// No description provided for @scanContainerCup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cup'**
+  String get scanContainerCup;
+
+  /// No description provided for @scanContainerTray.
+  ///
+  /// In en, this message translates to:
+  /// **'Tray'**
+  String get scanContainerTray;
+
+  /// No description provided for @scanContainerNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No container'**
+  String get scanContainerNone;
+
+  /// No description provided for @scanPlateDiameter.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate or bowl diameter (optional)'**
+  String get scanPlateDiameter;
+
+  /// No description provided for @scanFoodReferenceTip.
+  ///
+  /// In en, this message translates to:
+  /// **'A visible coin, card, ruler, or known plate diameter can narrow the weight range.'**
+  String get scanFoodReferenceTip;
+
+  /// No description provided for @scanProgressIdentifyFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Identifying visible foods…'**
+  String get scanProgressIdentifyFood;
+
+  /// No description provided for @scanProgressMatchUsda.
+  ///
+  /// In en, this message translates to:
+  /// **'Matching USDA nutrition data…'**
+  String get scanProgressMatchUsda;
+
+  /// No description provided for @scanProgressNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating calories and macros…'**
+  String get scanProgressNutrition;
+
+  /// No description provided for @scanFoodTotalWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated net food weight'**
+  String get scanFoodTotalWeight;
+
+  /// No description provided for @scanFoodComponents.
+  ///
+  /// In en, this message translates to:
+  /// **'Food components'**
+  String get scanFoodComponents;
+
+  /// No description provided for @scanNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition'**
+  String get scanNutrition;
+
+  /// No description provided for @scanCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories'**
+  String get scanCalories;
+
+  /// No description provided for @scanProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein'**
+  String get scanProtein;
+
+  /// No description provided for @scanCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs'**
+  String get scanCarbs;
+
+  /// No description provided for @scanFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat'**
+  String get scanFat;
+
+  /// No description provided for @scanEditAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct amount'**
+  String get scanEditAmount;
+
+  /// No description provided for @scanRemoveItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove false detection'**
+  String get scanRemoveItem;
+
+  /// No description provided for @scanAmountGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount in grams'**
+  String get scanAmountGrams;
+
+  /// No description provided for @scanOriginalAiRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Original AI range'**
+  String get scanOriginalAiRange;
+
+  /// No description provided for @scanUsdaSource.
+  ///
+  /// In en, this message translates to:
+  /// **'USDA source'**
+  String get scanUsdaSource;
+
+  /// No description provided for @scanNutritionMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight only — no complete USDA nutrition match'**
+  String get scanNutritionMissing;
+
+  /// No description provided for @scanPartialTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial total'**
+  String get scanPartialTotal;
+
+  /// No description provided for @scanCompleteTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete total'**
+  String get scanCompleteTotal;
+
+  /// No description provided for @scanFoodDisclaimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate photo-based estimate. Not a medical device or dietary advice.'**
+  String get scanFoodDisclaimer;
+
+  /// No description provided for @scanFoodEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct food amount'**
+  String get scanFoodEditTitle;
+
+  /// No description provided for @scanFoodEditBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition totals will use your amount; the original AI range stays visible.'**
+  String get scanFoodEditBody;
+
+  /// No description provided for @scanFoodAmountPositive.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an amount greater than zero.'**
+  String get scanFoodAmountPositive;
+
+  /// No description provided for @scanFoodAtLeastOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep at least one food component.'**
+  String get scanFoodAtLeastOne;
+
+  /// No description provided for @scanRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get scanRemove;
 
   /// No description provided for @scaleWatchAdGetScan.
   ///

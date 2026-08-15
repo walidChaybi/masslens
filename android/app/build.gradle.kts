@@ -32,6 +32,7 @@ val dartDefines = providers.gradleProperty("dart-defines").orNull
 if (buildingRelease) {
     val requiredDefines = listOf(
         "MASSLENS_API_URL",
+        "MASSLENS_PRIVACY_URL",
         "ADMOB_NATIVE_AD_UNIT_ID",
         "ADMOB_REWARDED_AD_UNIT_ID",
         "ADMOB_INTERSTITIAL_AD_UNIT_ID",
@@ -51,6 +52,14 @@ if (buildingRelease) {
     }
     check(dartDefines.getValue("MASSLENS_API_URL").startsWith("https://")) {
         "MASSLENS_API_URL must use HTTPS."
+    }
+    val privacyPolicyUrl = dartDefines.getValue("MASSLENS_PRIVACY_URL")
+    check(
+        privacyPolicyUrl.startsWith("https://") &&
+            !privacyPolicyUrl.contains(".example") &&
+            !privacyPolicyUrl.contains("localhost")
+    ) {
+        "MASSLENS_PRIVACY_URL must be a public HTTPS URL, not a placeholder."
     }
 }
 

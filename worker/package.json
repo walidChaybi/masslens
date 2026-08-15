@@ -8,6 +8,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "eval": "node scripts/evaluate.mjs",
+    "eval:food": "node scripts/evaluate-food.mjs",
     "logs": "wrangler tail"
   },
   "devDependencies": {

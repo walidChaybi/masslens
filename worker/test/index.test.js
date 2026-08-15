@@ -290,6 +290,75 @@ test("one or two views are proxied without exposing the client identifier", asyn
   }
 });
 
+test("a wrong-language estimate is retried once with a corrective prompt", async () => {
+  const originalFetch = globalThis.fetch;
+  const koreanEstimate = {
+    object_label: "에어팟 무선 이어폰",
+    category: "Electronics",
+    estimate_grams: 50,
+    lower_bound_grams: 40,
+    upper_bound_grams: 65,
+    confidence: "medium",
+    dimensions_mm: {width: 50, height: 28, depth: 50},
+    assumptions: [
+      "Size: 케이스 크기 기준",
+      "Material: 플라스틱",
+      "Uncertainty: 스케일 없음",
+    ],
+  };
+  const frenchEstimate = {
+    ...koreanEstimate,
+    object_label: "Écouteurs sans fil avec boîtier",
+    assumptions: [
+      "Taille : déduite du boîtier standard",
+      "Matériau : plastique creux",
+      "Incertitude : aucune référence d'échelle",
+    ],
+  };
+
+  const seenDeveloperPrompts = [];
+  globalThis.fetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    seenDeveloperPrompts.push(body.input[0].content[0].text);
+    const estimate =
+      seenDeveloperPrompts.length === 1 ? koreanEstimate : frenchEstimate;
+    return new Response(
+      JSON.stringify({
+        output: [{content: [{text: JSON.stringify(estimate)}]}],
+      }),
+      {status: 200, headers: {"Content-Type": "application/json"}},
+    );
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://masslens.example/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+          "X-MassLens-Request-ID": "request_identifier_ko_001",
+        },
+        body: JSON.stringify({
+          imageBase64: "aW1hZ2U=",
+          mimeType: "image/jpeg",
+          responseLocale: "fr",
+        }),
+      }),
+      env,
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), frenchEstimate);
+    assert.equal(seenDeveloperPrompts.length, 2);
+    assert.doesNotMatch(seenDeveloperPrompts[0], /previous attempt/);
+    assert.match(seenDeveloperPrompts[1], /previous attempt.*wrong language/s);
+    assert.match(seenDeveloperPrompts[1], /strictly in French/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("AI estimates require positive dimensions and three evidence summaries", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(

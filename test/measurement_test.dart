@@ -27,7 +27,7 @@ void main() {
     expect(restored.id, measurement.id);
     expect(restored.createdAt, measurement.createdAt);
     expect(restored.estimateGrams, measurement.estimateGrams);
-    expect(restored.dimensions.width, 320);
+    expect(restored.dimensions!.width, 320);
     expect(restored.assumptions, ['Hollow construction']);
     expect(restored.analysisLocale, 'fr');
   });
@@ -144,6 +144,6 @@ void main() {
 
     expect(measurement.objectLabel, 'Ceramic mug');
     expect(measurement.estimateGrams, 360);
-    expect(measurement.dimensions.height, 105);
+    expect(measurement.dimensions!.height, 105);
   });
 }

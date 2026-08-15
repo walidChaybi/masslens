@@ -14,19 +14,39 @@ npm install
 npx wrangler login
 npx wrangler d1 migrations apply masslens-billing --remote
 npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put USDA_FDC_API_KEY
 npm run check
 npx wrangler deploy
 curl -f https://masslens-api.masslens.workers.dev/ready
 ```
 
-`/ready` fails unless the OpenAI secret, D1 binding, enforced wallet, and
-`gpt-5-nano` are configured. Migration 0003 creates the ads wallet, idempotent
-request/result cache, and daily metrics without deleting old ledgers. Migration
-0004 adds durable reward-attempt reconciliation and an audited support-credit
-ledger. Migration 0005 adds the separate idempotent mobile-SDK reward ledger and
-server cooldown lease; it does not create signed SSV transactions. The default
-AI cost ceiling is $5/day
+`/ready` fails unless the OpenAI and USDA secrets, D1 binding, enforced wallet,
+and `gpt-5-nano` are configured. `USDA_FDC_API_KEY` must be a production
+data.gov key, not the rate-limited public demo key. Keep it in the Worker secret
+store only; never put it in Flutter assets, a `--dart-define`, source control, or
+client logs. For local smoke tests only, USDA documents the public `DEMO_KEY`
+(30 requests per IP per hour and 50 per day). A free personal data.gov key uses
+the normal FoodData Central limit, currently 1,000 requests per hour per IP, and
+is the correct choice for staging and production. See
+https://fdc.nal.usda.gov/api-guide/. Migration 0003 creates the ads wallet, idempotent request/result
+cache, and daily metrics without deleting old ledgers. Migration 0004 adds
+durable reward-attempt reconciliation and an audited support-credit ledger.
+Migration 0005 adds the separate idempotent mobile-SDK reward ledger and server
+cooldown lease; it does not create signed SSV transactions. The default AI cost
+ceiling is $5/day
 (`MAX_DAILY_AI_COST_MICROS=5000000`); tune it in Worker variables.
+
+Food & macros requests send photos only to the existing Worker/OpenAI analysis
+path. The Worker sends USDA FoodData Central a normalized food query only—never
+the image, client ID, request ID, or local history. Nutrition comes from matched
+USDA records; a missing match remains weight-only and produces a partial total.
+The app does not provide a diary, health goals, diagnoses, treatment, or dietary
+coaching.
+
+Empty and non-food images return 422 `no_food_detected`; a plate with zero valid
+USDA matches returns 422 `nutrition_not_found`; a complete USDA outage returns
+502 `nutrition_service_unavailable`. Each path refunds the reserved scan. Test
+these errors as well as partial success with at least one matched component.
 
 ## AdMob
 
@@ -35,9 +55,9 @@ Create/verify four Android units:
 - native, used on scale, AI home, and after history result two;
 - rewarded with reward amount `1` and reward item exactly `scan`;
 - interstitial, shown once during the first-open onboarding transition, at
-  drawer transitions into AI Scan or Digital Scale, and after every second
-  completed scan only after result close. All uses share the server-controlled
-  cooldown;
+  drawer transitions into AI Scan, Digital Scale, or History, after every
+  second completed scan only after result close, and after every second saved
+  result is read and closed. All uses share the server-controlled cooldown;
 - app-open, eligible only after four hours in background and after onboarding.
 
 Production IDs:
@@ -71,6 +91,7 @@ build production:
 ```bash
 flutter build appbundle --release \
   --dart-define=MASSLENS_API_URL=https://masslens-api.masslens.workers.dev/estimate \
+  --dart-define=MASSLENS_PRIVACY_URL=https://your-public-domain.example/privacy \
   --dart-define=ADMOB_ENABLED=true \
   --dart-define=ADMOB_USE_TEST_IDS=false \
   --dart-define=ADMOB_NATIVE_AD_UNIT_ID=ca-app-pub-7681170430097585/1035038854 \
@@ -78,6 +99,11 @@ flutter build appbundle --release \
   --dart-define=ADMOB_INTERSTITIAL_AD_UNIT_ID=ca-app-pub-7681170430097585/5269089498 \
   --dart-define=ADMOB_APP_OPEN_AD_UNIT_ID=ca-app-pub-7681170430097585/3116075891
 ```
+
+Replace the example privacy URL with the final public HTTPS policy before
+building. Release validation must fail when `MASSLENS_PRIVACY_URL` is missing,
+not HTTPS, or still uses the example host. Use that same URL in the Google Play
+listing and confirm that Settings opens it on a physical device.
 
 For a safe physical-device onboarding check, keep Google test ads and force the
 new onboarding without deleting local history:
@@ -97,9 +123,33 @@ reward acknowledgement/deduplication, unavailable inventory, every placement,
 interstitial cadence/cooldown, and four-hour app-open suppression on physical
 devices.
 
+`HISTORY_INTERSTITIAL_EVERY` defaults to `2`. Keep the global interstitial
+cooldown at three minutes or longer: added placements create more eligible
+natural breaks, not permission to show repeated full-screen ads. Help,
+settings, camera capture, analysis, result reading, and app exit stay free of
+interstitials.
+
 Before release, use Google's rewarded test unit and then the production rewarded
 unit on a registered test device. Each completed ad must add exactly one scan;
 replaying the same attempt ID must grant zero additional scans.
+
+## Food Scale release compliance
+
+Before submitting the Food & macros release:
+
+- complete the Google Play Health declaration and select **Nutrition and Weight
+  Management**;
+- update the privacy policy and Data safety answers for photo processing by the
+  Worker/OpenAI, normalized USDA text queries, local history, and deletion;
+- show “not a medical device or dietary advice” in the Food Scale result and the
+  store listing;
+- verify that correcting or removing a food recalculates the displayed totals,
+  while an unmatched food is clearly weight-only and the meal total says
+  “partial”;
+- test camera, gallery, optional second view, privacy link, consent, rewarded
+  credit/refund behavior, history, and sharing on a physical Android device;
+- pass both private evaluation gates in `eval/README.md` and retain the results
+  with the release evidence.
 
 ## Seven-day margin check
 

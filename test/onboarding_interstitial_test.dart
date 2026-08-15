@@ -67,8 +67,8 @@ void main() {
     timeoutLoader.completeNext(null);
   });
 
-  test('onboarding bypasses cadence, waits for dismissal, guards duplicates, '
-      'and shares cooldown', () async {
+  test('history drawer ad bypasses scan cadence, waits for dismissal, '
+      'guards duplicates, and shares cooldown', () async {
     final clock = _FakeClock(DateTime.utc(2026, 8, 9, 12));
     final loader = _FakeInterstitialLoader();
     final paidPlacements = <String>[];
@@ -80,26 +80,26 @@ void main() {
     addTearDown(service.dispose);
 
     final initialWait = service.waitForInterstitial();
-    final onboardingAd = _FakeInterstitialAd();
-    loader.completeNext(onboardingAd);
+    final firstAd = _FakeInterstitialAd();
+    loader.completeNext(firstAd);
     expect(await initialWait, isTrue);
     expect(await service.showInterstitialAfterScan(1), isFalse);
 
     var dismissed = false;
-    final firstShow = service.showOnboardingInterstitial().then((value) {
+    final firstShow = service.showDrawerHistoryInterstitial().then((value) {
       dismissed = true;
       return value;
     });
     await Future<void>.delayed(Duration.zero);
-    expect(onboardingAd.showCount, 1);
+    expect(firstAd.showCount, 1);
     expect(dismissed, isFalse);
-    expect(await service.showOnboardingInterstitial(), isFalse);
+    expect(await service.showDrawerHistoryInterstitial(), isFalse);
 
-    onboardingAd.emitPaid();
-    onboardingAd.dismiss();
+    firstAd.emitPaid();
+    firstAd.dismiss();
     expect(await firstShow, isTrue);
-    expect(onboardingAd.disposeCount, 1);
-    expect(paidPlacements, ['onboarding_interstitial']);
+    expect(firstAd.disposeCount, 1);
+    expect(paidPlacements, ['drawer_history_interstitial']);
 
     final scanAd = _FakeInterstitialAd();
     loader.completeNext(scanAd);
@@ -124,13 +124,13 @@ void main() {
     final failed = _FakeInterstitialAd(failToShow: true);
     loader.completeNext(failed);
     expect(await failedWait, isTrue);
-    expect(await service.showOnboardingInterstitial(), isFalse);
+    expect(await service.showDrawerHistoryInterstitial(), isFalse);
     expect(failed.disposeCount, 1);
 
     final thrown = _FakeInterstitialAd(throwOnShow: true);
     loader.completeNext(thrown);
     expect(await service.waitForInterstitial(), isTrue);
-    expect(await service.showOnboardingInterstitial(), isFalse);
+    expect(await service.showDrawerHistoryInterstitial(), isFalse);
     expect(thrown.disposeCount, 1);
 
     loader.completeNext(null);
@@ -168,35 +168,81 @@ void main() {
       scaleAd.emitPaid();
       scaleAd.dismiss();
       expect(await scaleShow, isTrue);
+      final historyAd = _FakeInterstitialAd();
+      loader.completeNext(historyAd);
+      await Future<void>.delayed(Duration.zero);
+      clock.value = clock.value.add(const Duration(seconds: 181));
+      final historyShow = service.showDrawerHistoryInterstitial();
+      await Future<void>.delayed(Duration.zero);
+      expect(historyAd.showCount, 1);
+      historyAd.emitPaid();
+      historyAd.dismiss();
+      expect(await historyShow, isTrue);
       expect(placements, [
         'drawer_ai_scan_interstitial',
         'drawer_digital_scale_interstitial',
+        'drawer_history_interstitial',
       ]);
       loader.completeNext(null);
     },
   );
 
-  test('controller exposes onboarding readiness, wait, and show', () async {
+  test('saved-result detail interstitial starts at the second close', () async {
     final loader = _FakeInterstitialLoader();
-    final service = AppAdService.forTesting(interstitialAdLoader: loader.load);
+    final placements = <String>[];
+    final service = AppAdService.forTesting(
+      interstitialAdLoader: loader.load,
+      onPaidEvent: (placement, _, _, _) => placements.add(placement),
+    );
+    addTearDown(service.dispose);
+
+    final wait = service.waitForInterstitial();
+    final ad = _FakeInterstitialAd();
+    loader.completeNext(ad);
+    expect(await wait, isTrue);
+    expect(await service.showHistoryDetailInterstitial(1), isFalse);
+
+    final showing = service.showHistoryDetailInterstitial(2);
+    await Future<void>.delayed(Duration.zero);
+    expect(ad.showCount, 1);
+    ad.emitPaid();
+    ad.dismiss();
+    expect(await showing, isTrue);
+    expect(placements, ['history_detail_interstitial']);
+    loader.completeNext(null);
+  });
+
+  test('completion interstitial shows once inventory is ready and skips '
+      'silently without it', () async {
+    final loader = _FakeInterstitialLoader();
+    final placements = <String>[];
+    final service = AppAdService.forTesting(
+      interstitialAdLoader: loader.load,
+      onPaidEvent: (placement, _, _, _) => placements.add(placement),
+    );
     final controller = MonetizationController.forTesting(
       api: _AdsEnabledApi(),
       adService: service,
     );
     addTearDown(controller.dispose);
 
-    final waiting = controller.waitForOnboardingInterstitial();
+    final showing = controller.showOnboardingCompletionInterstitial();
+    await Future<void>.delayed(Duration.zero);
     final ad = _FakeInterstitialAd();
-    await Future<void>.delayed(Duration.zero);
     loader.completeNext(ad);
-    expect(await waiting, isTrue);
-    expect(controller.onboardingInterstitialReady, isTrue);
-
-    final showing = controller.showOnboardingInterstitial();
     await Future<void>.delayed(Duration.zero);
+    expect(ad.showCount, 1);
+    ad.emitPaid();
     ad.dismiss();
     expect(await showing, isTrue);
+    expect(placements, ['onboarding_interstitial']);
+
+    // The shared cooldown keeps an immediate second attempt silent instead
+    // of blocking entry into the app.
+    final skipped = controller.showOnboardingCompletionInterstitial();
+    await Future<void>.delayed(Duration.zero);
     loader.completeNext(null);
+    expect(await skipped, isFalse);
   });
 
   testWidgets('drawer waits for each mode ad before changing screens', (
@@ -252,6 +298,22 @@ void main() {
     scaleAd.dismiss();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+
+    final historyAd = _FakeInterstitialAd();
+    loader.completeNext(historyAd);
+    clock.value = clock.value.add(const Duration(seconds: 181));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav_history')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(historyAd.showCount, 1);
+    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.byKey(const Key('history_screen')), findsNothing);
+
+    historyAd.dismiss();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('history_screen')), findsOneWidget);
     loader.completeNext(null);
   });
 }

@@ -1,0 +1,68 @@
+[
+  {
+    "id": "chicken-rice-plate-01",
+    "expectedOutcome": "food",
+    "images": [
+      "eval/private_dataset/chicken-rice-plate-01-top.jpg",
+      "eval/private_dataset/chicken-rice-plate-01-side.jpg"
+    ],
+    "containerType": "Dinner plate",
+    "context": {
+      "referenceObject": "None",
+      "knownDimension": {
+        "axis": "Width",
+        "value": 26,
+        "unit": "cm"
+      }
+    },
+    "expectedComponents": [
+      {
+        "id": "chicken-breast",
+        "label": "grilled chicken breast",
+        "acceptableLabels": [
+          "chicken breast",
+          "grilled chicken"
+        ],
+        "trueWeightGrams": 142,
+        "acceptableFdcIds": [
+          "replace-with-audited-chicken-fdc-id"
+        ]
+      },
+      {
+        "id": "white-rice",
+        "label": "cooked white rice",
+        "acceptableLabels": [
+          "white rice",
+          "cooked rice"
+        ],
+        "trueWeightGrams": 198,
+        "acceptableFdcIds": [
+          "replace-with-audited-rice-fdc-id"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "empty-plate-01",
+    "expectedOutcome": "reject",
+    "negativeKind": "empty_plate",
+    "images": [
+      "eval/private_dataset/empty-plate-01.jpg"
+    ],
+    "containerType": "Dinner plate",
+    "acceptableErrorCodes": [
+      "no_food_detected"
+    ]
+  },
+  {
+    "id": "non-food-01",
+    "expectedOutcome": "reject",
+    "negativeKind": "non_food",
+    "images": [
+      "eval/private_dataset/non-food-01.jpg"
+    ],
+    "acceptableErrorCodes": [
+      "no_food_detected"
+    ]
+  }
+]

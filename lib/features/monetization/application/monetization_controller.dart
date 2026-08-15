@@ -71,6 +71,10 @@ class MonetizationController extends ChangeNotifier {
 
   static const _completedScanCountKey =
       'mass_lens.completed_scan_count_for_ads';
+  static const _historyDetailViewCountKey =
+      'mass_lens.history_detail_view_count_for_ads';
+  static const _pendingHistoryInterstitialCountKey =
+      'mass_lens.pending_history_interstitial_count';
   static const _rewardStateKey = 'mass_lens.reward_attempt_state.v1';
   static const _rewardAttemptLifetime = Duration(hours: 24);
   static const _rewardAdGuard = Duration(minutes: 2);
@@ -89,6 +93,8 @@ class MonetizationController extends ChangeNotifier {
   bool _loading = false;
   int _completedScanCount = 0;
   int? _pendingInterstitialScanCount;
+  int _historyDetailViewCount = 0;
+  int? _pendingHistoryInterstitialCount;
   List<PendingRewardAttempt> _rewardAttempts = [];
   DateTime? _lastRewardAdStartedAt;
   RewardFlowState _rewardFlowState = RewardFlowState.idle;
@@ -103,15 +109,12 @@ class MonetizationController extends ChangeNotifier {
   bool get canRequestNativeAds =>
       _adService.canRequestNativeAds && _access.adsEnabled;
   bool get rewardedAdReady => _adService.rewardedReady;
-  bool get onboardingInterstitialReady =>
-      _access.adsEnabled && _adService.interstitialReady;
-  bool get onboardingInterstitialLoading =>
-      _access.adsEnabled && _adService.interstitialLoading;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
   RewardFlowState get rewardFlowState => _rewardFlowState;
   bool get rewardActionBusy => _rewardActionBusy || _reconcilingRewards;
   bool get hasPendingReward => _rewardAttempts.isNotEmpty;
   int get pendingRewardCount => _rewardAttempts.length;
+  int get completedScanCount => _completedScanCount;
 
   Duration get rewardRetryAfter {
     final startedAt = _lastRewardAdStartedAt;
@@ -154,6 +157,11 @@ class MonetizationController extends ChangeNotifier {
     try {
       final preferences = await SharedPreferences.getInstance();
       _completedScanCount = preferences.getInt(_completedScanCountKey) ?? 0;
+      _historyDetailViewCount =
+          preferences.getInt(_historyDetailViewCountKey) ?? 0;
+      _pendingHistoryInterstitialCount = preferences.getInt(
+        _pendingHistoryInterstitialCountKey,
+      );
       _restoreRewardState(preferences.getString(_rewardStateKey));
       if (_rewardStateNeedsPersist) await _persistRewardState();
     } on Object {
@@ -209,17 +217,16 @@ class MonetizationController extends ChangeNotifier {
     if (shown) _pendingInterstitialScanCount = null;
   }
 
-  Future<bool> waitForOnboardingInterstitial({
-    Duration timeout = const Duration(seconds: 4),
-  }) async {
+  /// Fires when the user taps the final onboarding button. Missing inventory
+  /// or an unconfirmed access status skips the ad instead of blocking entry
+  /// into the app.
+  Future<bool> showOnboardingCompletionInterstitial() async {
     await initialize();
-    if (!_access.isAuthoritative && enabled) await refreshAccess();
     if (!_access.adsEnabled) return false;
-    return _adService.waitForInterstitial(timeout: timeout);
-  }
-
-  Future<bool> showOnboardingInterstitial() {
-    if (!_access.adsEnabled) return Future<bool>.value(false);
+    final ready = await _adService.waitForInterstitial(
+      timeout: const Duration(milliseconds: 1500),
+    );
+    if (!ready) return false;
     return _adService.showOnboardingInterstitial();
   }
 
@@ -231,6 +238,59 @@ class MonetizationController extends ChangeNotifier {
     );
     if (!ready) return false;
     return _adService.showDrawerModeInterstitial(aiScan: aiScan);
+  }
+
+  Future<bool> showDrawerHistoryInterstitial() async {
+    await initialize();
+    if (!_access.adsEnabled) return false;
+    final ready = await _adService.waitForInterstitial(
+      timeout: const Duration(milliseconds: 900),
+    );
+    if (!ready) return false;
+    return _adService.showDrawerHistoryInterstitial();
+  }
+
+  /// Saved results are already complete and local, so closing every second
+  /// detail is a natural content break. The pending marker survives no-fill,
+  /// cooldowns, and process restarts without ever blocking history access.
+  Future<void> onHistoryDetailClosed() async {
+    await initialize();
+    if (_pendingHistoryInterstitialCount == null) {
+      _historyDetailViewCount += 1;
+      if (_access.adPolicy.isHistoryInterstitialBreak(
+        _historyDetailViewCount,
+      )) {
+        _pendingHistoryInterstitialCount = _historyDetailViewCount;
+      }
+      await _persistHistoryAdState();
+    }
+
+    final qualifyingCount = _pendingHistoryInterstitialCount;
+    if (qualifyingCount == null || !_access.adsEnabled) return;
+    final shown = await _adService.showHistoryDetailInterstitial(
+      qualifyingCount,
+    );
+    if (!shown) return;
+    _pendingHistoryInterstitialCount = null;
+    await _persistHistoryAdState();
+  }
+
+  Future<void> _persistHistoryAdState() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setInt(
+        _historyDetailViewCountKey,
+        _historyDetailViewCount,
+      );
+      final pending = _pendingHistoryInterstitialCount;
+      if (pending == null) {
+        await preferences.remove(_pendingHistoryInterstitialCountKey);
+      } else {
+        await preferences.setInt(_pendingHistoryInterstitialCountKey, pending);
+      }
+    } on Object {
+      // History remains usable if local ad-cadence persistence is unavailable.
+    }
   }
 
   Future<bool> watchAdForScan() async {
