@@ -18,4 +18,3 @@ void main() {
     expect(buildFunWeightComparisons(-5), isNull);
   });
 }
-

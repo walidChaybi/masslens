@@ -9,7 +9,7 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
-  String get appTitle => 'MassLens';
+  String get appTitle => 'MassLens: Estimaciones foto';
 
   @override
   String get commonCancel => 'Cancelar';
@@ -266,21 +266,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingAccessEyebrow => 'Acceso a escaneos';
 
   @override
-  String get onboardingAccessTitle => 'Se incluyen tres escaneos de IA reales.';
+  String get onboardingAccessTitle => 'Se incluyen dos escaneos de IA reales.';
 
   @override
   String get onboardingAccessBody =>
       'MassLens comprueba tu saldo seguro antes del análisis. Capturar o revisar una foto nunca consume un escaneo.';
 
   @override
-  String get onboardingAdsEyebrow => 'Los anuncios financian los escaneos';
+  String get onboardingAdsEyebrow => 'Opciones de acceso';
 
   @override
-  String get onboardingAdsTitle => 'Sin suscripción. Sin paquetes de escaneos.';
+  String get onboardingAdsTitle => '2 escaneos gratis, luego 1 por anuncio';
 
   @override
   String get onboardingAdsBody =>
-      'Después de los escaneos incluidos, termina un anuncio recompensado para añadir un escaneo de IA real.';
+      'Obtén dos escaneos de IA gratis. Después, mira un anuncio recompensado para conseguir un escaneo, o desbloquea escaneos ilimitados sin anuncios con una compra única de por vida.';
 
   @override
   String get onboardingAccessPreparing => 'Preparando el acceso a escaneos…';
@@ -300,7 +300,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get onboardingHeroBody =>
-      'Fotografía un objeto para obtener un intervalo de peso honesto, dimensiones visuales y la evidencia en la que se basa la estimación.';
+      'Estima el peso probable de un objeto a partir de lo visible. Las fotos no miden el peso real ni revelan el contenido oculto.';
 
   @override
   String get onboardingHeroCta => 'Empezar';
@@ -330,7 +330,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get onboardingPreparingBody =>
-      'Estamos preparando tus tres escaneos iniciales y el acceso financiado con anuncios.';
+      'Preparando tus dos escaneos gratis y el acceso con anuncios recompensados.';
 
   @override
   String get onboardingPreparingCta => 'Comprobando…';
@@ -339,8 +339,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingReadyTitle => 'Ya puedes escanear';
 
   @override
-  String get onboardingReadyBody =>
-      'Tus 3 primeros escaneos de IA están incluidos.';
+  String get onboardingReadyBody => 'Tus 2 primeros escaneos de IA son gratis.';
 
   @override
   String get onboardingReadyCta => 'Empezar';
@@ -365,7 +364,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingAdSupportLabel => 'Financiado con anuncios';
 
   @override
-  String get onboardingThreeStarterScans => '3 escaneos iniciales';
+  String get onboardingThreeStarterScans => '2 escaneos gratis';
 
   @override
   String get onboardingPreparingStatus => 'Preparando…';
@@ -377,16 +376,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get onboardingRetryStatus => 'Reintentar';
 
   @override
-  String get homeAiWeight => 'Peso por IA';
+  String get homeAiWeight => 'Estimación fotográfica';
 
   @override
   String homeScansLeftGetOne(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Quedan $count · +1',
-      one: 'Queda 1 · +1',
-      zero: '0 disponibles · +1',
+      other: 'Get free scan',
+      one: 'Get free scan',
+      zero: 'Get free scan',
     );
     return '$_temp0';
   }
@@ -429,10 +428,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get shellDigitalScale => 'Báscula digital';
-
-  @override
-  String get shellAiWeightScan => 'Escaneo de peso por IA';
+  String get shellAiWeightScan => 'Estimaciones de fotos';
 
   @override
   String get shellNutrition => 'Nutrición';
@@ -450,18 +446,39 @@ class AppLocalizationsEs extends AppLocalizations {
   String get shellOpenNavigationMenu => 'Abrir el menú de navegación';
 
   @override
-  String get shellChooseMode =>
-      'Elige una báscula física o una estimación fotográfica con IA.';
+  String get shellChooseMode => 'Estimaciones de fotos y diario de nutrición.';
 
   @override
   String get shellMeasurementNotice =>
-      'Las lecturas por Bluetooth son mediciones. El modo táctil es un simulador; los escaneos de IA son estimaciones visuales reales.';
+      'Los resultados son estimaciones inciertas. El teléfono no mide el peso. Usa una báscula física para medir.';
 
   @override
   String get shellExitTitle => '¿Salir de MassLens?';
 
   @override
   String get shellExitBody => '¿Seguro que quieres salir de la aplicación?';
+
+  @override
+  String get navScanShort => 'Escaneo IA';
+
+  @override
+  String get navGuideShort => 'Guía';
+
+  @override
+  String get homeHeroTitle => 'Explora un objeto con una foto';
+
+  @override
+  String get homeHeroBody =>
+      'Obtén un intervalo de peso aproximado a partir de lo visible. Una foto no mide el peso ni revela el contenido oculto.';
+
+  @override
+  String get homeTipWhole => 'Objeto completo';
+
+  @override
+  String get homeTipLight => 'Buena luz';
+
+  @override
+  String get homeTipReference => 'Referencia de tamaño';
 
   @override
   String get nutritionEyebrow => 'Registro diario privado';
@@ -555,7 +572,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get nutritionNoEntriesBody =>
-      'Añade un resultado de Food Scale guardado o introduce calorías y macros manualmente.';
+      'Añade una estimación de alimentos guardada o introduce calorías y macros manualmente.';
 
   @override
   String get nutritionFromScans => 'Desde escaneos de comida';
@@ -678,6 +695,87 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get nutritionDisclaimer =>
       'Guardado solo en este dispositivo. Los valores nutricionales son aproximados y no constituyen consejo médico ni dietético.';
+
+  @override
+  String get nutritionScanAMeal => 'Escanear una comida';
+
+  @override
+  String get nutritionOpenGallery => 'Elegir de la galería';
+
+  @override
+  String get nutritionRemainingLabel => 'restantes';
+
+  @override
+  String nutritionEatenKcal(String value) {
+    return '$value consumidas';
+  }
+
+  @override
+  String nutritionOverGoal(String value) {
+    return '$value por encima del objetivo';
+  }
+
+  @override
+  String get nutritionStreakZero => 'Empieza una racha';
+
+  @override
+  String nutritionStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Racha de $count días',
+      one: 'Racha de 1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nutritionDailyGoals => 'Objetivos diarios';
+
+  @override
+  String get nutritionCalorieGoal => 'Calorías diarias';
+
+  @override
+  String get nutritionEmptyTitle => 'Registra tu primera comida';
+
+  @override
+  String get nutritionEmptyBody =>
+      'Fotografía un plato para estimar calorías y macros. Los valores son coincidencias USDA aproximadas, no consejo médico.';
+
+  @override
+  String get nutritionSaveToToday => 'Guardar en hoy';
+
+  @override
+  String get nutritionSaveHistoryOnly => 'Guardar solo en el historial';
+
+  @override
+  String get nutritionScanLoggedMessage => 'Añadido a las comidas de hoy';
+
+  @override
+  String get nutritionScanReviewTitle => 'Encuadra todo el plato';
+
+  @override
+  String get nutritionScanReviewBody => 'Confirma que se ve toda la comida';
+
+  @override
+  String get nutritionScanWholePlate => 'Plato completo';
+
+  @override
+  String get nutritionHomeHint => 'El registro de comidas está en Nutrición';
+
+  @override
+  String get nutritionMoreActions => 'Más';
+
+  @override
+  String get nutritionGoalsSave => 'Guardar objetivos';
+
+  @override
+  String nutritionOfGoalGrams(String consumed, String goal) {
+    return '$consumed / $goal g';
+  }
+
+  @override
+  String get nutritionEditGoals => 'Editar objetivos diarios';
 
   @override
   String get guideEyebrow => 'Mejor entrada, mejor intervalo';
@@ -838,11 +936,43 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsImperial => 'Imperial';
 
   @override
-  String get settingsBluetoothSupport =>
-      'Compatibilidad con básculas Bluetooth';
+  String get settingsAppearance => 'Apariencia';
 
   @override
-  String get settingsStandardBle => 'BLE WSS estándar';
+  String get settingsTheme => 'Tema';
+
+  @override
+  String get settingsThemeBody =>
+      'Sigue tu dispositivo o fija el modo claro u oscuro.';
+
+  @override
+  String get settingsThemeSystem => 'Sistema';
+
+  @override
+  String get settingsThemeLight => 'Claro';
+
+  @override
+  String get settingsThemeDark => 'Oscuro';
+
+  @override
+  String get settingsHelp => 'Ayuda';
+
+  @override
+  String get settingsReplayWalkthrough => 'Ver de nuevo la guía inicial';
+
+  @override
+  String get settingsReplayWalkthroughBody =>
+      'Vuelve a ver los consejos de captura del primer inicio.';
+
+  @override
+  String get settingsRateApp => 'Valorar esta aplicación';
+
+  @override
+  String get settingsRateAppBody => 'Deja una valoración en Google Play.';
+
+  @override
+  String get settingsRateAppUnavailable =>
+      'Google Play no está disponible ahora mismo.';
 
   @override
   String get settingsEngine => 'Motor';
@@ -870,7 +1000,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settingsEarnAiScansBody(String usage) {
-    return '$usage · un anuncio por un escaneo';
+    return '$usage · Un anuncio por un escaneo';
   }
 
   @override
@@ -924,7 +1054,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get legalTermsOfUse => 'Condiciones';
 
   @override
-  String get legalLastUpdated => '15 ago 2026';
+  String get legalLastUpdated => '21 ago 2026';
 
   @override
   String get legalPublishedPolicy => 'Ver la política publicada';
@@ -959,21 +1089,21 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get legalPrivacyLocalBody =>
-      'Los resultados y una copia privada de la imagen solo se guardan cuando eliges Guardar. Las preferencias, el historial local de escaneos y las entradas de Nutrición y tendencias se almacenan dentro de la aplicación en tu dispositivo. Las entradas nutricionales solo se añaden cuando importas expresamente un escaneo de alimentos guardado o introduces valores manualmente; no se cargan. La información de dispositivos Bluetooth solo se usa para encontrar y conectar básculas compatibles y no se envía a MassLens. El comportamiento de las copias de seguridad de Android puede depender de los ajustes del dispositivo.';
+      'Los resultados y una copia privada de la foto se guardan solo cuando eliges Guardar. Las preferencias, el historial y el diario de nutrición permanecen en tu dispositivo. Las entradas se añaden al importar voluntariamente una foto guardada o introducir datos manualmente; no se suben al servidor. La copia de seguridad de Android depende de la configuración del dispositivo.';
 
   @override
   String get legalPrivacyServiceTitle => 'Datos del servicio y conservación';
 
   @override
   String get legalPrivacyServiceBody =>
-      'MassLens crea un identificador de instalación aleatorio para gestionar los escaneos iniciales, créditos obtenidos con anuncios, reintentos y prevención de abusos. El servicio lo convierte en hash antes de usarlo en la base de datos y registra identificadores de solicitud, estado de créditos y recompensas, eventos técnicos limitados y totales diarios anónimos, como el modo de escaneo completado y el coste de IA. El JSON de un resultado completado, nunca la foto, puede conservarse hasta 24 horas para repetir una solicitud sin doble cobro. Los registros de créditos y prevención de abusos se conservan mientras sean necesarios para esas funciones. Los proveedores de alojamiento y red pueden tratar direcciones IP y registros de seguridad rutinarios.';
+      'MassLens transmite fuera del dispositivo identificadores de dispositivo u otros ID. Crea un identificador de instalación aleatorio —no un IMEI, número de serie ni dirección MAC de hardware— y lo envía al servicio MassLens para gestionar los escaneos iniciales, créditos obtenidos con anuncios, verificación de compras de por vida, reintentos y prevención de abusos. El servicio lo convierte en hash antes de usarlo en la base de datos y registra identificadores de solicitud, estado de créditos y recompensas, tokens de compra para acceso de por vida, eventos técnicos limitados y totales diarios anónimos, como el modo de escaneo completado y el coste de IA. El JSON de un resultado completado, nunca la foto, puede conservarse hasta 24 horas para repetir una solicitud sin doble cobro. Los registros de créditos, compras y prevención de abusos se conservan mientras sean necesarios para esas funciones. Los proveedores de alojamiento y red pueden tratar direcciones IP y registros de seguridad rutinarios.';
 
   @override
   String get legalPrivacyAdsTitle => 'Publicidad y consentimiento';
 
   @override
   String get legalPrivacyAdsBody =>
-      'MassLens usa Google Mobile Ads para conceder créditos de escaneo con recompensa y mostrar otros anuncios. Google y sus socios publicitarios pueden tratar identificadores publicitarios, información del dispositivo, ubicación aproximada deducida de señales de red, diagnósticos, opciones de consentimiento e interacciones con anuncios según sus propias políticas. Cuando sea obligatorio, la aplicación solicitará tu consentimiento. Si Google ofrece opciones de privacidad para ti, podrás revisarlas en Ajustes.';
+      'MassLens usa Google Mobile Ads (AdMob) para conceder créditos de escaneo con recompensa y mostrar otros anuncios. Google y sus socios publicitarios recopilan y comparten identificadores de dispositivo u otros ID, incluido el identificador publicitario de Android y el App Set ID, además de información del dispositivo, ubicación aproximada deducida de la dirección IP, diagnósticos, opciones de consentimiento e interacciones con anuncios, con fines publicitarios, de analítica y de prevención de fraude, según sus propias políticas. Cuando sea obligatorio, la aplicación solicitará tu consentimiento. Puedes restablecer el identificador publicitario en los ajustes de Android. Si Google ofrece opciones de privacidad para ti, podrás revisarlas en Ajustes.';
 
   @override
   String get legalPrivacySharingTitle => 'Proveedores, transferencias y venta';
@@ -987,7 +1117,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get legalPrivacyChoicesBody =>
-      'Puedes denegar los permisos de cámara o Bluetooth, usar el simulador o una báscula Bluetooth compatible sin IA, cancelar antes del análisis, no guardar resultados, eliminar escaneos individuales, borrar todo el historial de estimaciones, borrar Nutrición y tendencias por separado, revisar las opciones de privacidad publicitaria disponibles o desinstalar la aplicación. La desinstalación elimina los datos locales, sujeto a los ajustes de copia de seguridad de Android. Para solicitudes que no puedan completarse en el dispositivo, utiliza el contacto del desarrollador en la ficha de Google Play de MassLens. No envíes fotos ni información sanitaria sensible con tu solicitud.';
+      'Puedes denegar el permiso de cámara, usar el diario manual sin IA, cancelar antes del análisis, no guardar resultados, eliminar escaneos o el historial, vaciar el diario por separado, revisar las opciones publicitarias o desinstalar la app. La eliminación de datos locales también depende de las copias de seguridad de Android. Para otras solicitudes, contacta al desarrollador en Google Play sin enviar fotos ni datos de salud sensibles.';
 
   @override
   String get legalPrivacySecurityTitle => 'Seguridad y menores';
@@ -1015,7 +1145,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get legalTermsServiceBody =>
-      'MassLens ofrece lecturas de básculas Bluetooth compatibles, un simulador táctil claramente identificado, estimaciones visuales asistidas por IA para objetos y platos de comida, nutrición aproximada basada en el USDA, historial local y un diario nutricional local opcional. Algunas funciones pueden requerir un dispositivo compatible, conexión a Internet, permisos, disponibilidad de anuncios o un crédito de escaneo restante.';
+      'MassLens ofrece estimaciones visuales con IA de objetos y platos, nutrición aproximada basada en USDA, historial local y un diario de nutrición opcional. El análisis de fotos requiere Internet y acceso a escaneos. Algunas funciones dependen de permisos o de la disponibilidad de anuncios.';
 
   @override
   String get legalTermsEstimatesTitle => 'Estimaciones, nutrición y seguridad';
@@ -1036,7 +1166,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get legalTermsCreditsBody =>
-      'Una instalación nueva puede recibir un número limitado de escaneos iniciales. Un anuncio con recompensa completado puede conceder un crédito tras la confirmación de la aplicación y el servicio. Los créditos no tienen valor monetario, no pueden transferirse y pueden limitarse para evitar abusos. La disponibilidad de anuncios no está garantizada. Los escaneos válidos que fallen suelen reembolsarse, pero el acceso puede retrasarse por interrupciones, controles antifraude o errores técnicos. Los formatos de anuncios y reglas de créditos pueden cambiar con un aviso razonable.';
+      'Una instalación nueva puede recibir un número limitado de escaneos iniciales. Un anuncio con recompensa completado puede conceder un crédito tras la confirmación de la aplicación y el servicio. Una compra única en Google Play puede desbloquear escaneos ilimitados y eliminar anuncios para esa cuenta de Google en dispositivos compatibles, sujeta a límites de uso razonable y reglas de reembolso de Google Play. Los créditos y el acceso de por vida no tienen valor monetario, no pueden transferirse entre cuentas y pueden limitarse para evitar abusos. La disponibilidad de anuncios no está garantizada. Los escaneos válidos que fallen suelen reembolsarse, pero el acceso puede retrasarse por interrupciones, controles antifraude, verificación de compras o errores técnicos. Los formatos de anuncios, reglas de créditos y precios pueden cambiar con un aviso razonable.';
 
   @override
   String get legalTermsThirdPartyTitle =>
@@ -1167,7 +1297,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsSafetyBody =>
-      'Una báscula Bluetooth compatible proporciona mediciones físicas. El modo táctil es un simulador interactivo y los escaneos de IA son estimaciones visuales reales. Nunca uses MassLens para dosis médicas, comercio regulado u otras decisiones críticas de seguridad.';
+      'Las fotos ofrecen estimaciones visuales inciertas. Usa una báscula física cuando importe la precisión. Nunca uses MassLens para dosis médicas, comercio regulado o decisiones de seguridad.';
 
   @override
   String get cameraUnavailable => 'La cámara no está disponible.';
@@ -1323,7 +1453,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get scanHowEstimated => 'Cómo se hizo la estimación';
 
   @override
-  String get scanTryAnother => 'Probar otro';
+  String get scanTryAnother => 'Otro objeto';
 
   @override
   String get scanSecondViewTitle => 'Añadir una vista lateral';
@@ -1371,7 +1501,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se encontró una coincidencia nutricional completa de USDA. Prueba con una foto más clara; el escaneo fue reembolsado.';
 
   @override
-  String get scanFoodScale => 'Báscula de alimentos';
+  String get scanFoodScale => 'Estimaciones de alimentos';
 
   @override
   String get scanPhotographMeal => 'Fotografía un plato completo';
@@ -1489,138 +1619,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get scanRemove => 'Eliminar';
 
   @override
-  String get scaleWatchAdGetScan => 'Ver anuncio · +1 escaneo';
-
-  @override
-  String get scaleSimulatorStatus => 'SIMULADOR · NO ES UNA MEDICIÓN';
-
-  @override
-  String get scaleLiveStatus => 'EN VIVO · BÁSCULA BLUETOOTH';
-
-  @override
-  String get scaleDisconnectedStatus => 'BLUETOOTH · SIN CONEXIÓN';
-
-  @override
-  String get scaleSimulatorSemantics =>
-      'Simulador de báscula táctil, no una medición física';
-
-  @override
-  String get scaleLiveSemantics => 'Lectura en vivo de una báscula Bluetooth';
-
-  @override
-  String get scaleDisconnectedSemantics => 'Báscula Bluetooth desconectada';
-
-  @override
-  String get scaleOpenNavigation => 'Abrir el menú de navegación';
-
-  @override
-  String get scaleOpenAiScan => 'Escaneo de peso por IA';
-
-  @override
-  String get scaleBluetooth => 'Báscula Bluetooth';
-
-  @override
-  String get scaleGenericDevice => 'Báscula de peso Bluetooth';
-
-  @override
-  String get scaleUnit => 'UNIDAD';
-
-  @override
-  String get scaleTare => 'TARA';
-
-  @override
-  String get scaleCloseBluetooth => 'Cerrar el panel de Bluetooth';
-
-  @override
-  String get scaleReceivingMeasurements =>
-      'Recibiendo mediciones estándar de la báscula';
-
-  @override
-  String get scaleBleSupport =>
-      'Compatible con el servicio BLE Weight Scale (0x181D)';
-
-  @override
-  String get scaleDisconnect => 'Desconectar báscula';
-
-  @override
-  String get scaleSearching => 'Buscando…';
-
-  @override
-  String get scaleFindCompatible => 'Buscar básculas compatibles';
-
-  @override
-  String get scaleAvailableScales => 'BÁSCULAS DISPONIBLES';
-
-  @override
-  String get scaleCompatible => 'Báscula compatible';
-
-  @override
-  String scaleSignal(int rssi) {
-    return 'Señal $rssi dBm';
-  }
-
-  @override
-  String get scaleNoneFound =>
-      'No se encontró ninguna báscula estándar. Asegúrate de que esté activa y no conectada a otra aplicación e inténtalo de nuevo.';
-
-  @override
-  String get scalePrivateProtocolNotice =>
-      'Muchas básculas de cocina usan protocolos privados del fabricante. Requieren una integración específica para cada modelo, aunque aparezcan en los ajustes de Bluetooth del teléfono.';
-
-  @override
-  String get scalePermissionNeeded =>
-      'Se necesita permiso para dispositivos cercanos a fin de encontrar una báscula.';
-
-  @override
-  String get scalePowerOnBluetooth => 'Activa el Bluetooth y vuelve a buscar.';
-
-  @override
-  String get scaleCommunicationFailed =>
-      'No se pudo comunicar con esta báscula.';
-
-  @override
-  String get scalePhaseIdle => 'No hay ninguna báscula conectada';
-
-  @override
-  String get scalePhasePermission => 'Solicitando permiso';
-
-  @override
-  String get scalePhaseScanning => 'Buscando cerca';
-
-  @override
-  String get scalePhaseConnecting => 'Conectando';
-
-  @override
-  String get scalePhaseDiscovering => 'Comprobando compatibilidad';
-
-  @override
-  String get scalePhaseSubscribing => 'Iniciando lecturas en vivo';
-
-  @override
-  String get scalePhaseConnected => 'Báscula conectada';
-
-  @override
-  String get scalePhaseDisconnecting => 'Desconectando';
-
-  @override
-  String get scalePhaseUnavailable => 'Bluetooth no disponible';
-
-  @override
-  String get scalePhaseError => 'La conexión requiere atención';
-
-  @override
-  String get scalePhaseClosed => 'Lector cerrado';
-
-  @override
   String get rewardAdsFundAnalysis =>
       'Los anuncios financian el análisis de IA real';
 
   @override
-  String get rewardHeadline => 'Un anuncio. Un escaneo.';
+  String get rewardHeadline => 'Consigue más escaneos de IA';
 
   @override
   String get rewardBody =>
-      'Termina el anuncio y MassLens añadirá un escaneo. Sin suscripción, compra ni resultado ficticio.';
+      'Mira un anuncio recompensado por un escaneo o desbloquea escaneos ilimitados y elimina los anuncios con una compra única.';
 
   @override
   String rewardMaxBalance(int count) {
@@ -1693,6 +1700,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get rewardTryLoadingAgain => 'Intentar cargar de nuevo';
 
   @override
+  String get rewardUnlockUnlimited => 'Desbloquear ilimitado';
+
+  @override
+  String get drawerUpgradeUnlimited => 'Mejora a Ilimitado';
+
+  @override
   String get rewardCreditStillSyncing =>
       'El crédito de escaneo aún se está sincronizando.';
 
@@ -1701,7 +1714,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se añadió ningún crédito de escaneo pendiente.';
 
   @override
-  String get accessLoadingBalance => 'Cargando saldo de escaneos…';
+  String get accessLoadingBalance => 'Cargando…';
 
   @override
   String get accessPreview => 'Vista previa del acceso';
@@ -1711,9 +1724,8 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Quedan $count escaneos',
-      one: 'Queda 1 escaneo',
-      zero: 'No hay escaneos disponibles',
+      other: '$count escaneos',
+      one: '1 escaneo',
     );
     return '$_temp0';
   }
@@ -1723,9 +1735,8 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count escaneos disponibles',
-      one: '1 escaneo disponible',
-      zero: 'No hay escaneos disponibles',
+      other: '$count escaneos',
+      one: '1 escaneo',
     );
     return '$_temp0';
   }
@@ -1736,10 +1747,147 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get accessStarterThenAd => '3 escaneos iniciales y después un anuncio';
+  String get accessStarterThenAd => '2 escaneos gratis, luego 1 por anuncio';
 
   @override
   String get accessGetOne => '+1';
+
+  @override
+  String get accessUnlimitedScans => 'Escaneos ilimitados';
+
+  @override
+  String get accessLifetimeActive => 'Acceso de por vida activo';
+
+  @override
+  String accessBuyLifetime(String price) {
+    return 'Desbloquear ilimitado · $price';
+  }
+
+  @override
+  String get accessRestorePurchases => 'Restaurar compras';
+
+  @override
+  String get accessLifetimeUnlocked =>
+      'El acceso de por vida está activo en este dispositivo.';
+
+  @override
+  String get accessLifetimeLoadingPrice => 'Cargando precio…';
+
+  @override
+  String get paywallEyebrow => 'Análisis de fotos con IA real';
+
+  @override
+  String get paywallHeadline => 'Estimaciones de fotos.';
+
+  @override
+  String get paywallHeadlineAccent => 'Desbloquea';
+
+  @override
+  String get paywallHeadlineRest => 'Explora con IA.';
+
+  @override
+  String get paywallHeroSubtitle =>
+      'Explora objetos y alimentos mediante fotos.\nEstimaciones aproximadas, no mediciones de peso.';
+
+  @override
+  String get paywallSocialProof => 'Paga una vez · tuyo siempre';
+
+  @override
+  String get paywallSocialSubline => 'Escaneos IA ilimitados. Cero anuncios.';
+
+  @override
+  String get paywallUnlockLifetime => 'Desbloquear acceso de por vida';
+
+  @override
+  String paywallTrustPriced(String price) {
+    return 'Compra única · $price';
+  }
+
+  @override
+  String get paywallOneTimeCaption => 'Pago único';
+
+  @override
+  String get paywallLuggageLabel => 'Escaneo de equipaje';
+
+  @override
+  String get paywallLuggageTitle => 'Maleta de cabina';
+
+  @override
+  String get paywallLuggageWeight => '2–4 kg';
+
+  @override
+  String get paywallLuggageConfidence => 'Ejemplo de estimación';
+
+  @override
+  String get paywallFeatureHeading =>
+      'PEQUEÑOS OBJETOS. GRANDES POSIBILIDADES.';
+
+  @override
+  String get paywallFeatureUnlimited => 'Escaneos ilimitados';
+
+  @override
+  String get paywallFeatureNoAds => 'Sin anuncios';
+
+  @override
+  String get paywallFeatureNutrition => 'Conoce mejor tu plato';
+
+  @override
+  String get paywallFeatureNutritionSub =>
+      'Calorías, proteínas y macros estimados';
+
+  @override
+  String get paywallFeatureLuggage => 'Estimaciones de objetos';
+
+  @override
+  String get paywallFeatureLuggageSub =>
+      'Solo lo visible; el contenido es desconocido';
+
+  @override
+  String get paywallFeatureObjects => 'Apunta. Captura. Estima.';
+
+  @override
+  String get paywallFeatureObjectsSub =>
+      'Intervalos aproximados según lo visible';
+
+  @override
+  String get paywallPhotoScanLabel => 'ESCANEO DE FOTOS CON IA';
+
+  @override
+  String get paywallEstimateExample => 'Estimación IA · ejemplo';
+
+  @override
+  String get paywallIllustrativeReadings =>
+      'Solo ilustraciones. Una foto no mide el peso real.';
+
+  @override
+  String get paywallLifetimeOffer => 'Acceso de por vida · Sin anuncios';
+
+  @override
+  String get paywallPurchaseTrust => 'Un pago. Sin suscripción. Google Play.';
+
+  @override
+  String get paywallTerms => 'Condiciones';
+
+  @override
+  String get paywallPrivacy => 'Privacidad';
+
+  @override
+  String get paywallFeatureLifetime => 'Ilimitado + sin anuncios';
+
+  @override
+  String get paywallFeatureLifetimeSub => 'Un pago. Tuyo.';
+
+  @override
+  String get paywallOneTimeBadge => 'Pago único';
+
+  @override
+  String get paywallLifetimePlan => 'Acceso de por vida';
+
+  @override
+  String get paywallContinueFree => 'Continuar con escaneos gratis';
+
+  @override
+  String get paywallPurchaseUnavailable => 'Compra no disponible';
 
   @override
   String get nativeSponsored => 'Contenido patrocinado';
@@ -1749,4 +1897,157 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get nativeTestRetrying => 'Reintentando el anuncio de prueba…';
+
+  @override
+  String get accessGetFreeScan => 'Escaneo gratis';
+
+  @override
+  String get settingsReminders => 'Recordatorios';
+
+  @override
+  String get mealReminderTitle => 'Recordatorio diario de comidas';
+
+  @override
+  String mealReminderOnBody(String time) {
+    return 'Cada día a las $time, salvo si acabas de registrar una comida';
+  }
+
+  @override
+  String get mealReminderOffBody =>
+      'Recibe un aviso al día para registrar tus comidas';
+
+  @override
+  String get mealReminderTime => 'Hora del recordatorio';
+
+  @override
+  String get mealReminderPermissionDenied =>
+      'Las notificaciones están bloqueadas. Actívalas para MassLens en los ajustes del teléfono.';
+
+  @override
+  String mealReminderEnabled(String time) {
+    return 'Recordatorio programado a las $time cada día.';
+  }
+
+  @override
+  String get mealReminderPromptTitle => 'Mantén tu racha';
+
+  @override
+  String get mealReminderPromptBody =>
+      'Recibe un recordatorio diario para registrar tus comidas. Puedes cambiar la hora en Ajustes.';
+
+  @override
+  String get mealReminderPromptAction => 'Activar recordatorio';
+
+  @override
+  String get mealReminderPromptDismiss => 'Ahora no';
+
+  @override
+  String get mealReminderNotificationTitle => 'Hora de registrar tu comida';
+
+  @override
+  String get mealReminderNotificationBody =>
+      'Fotografía tu plato en MassLens para contar calorías y mantener tu racha.';
+
+  @override
+  String get mealReminderChannelName => 'Recordatorios de comidas';
+
+  @override
+  String get barcodeScanAction => 'Escanear código de barras';
+
+  @override
+  String get barcodeScanActionBody =>
+      'Productos envasados · gratis, sin gastar escaneos';
+
+  @override
+  String get barcodeFreeBadge => 'GRATIS';
+
+  @override
+  String get barcodeScannerHint => 'Centra el código de barras en el marco';
+
+  @override
+  String get barcodeTypeNumber => 'Escribir el número';
+
+  @override
+  String get barcodeTorch => 'Linterna';
+
+  @override
+  String get barcodeEnterTitle => 'Introduce el número del código de barras';
+
+  @override
+  String get barcodeInvalid =>
+      'Introduce un código de barras válido de 8, 12 o 13 dígitos.';
+
+  @override
+  String get barcodeLookingUp => 'Buscando el producto…';
+
+  @override
+  String get barcodeNotFoundTitle => 'Producto no encontrado';
+
+  @override
+  String barcodeNotFoundBody(String code) {
+    return 'El código $code aún no está en Open Food Facts ni en USDA FoodData Central. Puedes introducir los valores de la etiqueta.';
+  }
+
+  @override
+  String get barcodeUnavailableTitle => 'No se pudo buscar este producto';
+
+  @override
+  String get barcodeUnavailableBody =>
+      'Revisa tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get barcodeRetry => 'Reintentar';
+
+  @override
+  String get barcodeEnterManually => 'Introducir manualmente';
+
+  @override
+  String get barcodeScanAgain => 'Escanear de nuevo';
+
+  @override
+  String barcodePer100(String unit) {
+    return 'Por 100 $unit';
+  }
+
+  @override
+  String barcodeServing(String amount) {
+    return '1 porción · $amount';
+  }
+
+  @override
+  String barcodeWholePack(String amount) {
+    return 'Envase entero · $amount';
+  }
+
+  @override
+  String get barcodeYourPortion => 'Tu porción';
+
+  @override
+  String get barcodeAmountEaten => 'Cantidad consumida';
+
+  @override
+  String get barcodePartialNutrition =>
+      'Faltan algunos macros en los datos de este producto y cuentan como 0.';
+
+  @override
+  String get barcodeAddToDiary => 'Añadir al diario';
+
+  @override
+  String get barcodeSourceOpenFoodFacts =>
+      'Datos de etiqueta de Open Food Facts (ODbL). Revisa el envase: los valores pueden estar incompletos o desactualizados.';
+
+  @override
+  String get barcodeSourceUsda =>
+      'Datos de etiqueta de USDA FoodData Central. Revisa el envase: los valores pueden estar incompletos o desactualizados.';
+
+  @override
+  String get barcodeRecentTitle => 'Productos recientes';
+
+  @override
+  String get barcodeRecentBody => 'Registra un producto que ya escaneaste';
+
+  @override
+  String barcodeKcalPer100(String value, String unit) {
+    return '$value kcal / 100 $unit';
+  }
 }

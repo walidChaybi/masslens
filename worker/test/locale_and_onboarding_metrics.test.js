@@ -9,6 +9,7 @@ const migrations = [
   "../migrations/0001_monetization.sql",
   "../migrations/0002_consumable_credits.sql",
   "../migrations/0003_ads_only_access.sql",
+  "../migrations/0006_lifetime_entitlements.sql",
 ].map((url) => readFileSync(new URL(url, import.meta.url), "utf8"));
 
 const clientId = "locale_client_identifier_01";

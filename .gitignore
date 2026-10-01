@@ -50,3 +50,22 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets - never commit (signing keys, service-account keys, certificates)
+*.jks
+*.keystore
+*.p12
+*.pem
+excellent-range-*.json
+*service-account*.json
+
+# Release bundles / APKs
+*.aab
+*.apk
+
+# Local logs written by the helper .command scripts
+*_log.txt
+
+# Tool scratch and Flutter golden-test failure output
+.codex_tmp/
+test/failures/

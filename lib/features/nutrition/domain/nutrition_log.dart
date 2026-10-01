@@ -36,6 +36,7 @@ class NutritionLogEntry {
     this.weightGrams,
     this.isPartial = false,
     this.sourceMeasurementId,
+    this.imagePath,
   });
 
   factory NutritionLogEntry.create({
@@ -47,6 +48,7 @@ class NutritionLogEntry {
     double? weightGrams,
     bool isPartial = false,
     String? sourceMeasurementId,
+    String? imagePath,
   }) {
     final entry = NutritionLogEntry(
       id: id.trim(),
@@ -58,6 +60,9 @@ class NutritionLogEntry {
       weightGrams: weightGrams,
       isPartial: isPartial,
       sourceMeasurementId: sourceMeasurementId?.trim(),
+      imagePath: imagePath?.trim().isNotEmpty == true
+          ? imagePath!.trim()
+          : null,
     );
     entry.validate();
     return entry;
@@ -83,6 +88,7 @@ class NutritionLogEntry {
       weightGrams: measurement.totalEstimateGrams,
       isPartial: measurement.hasPartialNutrition,
       sourceMeasurementId: measurement.id,
+      imagePath: measurement.imagePath,
     );
   }
 
@@ -95,6 +101,7 @@ class NutritionLogEntry {
   final NutritionTotals nutrition;
   final bool isPartial;
   final String? sourceMeasurementId;
+  final String? imagePath;
 
   NutritionLogEntry copyWith({
     DateTime? loggedAt,
@@ -104,6 +111,7 @@ class NutritionLogEntry {
     NutritionTotals? nutrition,
     bool? isPartial,
     Object? sourceMeasurementId = _notProvided,
+    Object? imagePath = _notProvided,
   }) {
     return NutritionLogEntry.create(
       id: id,
@@ -118,6 +126,9 @@ class NutritionLogEntry {
       sourceMeasurementId: identical(sourceMeasurementId, _notProvided)
           ? this.sourceMeasurementId
           : sourceMeasurementId as String?,
+      imagePath: identical(imagePath, _notProvided)
+          ? this.imagePath
+          : imagePath as String?,
     );
   }
 
@@ -160,6 +171,7 @@ class NutritionLogEntry {
     'fatGrams': nutrition.fatGrams,
     'isPartial': isPartial,
     if (sourceMeasurementId != null) 'sourceMeasurementId': sourceMeasurementId,
+    if (imagePath != null) 'imagePath': imagePath,
   };
 
   factory NutritionLogEntry.fromJson(Map<String, Object?> json) {
@@ -181,6 +193,7 @@ class NutritionLogEntry {
       ),
       isPartial: json['isPartial'] as bool? ?? false,
       sourceMeasurementId: (json['sourceMeasurementId'] as String?)?.trim(),
+      imagePath: (json['imagePath'] as String?)?.trim(),
     );
     entry.validate();
     return entry;
@@ -240,6 +253,25 @@ NutritionDaySummary summarizeNutritionDay(
     totals: totals,
     hasPartialData: matching.any((entry) => entry.isPartial),
   );
+}
+
+int nutritionLoggingStreak(
+  Iterable<NutritionLogEntry> entries, {
+  DateTime? now,
+}) {
+  final keys = {for (final entry in entries) entry.dayKey};
+  if (keys.isEmpty) return 0;
+  var cursor = nutritionDay(now ?? DateTime.now());
+  if (!keys.contains(nutritionDayKey(cursor))) {
+    cursor = DateTime(cursor.year, cursor.month, cursor.day - 1);
+    if (!keys.contains(nutritionDayKey(cursor))) return 0;
+  }
+  var streak = 0;
+  while (keys.contains(nutritionDayKey(cursor))) {
+    streak += 1;
+    cursor = DateTime(cursor.year, cursor.month, cursor.day - 1);
+  }
+  return streak;
 }
 
 NutritionPeriodSummary summarizeNutritionPeriod(

@@ -16,13 +16,16 @@ import '../../../l10n/l10n.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../measurements/domain/fun_weight_comparisons.dart';
 import '../../measurements/presentation/share_card.dart';
+import '../../monetization/presentation/native_ad_card.dart';
 import '../../monetization/presentation/rewarded_scan_sheet.dart';
+import '../../nutrition/domain/nutrition_log.dart';
 import '../data/cloudflare_estimate_repository.dart';
 import '../data/estimate_repository_factory.dart';
 import '../data/photo_picker.dart';
 import '../data/scan_image_processor.dart';
 import '../domain/estimate_repository.dart';
 import 'capture/camera_launcher.dart';
+import 'scan_analysis_view.dart';
 
 String _localizedContainer(AppLocalizations l10n, String value) =>
     switch (value) {
@@ -33,6 +36,14 @@ String _localizedContainer(AppLocalizations l10n, String value) =>
       'None' => l10n.scanContainerNone,
       _ => l10n.scanContainerUnknown,
     };
+
+MealType _mealTypeFor(DateTime time) {
+  final hour = time.toLocal().hour;
+  if (hour >= 5 && hour < 11) return MealType.breakfast;
+  if (hour >= 11 && hour < 16) return MealType.lunch;
+  if (hour >= 16 && hour < 22) return MealType.dinner;
+  return MealType.snack;
+}
 
 class ScanScreen extends StatefulWidget {
   ScanScreen({
@@ -56,6 +67,19 @@ class ScanScreen extends StatefulWidget {
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
+}
+
+/// The dedicated meal-photo flow. Keeping this as a separate public entry
+/// point prevents the Weight Scan surface from accidentally opening food mode.
+class NutritionScanScreen extends ScanScreen {
+  NutritionScanScreen({
+    super.estimateRepository,
+    super.photoPicker,
+    super.cameraLauncher,
+    super.autoStart,
+    super.startWithGallery,
+    super.key,
+  }) : super(scanMode: ScanMode.foodPlate);
 }
 
 class _ScanScreenState extends State<ScanScreen> {
@@ -106,6 +130,8 @@ class _ScanScreenState extends State<ScanScreen> {
   String? _error;
   String? _requestId;
   bool _saved = false;
+  bool _logged = false;
+  MealType _mealType = MealType.snack;
   bool _routePopAllowed = false;
   bool _routePopScheduled = false;
   final _shareCardKey = GlobalKey();
@@ -116,6 +142,7 @@ class _ScanScreenState extends State<ScanScreen> {
     super.initState();
     if (widget.scanMode == ScanMode.foodPlate) {
       _dimensionAxis = 'Diameter';
+      _mealType = _mealTypeFor(DateTime.now());
     }
     if (widget.autoStart) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -144,7 +171,10 @@ class _ScanScreenState extends State<ScanScreen> {
       _requestId = null;
     });
     try {
-      final imagePath = await widget.cameraLauncher.launch(context);
+      final imagePath = await widget.cameraLauncher.launch(
+        context,
+        scanMode: widget.scanMode,
+      );
       if (!mounted || imagePath == null) return;
       _acceptImage(imagePath);
     } on Object {
@@ -176,11 +206,13 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   void _acceptImage(String imagePath) {
+    unawaited(SubjectCutout.prepare(imagePath));
     setState(() {
       _imagePath = imagePath;
       _secondaryImagePath = null;
       _result = null;
       _saved = false;
+      _logged = false;
       _error = null;
     });
   }
@@ -441,6 +473,35 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
+  Future<void> _saveAndLog() async {
+    final result = _result;
+    if (result == null || _logged || !result.isFoodPlate) return;
+    final controller = AppScope.of(context);
+
+    if (!_saved) {
+      await controller.addMeasurement(result);
+    }
+    if (!mounted) return;
+    final persisted = controller.measurements.firstWhere(
+      (item) => item.id == result.id,
+      orElse: () => result,
+    );
+    final now = DateTime.now();
+    await controller.nutritionDiary.addMeasurement(
+      id: 'meal-${persisted.id}-${now.microsecondsSinceEpoch}',
+      loggedAt: now,
+      mealType: _mealType,
+      measurement: persisted,
+    );
+    if (!mounted) return;
+    setState(() {
+      _result = persisted;
+      _saved = true;
+      _logged = true;
+    });
+    _close();
+  }
+
   Future<void> _replaceResult(Measurement measurement) async {
     if (!mounted) return;
     final shouldPersist = _saved;
@@ -507,6 +568,8 @@ class _ScanScreenState extends State<ScanScreen> {
       _result = null;
       _error = null;
       _saved = false;
+      _logged = false;
+      _mealType = _mealTypeFor(DateTime.now());
       _requestId = null;
     });
   }
@@ -692,7 +755,7 @@ class _ScanScreenState extends State<ScanScreen> {
                         ? l10n.scanFoodReferenceTip
                         : l10n.scanReferenceTip,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.inkMuted,
+                      color: context.palette.inkMuted,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -713,6 +776,21 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final isFood = widget.scanMode == ScanMode.foodPlate;
+    if (_isAnalyzing && _imagePath != null) {
+      return PopScope<bool>(
+        canPop: _routePopAllowed,
+        onPopInvokedWithResult: _handleRoutePop,
+        child: Scaffold(
+          body: ScanAnalysisView(
+            imagePath: _imagePath!,
+            step: _analysisStep,
+            scanMode: widget.scanMode,
+            onClose: _close,
+          ),
+        ),
+      );
+    }
     final objectTitle = _result != null
         ? l10n.scanEstimate
         : _isAnalyzing
@@ -720,9 +798,7 @@ class _ScanScreenState extends State<ScanScreen> {
         : _imagePath == null
         ? l10n.scanNewEstimate
         : l10n.scanReview;
-    final title = widget.scanMode == ScanMode.foodPlate
-        ? l10n.scanFoodScale
-        : objectTitle;
+    final title = isFood ? l10n.scanFoodScale : objectTitle;
     return PopScope<bool>(
       canPop: _routePopAllowed,
       onPopInvokedWithResult: _handleRoutePop,
@@ -760,17 +836,15 @@ class _ScanScreenState extends State<ScanScreen> {
                         measurement: _result!,
                         unitSystem: AppScope.of(context).unitSystem,
                         saved: _saved,
+                        logged: _logged,
+                        mealType: _mealType,
+                        onMealTypeChanged: (value) =>
+                            setState(() => _mealType = value),
                         onSave: _save,
+                        onLog: _saveAndLog,
                         onReset: _reset,
                         onMeasurementChanged: (measurement) =>
                             unawaited(_replaceResult(measurement)),
-                      )
-                    : _isAnalyzing
-                    ? _AnalysisView(
-                        key: const ValueKey('analysis'),
-                        imagePath: _imagePath!,
-                        step: _analysisStep,
-                        scanMode: widget.scanMode,
                       )
                     : _imagePath == null
                     ? _CaptureView(
@@ -780,6 +854,20 @@ class _ScanScreenState extends State<ScanScreen> {
                         scanMode: widget.scanMode,
                         onCapture: _capturePhoto,
                         onGallery: _captureFromGallery,
+                      )
+                    : isFood
+                    ? _NutritionReviewView(
+                        key: const ValueKey('review'),
+                        imagePath: _imagePath!,
+                        secondImagePath: _secondaryImagePath,
+                        error: _error,
+                        onAddSideView: _showSecondAnglePicker,
+                        onRemoveSideView: () => setState(() {
+                          _secondaryImagePath = null;
+                          _requestId = null;
+                        }),
+                        onDetails: _showDetails,
+                        onAnalyze: _analyze,
                       )
                     : _ReviewView(
                         key: const ValueKey('review'),
@@ -909,26 +997,29 @@ class _ScanFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _ScanFramePainter(scanMode),
+      painter: _ScanFramePainter(scanMode, context.palette),
       child: const SizedBox.expand(),
     );
   }
 }
 
 class _ScanFramePainter extends CustomPainter {
-  const _ScanFramePainter(this.scanMode);
+  const _ScanFramePainter(this.scanMode, this.palette);
 
   final ScanMode scanMode;
+
+  /// A painter has no BuildContext, so the palette is passed in.
+  final AppPalette palette;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     canvas.drawRRect(
       RRect.fromRectAndRadius(rect, const Radius.circular(8)),
-      Paint()..color = AppColors.surface,
+      Paint()..color = palette.surface,
     );
     final border = Paint()
-      ..color = AppColors.line
+      ..color = palette.line
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     canvas.drawRRect(
@@ -942,23 +1033,23 @@ class _ScanFramePainter extends CustomPainter {
         width: size.width * 0.48,
         height: size.height * 0.62,
       );
-      canvas.drawOval(plateRect, Paint()..color = AppColors.navySoft);
+      canvas.drawOval(plateRect, Paint()..color = palette.navySoft);
       canvas.drawOval(
         plateRect.deflate(9),
         Paint()
-          ..color = AppColors.line
+          ..color = palette.line
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,
       );
       canvas.drawCircle(
         plateRect.center + Offset(-plateRect.width * 0.12, 0),
         plateRect.shortestSide * 0.17,
-        Paint()..color = AppColors.lime.withValues(alpha: 0.75),
+        Paint()..color = palette.lime.withValues(alpha: 0.75),
       );
       canvas.drawCircle(
         plateRect.center + Offset(plateRect.width * 0.14, -5),
         plateRect.shortestSide * 0.13,
-        Paint()..color = AppColors.aqua.withValues(alpha: 0.55),
+        Paint()..color = palette.aqua.withValues(alpha: 0.55),
       );
     } else {
       final objectRect = Rect.fromCenter(
@@ -968,12 +1059,12 @@ class _ScanFramePainter extends CustomPainter {
       );
       canvas.drawRRect(
         RRect.fromRectAndRadius(objectRect, const Radius.circular(18)),
-        Paint()..color = AppColors.navySoft,
+        Paint()..color = palette.navySoft,
       );
     }
 
     final cornerPaint = Paint()
-      ..color = AppColors.limeDark
+      ..color = palette.limeDark
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.4
       ..strokeCap = StrokeCap.round;
@@ -1002,7 +1093,7 @@ class _ScanFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ScanFramePainter oldDelegate) =>
-      oldDelegate.scanMode != scanMode;
+      oldDelegate.scanMode != scanMode || oldDelegate.palette != palette;
 }
 
 class _ReviewView extends StatelessWidget {
@@ -1029,6 +1120,7 @@ class _ReviewView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final monetization = AppScope.of(context).monetization;
     final l10n = context.l10n;
     final horizontalPadding = math.max(
       20.0,
@@ -1038,9 +1130,7 @@ class _ReviewView extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(horizontalPadding, 8, horizontalPadding, 30),
       children: [
         Text(
-          scanMode == ScanMode.foodPlate
-              ? l10n.scanConfirmMeal
-              : l10n.scanConfirmObject,
+          l10n.scanConfirmObject,
           style: Theme.of(context).textTheme.headlineMedium,
         ),
         const SizedBox(height: 14),
@@ -1055,7 +1145,7 @@ class _ReviewView extends StatelessWidget {
                   File(imagePath),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
-                    color: AppColors.navySoft,
+                    color: context.palette.navySoft,
                     alignment: Alignment.center,
                     child: const Icon(Icons.photo_outlined, size: 48),
                   ),
@@ -1091,16 +1181,227 @@ class _ReviewView extends StatelessWidget {
                 key: const Key('analyze_button'),
                 onPressed: onAnalyze,
                 icon: const Icon(Icons.auto_awesome_rounded),
-                label: Text(
-                  scanMode == ScanMode.foodPlate
-                      ? l10n.scanAnalyzeMeal
-                      : l10n.scanEstimate,
-                ),
+                label: Text(l10n.scanEstimate),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        NativeAdCard(
+          enabled: monetization.canRequestNativeAds,
+          placement: 'review_object',
+          height: 120,
+          onPaidEvent: monetization.reportPaidAd,
+        ),
       ],
+    );
+  }
+}
+
+class _NutritionReviewView extends StatelessWidget {
+  const _NutritionReviewView({
+    required this.imagePath,
+    required this.secondImagePath,
+    required this.error,
+    required this.onAddSideView,
+    required this.onRemoveSideView,
+    required this.onDetails,
+    required this.onAnalyze,
+    super.key,
+  });
+
+  final String imagePath;
+  final String? secondImagePath;
+  final String? error;
+  final VoidCallback onAddSideView;
+  final VoidCallback onRemoveSideView;
+  final VoidCallback onDetails;
+  final VoidCallback onAnalyze;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final horizontalPadding = math.max(
+      18.0,
+      (MediaQuery.sizeOf(context).width - 720) / 2,
+    );
+    return ListView(
+      key: const Key('nutrition_scan_review'),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 4, horizontalPadding, 30),
+      children: [
+        Text(
+          l10n.nutritionScanReviewTitle,
+          style: Theme.of(context).textTheme.headlineLarge,
+        ),
+        const SizedBox(height: 7),
+        Text(
+          l10n.nutritionScanReviewBody,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 18),
+        AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Image.file(
+                  File(imagePath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: context.palette.navySoft,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.restaurant_rounded, size: 54),
+                  ),
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.75),
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 14,
+                bottom: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.ink.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: context.palette.lime,
+                        size: 17,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        l10n.nutritionScanWholePlate,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _NutritionAccuracyAction(
+                key: const Key('add_second_angle_action'),
+                icon: secondImagePath == null
+                    ? Icons.view_in_ar_outlined
+                    : Icons.check_circle_rounded,
+                label: secondImagePath == null
+                    ? l10n.scanAddSideView
+                    : l10n.scanSideViewAdded,
+                highlighted: secondImagePath != null,
+                onTap: secondImagePath == null
+                    ? onAddSideView
+                    : onRemoveSideView,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _NutritionAccuracyAction(
+                key: const Key('add_details_button'),
+                icon: Icons.straighten_rounded,
+                label: l10n.scanFoodOptionalDetails,
+                onTap: onDetails,
+              ),
+            ),
+          ],
+        ),
+        if (error != null) ...[
+          const SizedBox(height: 12),
+          _InlineError(error!),
+        ],
+        const SizedBox(height: 18),
+        FilledButton.icon(
+          key: const Key('analyze_button'),
+          onPressed: onAnalyze,
+          icon: const Icon(Icons.auto_awesome_rounded),
+          label: Text(l10n.scanAnalyzeMeal),
+        ),
+        const SizedBox(height: 14),
+        NativeAdCard(
+          enabled: AppScope.of(context).monetization.canRequestNativeAds,
+          placement: 'review_food',
+          height: 120,
+          onPaidEvent: AppScope.of(context).monetization.reportPaidAd,
+        ),
+      ],
+    );
+  }
+}
+
+class _NutritionAccuracyAction extends StatelessWidget {
+  const _NutritionAccuracyAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.highlighted = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: highlighted
+          ? context.palette.lime.withValues(alpha: 0.3)
+          : context.palette.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: context.palette.line),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 19),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1122,8 +1423,8 @@ class _SideViewCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.line),
+        color: context.palette.surface,
+        border: Border.all(color: context.palette.line),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -1134,7 +1435,7 @@ class _SideViewCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.navySoft,
+                color: context.palette.navySoft,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Icon(Icons.add_photo_alternate_outlined, size: 24),
@@ -1151,7 +1452,7 @@ class _SideViewCard extends StatelessWidget {
                 errorBuilder: (_, _, _) => Container(
                   width: 48,
                   height: 48,
-                  color: AppColors.navySoft,
+                  color: context.palette.navySoft,
                   child: const Icon(Icons.photo_outlined),
                 ),
               ),
@@ -1197,72 +1498,16 @@ class _SideViewCard extends StatelessWidget {
   }
 }
 
-class _AnalysisView extends StatelessWidget {
-  const _AnalysisView({
-    required this.imagePath,
-    required this.step,
-    required this.scanMode,
-    super.key,
-  });
-
-  final String imagePath;
-  final int step;
-  final ScanMode scanMode;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final labels = scanMode == ScanMode.foodPlate
-        ? [
-            l10n.scanProgressIdentifyFood,
-            l10n.scanProgressMatchUsda,
-            l10n.scanProgressNutrition,
-          ]
-        : [
-            l10n.scanProgressShape,
-            l10n.scanProgressMaterial,
-            l10n.scanProgressRange,
-          ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
-      child: Column(
-        children: [
-          const Spacer(),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(
-              File(imagePath),
-              width: 180,
-              height: 180,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                width: 180,
-                height: 180,
-                color: AppColors.navySoft,
-                child: const Icon(Icons.inventory_2_outlined, size: 48),
-              ),
-            ),
-          ),
-          const SizedBox(height: 28),
-          Text(
-            labels[step.clamp(0, 2)],
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 16),
-          const LinearProgressIndicator(minHeight: 4),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
 class _ResultView extends StatelessWidget {
   const _ResultView({
     required this.measurement,
     required this.unitSystem,
     required this.saved,
+    required this.logged,
+    required this.mealType,
+    required this.onMealTypeChanged,
     required this.onSave,
+    required this.onLog,
     required this.onReset,
     required this.onMeasurementChanged,
     super.key,
@@ -1271,7 +1516,11 @@ class _ResultView extends StatelessWidget {
   final Measurement measurement;
   final UnitSystem unitSystem;
   final bool saved;
+  final bool logged;
+  final MealType mealType;
+  final ValueChanged<MealType> onMealTypeChanged;
   final VoidCallback onSave;
+  final VoidCallback onLog;
   final VoidCallback onReset;
   final ValueChanged<Measurement> onMeasurementChanged;
 
@@ -1282,7 +1531,11 @@ class _ResultView extends StatelessWidget {
         measurement: measurement,
         unitSystem: unitSystem,
         saved: saved,
+        logged: logged,
+        mealType: mealType,
+        onMealTypeChanged: onMealTypeChanged,
         onSave: onSave,
+        onLog: onLog,
         onReset: onReset,
         onMeasurementChanged: onMeasurementChanged,
       );
@@ -1308,7 +1561,7 @@ class _ResultView extends StatelessWidget {
                   File(measurement.imagePath),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
-                    color: AppColors.navySoft,
+                    color: context.palette.navySoft,
                     child: const Icon(Icons.inventory_2_outlined, size: 52),
                   ),
                 ),
@@ -1330,70 +1583,20 @@ class _ResultView extends StatelessWidget {
             localeName: localeName,
           ),
           key: const Key('result_weight'),
-          style: const TextStyle(
-            color: AppColors.ink,
+          style: TextStyle(
+            color: context.palette.ink,
             fontSize: 44,
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          l10n.scanLikelyRange,
-          style: const TextStyle(
-            color: AppColors.inkMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0,
-          ),
+        const SizedBox(height: 20),
+        NativeAdCard(
+          enabled: AppScope.of(context).monetization.canRequestNativeAds,
+          placement: 'result_weight_estimate',
+          height: 120,
+          onPaidEvent: AppScope.of(context).monetization.reportPaidAd,
         ),
-        Text(
-          '${formatWeight(measurement.lowerBoundGrams, unitSystem, localeName: localeName)} – '
-          '${formatWeight(measurement.upperBoundGrams, unitSystem, localeName: localeName)}',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-        const SizedBox(height: 12),
-        if (buildFunWeightComparisons(measurement.estimateGrams)
-            case final fun?)
-          Text(
-            localizedFunWeightComparison(l10n, fun),
-            style: TextStyle(
-              color: AppColors.inkMuted,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              height: 1.25,
-            ),
-          ),
         const SizedBox(height: 18),
-        if (measurement.dimensions case final dimensions?)
-          _ResultFact(
-            label: l10n.scanAiVisualSize,
-            value: formatApproximateDimensions(
-              dimensions,
-              unitSystem,
-              localeName: localeName,
-            ),
-          ),
-        _ResultFact(
-          label: l10n.scanConfidence,
-          value: localizedConfidence(l10n, measurement.confidence),
-        ),
-        const SizedBox(height: 8),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: const EdgeInsets.only(bottom: 12),
-          title: Text(l10n.scanHowEstimated),
-          children: [
-            for (final assumption in measurement.assumptions)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('• $assumption'),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
@@ -1422,7 +1625,11 @@ class _FoodResultView extends StatelessWidget {
     required this.measurement,
     required this.unitSystem,
     required this.saved,
+    required this.logged,
+    required this.mealType,
+    required this.onMealTypeChanged,
     required this.onSave,
+    required this.onLog,
     required this.onReset,
     required this.onMeasurementChanged,
   });
@@ -1430,7 +1637,11 @@ class _FoodResultView extends StatelessWidget {
   final Measurement measurement;
   final UnitSystem unitSystem;
   final bool saved;
+  final bool logged;
+  final MealType mealType;
+  final ValueChanged<MealType> onMealTypeChanged;
   final VoidCallback onSave;
+  final VoidCallback onLog;
   final VoidCallback onReset;
   final ValueChanged<Measurement> onMeasurementChanged;
 
@@ -1479,15 +1690,15 @@ class _FoodResultView extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: AspectRatio(
-              aspectRatio: 16 / 10,
+              aspectRatio: 4 / 3,
               child: ClipRRect(
                 key: const Key('result_photo'),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(22),
                 child: Image.file(
                   File(measurement.imagePath),
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => Container(
-                    color: AppColors.navySoft,
+                    color: context.palette.navySoft,
                     alignment: Alignment.center,
                     child: const Icon(Icons.restaurant_outlined, size: 52),
                   ),
@@ -1500,14 +1711,98 @@ class _FoodResultView extends StatelessWidget {
         Text(
           measurement.mealLabel ?? measurement.objectLabel,
           key: const Key('result_object_label'),
-          style: Theme.of(context).textTheme.headlineMedium,
+          style: TextStyle(
+            color: context.palette.ink,
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final type in MealType.values)
+              ChoiceChip(
+                key: Key('meal_type_${type.name}'),
+                label: Text(localizedMealType(l10n, type)),
+                selected: mealType == type,
+                onSelected: (_) => onMealTypeChanged(type),
+                selectedColor: context.palette.ink,
+                labelStyle: TextStyle(
+                  color: mealType == type
+                      ? context.palette.onInk
+                      : context.palette.ink,
+                  fontWeight: FontWeight.w700,
+                ),
+                backgroundColor: context.palette.navySoft,
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          key: const Key('food_nutrition_summary'),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: context.palette.surface,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (measurement.hasNutritionData) ...[
+                Text(
+                  '${calories.format(nutrition.caloriesKcal)} kcal',
+                  key: const Key('food_total_calories'),
+                  style: TextStyle(
+                    color: context.palette.ink,
+                    fontSize: 48,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _FoodMacroChip(
+                      color: context.palette.aqua,
+                      label: l10n.scanProtein,
+                      value: '${number.format(nutrition.proteinGrams)} g',
+                    ),
+                    _FoodMacroChip(
+                      color: context.palette.carbs,
+                      label: l10n.scanCarbs,
+                      value: '${number.format(nutrition.carbsGrams)} g',
+                    ),
+                    _FoodMacroChip(
+                      color: context.palette.coral,
+                      label: l10n.scanFat,
+                      value: '${number.format(nutrition.fatGrams)} g',
+                    ),
+                  ],
+                ),
+              ] else
+                Text(l10n.scanNutritionMissing),
+              const SizedBox(height: 10),
+              Text(
+                measurement.hasPartialNutrition
+                    ? l10n.scanPartialTotal
+                    : l10n.scanCompleteTotal,
+                style: TextStyle(
+                  color: context.palette.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 14),
         Container(
           key: const Key('food_weight_summary'),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.ink,
+            color: context.palette.navySoft,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
@@ -1515,8 +1810,8 @@ class _FoodResultView extends StatelessWidget {
             children: [
               Text(
                 l10n.scanFoodTotalWeight.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white60,
+                style: TextStyle(
+                  color: context.palette.inkMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.1,
@@ -1530,9 +1825,9 @@ class _FoodResultView extends StatelessWidget {
                   localeName: localeName,
                 ),
                 key: const Key('result_weight'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 44,
+                style: TextStyle(
+                  color: context.palette.ink,
+                  fontSize: 32,
                   height: 1,
                   fontWeight: FontWeight.w900,
                 ),
@@ -1541,110 +1836,29 @@ class _FoodResultView extends StatelessWidget {
               Text(
                 '${formatWeight(measurement.totalLowerBoundGrams, unitSystem, localeName: localeName)} – '
                 '${formatWeight(measurement.totalUpperBoundGrams, unitSystem, localeName: localeName)}',
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: context.palette.inkMuted,
                   fontWeight: FontWeight.w700,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${l10n.scanConfidence}: ${localizedConfidence(l10n, measurement.confidence)}',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        Container(
-          key: const Key('food_nutrition_summary'),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border.all(color: AppColors.line),
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.scanNutrition,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: measurement.hasPartialNutrition
-                          ? AppColors.coral.withValues(alpha: 0.12)
-                          : AppColors.lime.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Text(
-                      measurement.hasPartialNutrition
-                          ? l10n.scanPartialTotal
-                          : l10n.scanCompleteTotal,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              if (measurement.hasNutritionData) ...[
-                Text(
-                  '${calories.format(nutrition.caloriesKcal)} kcal',
-                  key: const Key('food_total_calories'),
-                  style: const TextStyle(
-                    fontSize: 36,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                if (measurement.calorieLowerBoundKcal case final lower?)
-                  Text(
-                    '${calories.format(lower)}–${calories.format(measurement.calorieUpperBoundKcal)} kcal · ${l10n.scanLikelyRange}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _MacroValue(
-                        label: l10n.scanProtein,
-                        value: '${number.format(nutrition.proteinGrams)} g',
-                      ),
-                    ),
-                    Expanded(
-                      child: _MacroValue(
-                        label: l10n.scanCarbs,
-                        value: '${number.format(nutrition.carbsGrams)} g',
-                      ),
-                    ),
-                    Expanded(
-                      child: _MacroValue(
-                        label: l10n.scanFat,
-                        value: '${number.format(nutrition.fatGrams)} g',
-                      ),
-                    ),
-                  ],
-                ),
-              ] else
-                Text(l10n.scanNutritionMissing),
-            ],
-          ),
+        NativeAdCard(
+          enabled: AppScope.of(context).monetization.canRequestNativeAds,
+          placement: 'food_result',
+          height: 120,
+          onPaidEvent: AppScope.of(context).monetization.reportPaidAd,
         ),
         const SizedBox(height: 20),
         Text(
           l10n.scanFoodComponents,
-          style: Theme.of(context).textTheme.titleLarge,
+          style: TextStyle(
+            color: context.palette.ink,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 10),
         for (var index = 0; index < measurement.foodComponents.length; index++)
@@ -1678,22 +1892,23 @@ class _FoodResultView extends StatelessWidget {
               ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.navySoft,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.info_outline_rounded, size: 20),
-              const SizedBox(width: 10),
-              Expanded(child: Text(l10n.scanFoodDisclaimer)),
-            ],
-          ),
+        Text(
+          l10n.scanFoodDisclaimer,
+          style: TextStyle(color: context.palette.inkMuted, fontSize: 12),
         ),
         const SizedBox(height: 18),
+        FilledButton(
+          key: const Key('nutrition_save_to_today'),
+          onPressed: logged || !measurement.hasNutritionData ? null : onLog,
+          style: FilledButton.styleFrom(
+            backgroundColor: context.palette.ink,
+            foregroundColor: context.palette.onInk,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: const StadiumBorder(),
+          ),
+          child: Text(logged ? l10n.commonSaved : l10n.nutritionSaveToToday),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
@@ -1704,15 +1919,44 @@ class _FoodResultView extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: FilledButton(
+              child: OutlinedButton(
                 key: const Key('save_result_button'),
                 onPressed: saved ? null : onSave,
-                child: Text(saved ? l10n.commonSaved : l10n.commonSave),
+                child: Text(
+                  saved ? l10n.commonSaved : l10n.nutritionSaveHistoryOnly,
+                ),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _FoodMacroChip extends StatelessWidget {
+  const _FoodMacroChip({
+    required this.color,
+    required this.label,
+    required this.value,
+  });
+
+  final Color color;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        '$label $value',
+        style: TextStyle(color: color, fontWeight: FontWeight.w800),
+      ),
     );
   }
 }
@@ -1802,32 +2046,6 @@ class _FoodAmountDialogState extends State<_FoodAmountDialog> {
   }
 }
 
-class _MacroValue extends StatelessWidget {
-  const _MacroValue({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.inkMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
-      ],
-    );
-  }
-}
-
 class _FoodComponentCard extends StatelessWidget {
   const _FoodComponentCard({
     required this.component,
@@ -1853,8 +2071,8 @@ class _FoodComponentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.line),
+        color: context.palette.surface,
+        border: Border.all(color: context.palette.line),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -1871,8 +2089,8 @@ class _FoodComponentCard extends StatelessWidget {
               ),
               Text(
                 localizedConfidence(l10n, component.confidence),
-                style: const TextStyle(
-                  color: AppColors.inkMuted,
+                style: TextStyle(
+                  color: context.palette.inkMuted,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1910,13 +2128,13 @@ class _FoodComponentCard extends StatelessWidget {
               '${component.nutrition!.dataType} · FDC ${component.nutrition!.fdcId}',
               style: Theme.of(
                 context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.inkMuted),
+              ).textTheme.bodySmall?.copyWith(color: context.palette.inkMuted),
             ),
           ] else
             Text(
               l10n.scanNutritionMissing,
-              style: const TextStyle(
-                color: AppColors.coral,
+              style: TextStyle(
+                color: context.palette.coral,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1936,32 +2154,12 @@ class _FoodComponentCard extends StatelessWidget {
                 onPressed: onRemove,
                 icon: const Icon(Icons.remove_circle_outline, size: 18),
                 label: Text(l10n.scanRemove),
-                style: TextButton.styleFrom(foregroundColor: AppColors.coral),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.palette.coral,
+                ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResultFact extends StatelessWidget {
-  const _ResultFact({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -1978,10 +2176,10 @@ class _InlineError extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.coral.withValues(alpha: 0.12),
+        color: context.palette.coral.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(message, style: const TextStyle(color: AppColors.coral)),
+      child: Text(message, style: TextStyle(color: context.palette.coral)),
     );
   }
 }

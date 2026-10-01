@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/services/app_review_service.dart';
@@ -11,37 +11,50 @@ import '../features/measurements/domain/measurement.dart';
 import '../features/monetization/application/monetization_controller.dart';
 import '../features/nutrition/application/nutrition_diary_controller.dart';
 import '../features/nutrition/data/nutrition_log_store.dart';
+import '../features/reminders/application/meal_reminder_controller.dart';
 
 class AppController extends ChangeNotifier {
   AppController({
     required MeasurementStore measurementStore,
     List<Measurement> measurements = const [],
     bool onboardingComplete = false,
+    bool welcomeComplete = false,
+    bool appUnlockedThisSession = false,
     bool onboardingReviewPromptHandled = false,
     bool postScanReviewRequested = false,
     UnitSystem unitSystem = UnitSystem.metric,
+    ThemeMode themeMode = ThemeMode.system,
     DateTime? previousBackgroundedAt,
     MonetizationController? monetizationController,
     NutritionDiaryController? nutritionDiaryController,
+    MealReminderController? mealReminderController,
     AppReviewService? appReviewService,
   }) : _measurementStore = measurementStore,
        _measurements = List<Measurement>.from(measurements),
        _onboardingComplete = onboardingComplete,
+       _welcomeComplete = welcomeComplete,
+       _appUnlockedThisSession = appUnlockedThisSession,
        _onboardingReviewPromptHandled = onboardingReviewPromptHandled,
        _postScanReviewRequested = postScanReviewRequested,
        _unitSystem = unitSystem,
+       _themeMode = themeMode,
        _previousBackgroundedAt = previousBackgroundedAt,
        _appReviewService = appReviewService ?? PlayAppReviewService(),
        nutritionDiary =
            nutritionDiaryController ?? NutritionDiaryController.empty(),
+       mealReminders =
+           mealReminderController ?? MealReminderController.disabled(),
        monetization =
            monetizationController ?? MonetizationController.disabled() {
+    _knownNutritionEntryCount = nutritionDiary.entries.length;
+    monetization.addListener(_handleMonetizationChanged);
     monetization.addListener(notifyListeners);
-    nutritionDiary.addListener(notifyListeners);
+    nutritionDiary.addListener(_handleNutritionChanged);
+    mealReminders.addListener(notifyListeners);
   }
 
   static const _onboardingKey = 'mass_lens.onboarding_complete';
-  static const _onboardingSeenKey = 'mass_lens.onboarding_seen';
+  static const _welcomeCompleteKey = 'mass_lens.welcome_complete';
   static const _onboardingReviewPromptKey =
       'mass_lens.onboarding_review_prompt_handled';
   static const _postScanReviewRequestedKey =
@@ -50,55 +63,75 @@ class AppController extends ChangeNotifier {
     'MASSLENS_FORCE_ONBOARDING',
   );
   static const _unitKey = 'mass_lens.unit_system';
+  static const _themeModeKey = 'mass_lens.theme_mode';
   static const _backgroundedAtKey = 'mass_lens.backgrounded_at_ms';
 
   final MeasurementStore _measurementStore;
   final AppReviewService _appReviewService;
   final MonetizationController monetization;
   final NutritionDiaryController nutritionDiary;
+  final MealReminderController mealReminders;
+  int _knownNutritionEntryCount = 0;
   final List<Measurement> _measurements;
   bool _onboardingComplete;
+  bool _welcomeComplete;
+  bool _appUnlockedThisSession;
   bool _onboardingReviewPromptHandled;
   bool _postScanReviewRequested;
   UnitSystem _unitSystem;
+  ThemeMode _themeMode;
   DateTime? _previousBackgroundedAt;
   Future<void> _backgroundPersistence = Future<void>.value();
 
   List<Measurement> get measurements => List.unmodifiable(_measurements);
   bool get onboardingComplete => _onboardingComplete;
+  bool get welcomeComplete => _welcomeComplete;
+  bool get appUnlockedThisSession =>
+      _appUnlockedThisSession || monetization.hasLifetime;
   bool get onboardingReviewPromptHandled => _onboardingReviewPromptHandled;
   bool get postScanReviewRequested => _postScanReviewRequested;
   UnitSystem get unitSystem => _unitSystem;
+  ThemeMode get themeMode => _themeMode;
+
+  void _handleNutritionChanged() {
+    final count = nutritionDiary.entries.length;
+    if (count > _knownNutritionEntryCount) {
+      // A meal was just logged: skip today's reminder if it is due soon.
+      unawaited(mealReminders.noteMealLogged(DateTime.now()));
+    }
+    _knownNutritionEntryCount = count;
+    notifyListeners();
+  }
+
+  void _handleMonetizationChanged() {
+    if (monetization.hasLifetime && !_appUnlockedThisSession) {
+      _appUnlockedThisSession = true;
+      notifyListeners();
+    }
+  }
 
   static Future<AppController> bootstrap({
     MeasurementStore store = const MeasurementStore(),
     NutritionLogStore nutritionStore = const NutritionLogStore(),
   }) async {
     var onboardingComplete = false;
+    var welcomeComplete = false;
     var onboardingReviewPromptHandled = false;
     var postScanReviewRequested = false;
     var unitSystem = UnitSystem.metric;
+    var themeMode = ThemeMode.system;
     DateTime? previousBackgroundedAt;
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedOnboarding = preferences.getBool(_onboardingKey);
-      final onboardingSeen = preferences.getBool(_onboardingSeenKey) ?? false;
       final existingInstallation = InstallationIdStore.hasExisting(preferences);
-      // A genuinely fresh install sees onboarding during this launch only.
-      // Persisting `seen` now means closing midway never replays the guide.
-      // Existing installation IDs also preserve the legacy-upgrade behavior.
-      onboardingComplete =
-          savedOnboarding == true || onboardingSeen || existingInstallation;
-      if (onboardingComplete) {
-        if (savedOnboarding != true) {
-          await preferences.setBool(_onboardingKey, true);
-        }
-        if (!onboardingSeen) {
-          await preferences.setBool(_onboardingSeenKey, true);
-        }
-      } else {
-        await preferences.setBool(_onboardingKey, false);
-        await preferences.setBool(_onboardingSeenKey, true);
+      onboardingComplete = savedOnboarding == true;
+      welcomeComplete =
+          (preferences.getBool(_welcomeCompleteKey) ?? false) ||
+          existingInstallation ||
+          savedOnboarding == true;
+      if (kDebugMode && _forceOnboarding) {
+        welcomeComplete = false;
       }
       onboardingReviewPromptHandled =
           preferences.getBool(_onboardingReviewPromptKey) ?? false;
@@ -107,6 +140,13 @@ class AppController extends ChangeNotifier {
       unitSystem = UnitSystem.values.byName(
         preferences.getString(_unitKey) ?? UnitSystem.metric.name,
       );
+      final savedThemeMode = preferences.getString(_themeModeKey);
+      for (final mode in ThemeMode.values) {
+        if (mode.name == savedThemeMode) {
+          themeMode = mode;
+          break;
+        }
+      }
       final backgroundedAtMs = preferences.getInt(_backgroundedAtKey);
       if (backgroundedAtMs != null) {
         previousBackgroundedAt = DateTime.fromMillisecondsSinceEpoch(
@@ -117,23 +157,29 @@ class AppController extends ChangeNotifier {
       // Defaults keep the app operational if preferences are unavailable.
     }
 
-    final measurements = await store.load();
-    final nutritionEntries = await nutritionStore.load();
+    final (measurements, nutritionEntries, nutritionGoals, reminders) = await (
+      store.load(),
+      nutritionStore.load(),
+      nutritionStore.loadGoals(),
+      MealReminderController.load(),
+    ).wait;
     return AppController(
       measurementStore: store,
       measurements: measurements,
-      onboardingComplete: kDebugMode && _forceOnboarding
-          ? false
-          : onboardingComplete,
+      onboardingComplete: onboardingComplete,
+      welcomeComplete: welcomeComplete,
       onboardingReviewPromptHandled: onboardingReviewPromptHandled,
       postScanReviewRequested: postScanReviewRequested,
       unitSystem: unitSystem,
+      themeMode: themeMode,
       previousBackgroundedAt: previousBackgroundedAt,
       monetizationController: MonetizationController.create(),
       nutritionDiaryController: NutritionDiaryController(
         store: nutritionStore,
         entries: nutritionEntries,
+        goals: nutritionGoals,
       ),
+      mealReminderController: reminders,
     );
   }
 
@@ -192,15 +238,30 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> completeOnboarding() async {
-    if (_onboardingComplete) return;
+  Future<void> markWelcomeComplete() async {
+    if (_welcomeComplete) return;
+    _welcomeComplete = true;
+    notifyListeners();
     try {
       final preferences = await SharedPreferences.getInstance();
-      await preferences.setBool(_onboardingKey, true);
+      await preferences.setBool(_welcomeCompleteKey, true);
     } on Object {
       // The current session can continue even if persistence fails.
     }
-    _onboardingComplete = true;
+  }
+
+  Future<void> completeOnboarding() async {
+    if (_appUnlockedThisSession) return;
+    _appUnlockedThisSession = true;
+    if (!_onboardingComplete) {
+      _onboardingComplete = true;
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.setBool(_onboardingKey, true);
+      } on Object {
+        // The current session can continue even if persistence fails.
+      }
+    }
     notifyListeners();
     unawaited(monetization.initialize());
   }
@@ -269,6 +330,29 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> setThemeMode(ThemeMode value) async {
+    if (_themeMode == value) return;
+    _themeMode = value;
+    notifyListeners();
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_themeModeKey, value.name);
+    } on Object {
+      // Keep the selected appearance for this session.
+    }
+  }
+
+  /// Opens Google Play's in-app review sheet on request from Settings.
+  ///
+  /// Returns false when the platform declines to show it — no Play Store, or
+  /// the review quota is spent — so the caller can fall back to the listing.
+  Future<bool> requestAppReview() {
+    return _appReviewService.requestReview().timeout(
+      const Duration(seconds: 4),
+      onTimeout: () => false,
+    );
+  }
+
   Future<void> addMeasurement(Measurement measurement) async {
     if (_measurements.any((item) => item.id == measurement.id)) return;
     final persisted = await _measurementStore.persistImage(measurement);
@@ -305,9 +389,13 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     monetization
+      ..removeListener(_handleMonetizationChanged)
       ..removeListener(notifyListeners)
       ..dispose();
     nutritionDiary
+      ..removeListener(_handleNutritionChanged)
+      ..dispose();
+    mealReminders
       ..removeListener(notifyListeners)
       ..dispose();
     super.dispose();

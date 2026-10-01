@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/theme/app_theme.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
@@ -20,12 +22,25 @@ class MassLensApp extends StatefulWidget {
 class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
   DateTime? _backgroundedAt;
   bool _checkingResumeAd = false;
-  late bool _onboardingComplete;
+  late bool _appUnlocked;
+  late ThemeMode _themeMode;
+
+  /// The brightness the app is actually painting, for the system bars.
+  ///
+  /// This runs outside [MaterialApp], so the platform value is read from the
+  /// dispatcher rather than from a [MediaQuery] ancestor.
+  Brightness get _effectiveBrightness => switch (_themeMode) {
+    ThemeMode.light => Brightness.light,
+    ThemeMode.dark => Brightness.dark,
+    ThemeMode.system =>
+      WidgetsBinding.instance.platformDispatcher.platformBrightness,
+  };
 
   @override
   void initState() {
     super.initState();
-    _onboardingComplete = widget.controller.onboardingComplete;
+    _appUnlocked = widget.controller.appUnlockedThisSession;
+    _themeMode = widget.controller.themeMode;
     widget.controller.addListener(_handleControllerChanged);
     WidgetsBinding.instance.addObserver(this);
     if (widget.controller.monetization.enabled) {
@@ -43,14 +58,20 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
     super.didUpdateWidget(oldWidget);
     if (identical(oldWidget.controller, widget.controller)) return;
     oldWidget.controller.removeListener(_handleControllerChanged);
-    _onboardingComplete = widget.controller.onboardingComplete;
+    _appUnlocked = widget.controller.appUnlockedThisSession;
+    _themeMode = widget.controller.themeMode;
     widget.controller.addListener(_handleControllerChanged);
   }
 
   void _handleControllerChanged() {
-    final complete = widget.controller.onboardingComplete;
-    if (!mounted || complete == _onboardingComplete) return;
-    setState(() => _onboardingComplete = complete);
+    final unlocked = widget.controller.appUnlockedThisSession;
+    final themeMode = widget.controller.themeMode;
+    if (!mounted) return;
+    if (unlocked == _appUnlocked && themeMode == _themeMode) return;
+    setState(() {
+      _appUnlocked = unlocked;
+      _themeMode = themeMode;
+    });
   }
 
   Future<void> _initializeAdsForLaunch() async {
@@ -63,10 +84,14 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Ads and activity transitions often reset the system UI overlay.
+      SystemChrome.setSystemUIOverlayStyle(
+        systemUiOverlayStyleFor(_effectiveBrightness),
+      );
       final backgroundedAt = _backgroundedAt;
       _backgroundedAt = null;
       if (backgroundedAt != null) {
-        if (widget.controller.onboardingComplete) {
+        if (widget.controller.appUnlockedThisSession) {
           unawaited(_handleResume(backgroundedAt));
         } else {
           // Still consume onboarding pauses so they can never become a later
@@ -118,19 +143,42 @@ class _MassLensAppState extends State<MassLensApp> with WidgetsBindingObserver {
         },
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
-        builder: (context, child) => Stack(
-          children: [
-            ?child,
-            if (_checkingResumeAd)
-              const Positioned.fill(
-                child: ColoredBox(
-                  color: AppColors.canvas,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+        darkTheme: buildAppDarkTheme(),
+        themeMode: _themeMode,
+        builder: (context, child) {
+          final mediaQuery = MediaQuery.of(context);
+          // One UI sometimes reports padding.bottom == 0 while viewPadding
+          // still holds the nav-bar height; SafeArea needs the larger value.
+          final bottomInset = math.max(
+            mediaQuery.padding.bottom,
+            mediaQuery.viewPadding.bottom,
+          );
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: systemUiOverlayStyleFor(Theme.of(context).brightness),
+            child: MediaQuery(
+              data: mediaQuery.copyWith(
+                padding: mediaQuery.padding.copyWith(bottom: bottomInset),
               ),
-          ],
-        ),
-        home: _onboardingComplete ? const AppShell() : const OnboardingScreen(),
+              child: Stack(
+                children: [
+                  ?child,
+                  if (_checkingResumeAd)
+                    Positioned.fill(
+                      child: ColoredBox(
+                        color: context.palette.canvas,
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+        home: _appUnlocked
+            ? const AppShell()
+            : OnboardingScreen(
+                initialPage: widget.controller.welcomeComplete ? 3 : 0,
+              ),
       ),
     );
   }

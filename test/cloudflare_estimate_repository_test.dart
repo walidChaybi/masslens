@@ -68,6 +68,7 @@ void main() {
         'value': 32,
         'unit': 'cm',
       });
+      expect(body.containsKey('arMeasuredDimension'), isFalse);
       expect(body['material'], 'Metal');
       expect(body['scanMode'], 'object');
       expect(body.containsKey('containerType'), isFalse);

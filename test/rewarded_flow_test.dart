@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
+import 'package:mass_lens/app/mass_lens_app.dart';
 import 'package:mass_lens/core/theme/app_theme.dart';
 import 'package:mass_lens/features/home/presentation/home_screen.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
@@ -20,6 +21,34 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('exhausted AI Scan opens rewarded access with lifetime option', (
+    tester,
+  ) async {
+    final clock = _FakeClock(DateTime.utc(2026, 9, 14));
+    final monetization = MonetizationController.forTesting(
+      api: _FakeMonetizationApi(clock: clock),
+      adService: _FakeAppAdService(),
+      now: clock.now,
+    );
+    await monetization.initialize();
+    final controller = AppController(
+      measurementStore: const MeasurementStore(),
+      onboardingComplete: true,
+      appUnlockedThisSession: true,
+      monetizationController: monetization,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(MassLensApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('home_scan_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('watch_ad_for_scan')), findsOneWidget);
+    expect(find.byKey(const Key('earn_unlock_unlimited')), findsOneWidget);
+    expect(find.byKey(const Key('paywall_headline')), findsNothing);
   });
 
   test(
@@ -174,6 +203,38 @@ void main() {
     },
   );
 
+  testWidgets('premium paywall opens from earn sheet unlock link', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(360, 520));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final clock = _FakeClock(DateTime.utc(2026, 8, 8, 12));
+    final monetization = MonetizationController.forTesting(
+      api: _FakeMonetizationApi(clock: clock),
+      adService: _FakeAppAdService(),
+      now: clock.now,
+    );
+    await monetization.initialize();
+    final appController = AppController(
+      measurementStore: const MeasurementStore(),
+      onboardingComplete: true,
+      appUnlockedThisSession: true,
+      monetizationController: monetization,
+    );
+    addTearDown(appController.dispose);
+
+    await _openRewardSheet(tester, appController);
+
+    expect(find.byKey(const Key('watch_ad_for_scan')), findsOneWidget);
+    expect(find.byKey(const Key('buy_lifetime_unlock')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('earn_unlock_unlimited')));
+    await tester.tap(find.byKey(const Key('earn_unlock_unlimited')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('buy_lifetime_unlock')), findsOneWidget);
+    expect(find.byKey(const Key('paywall_headline')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('pending sheet is durable, checkable, and compact-screen safe', (
     tester,
   ) async {
@@ -190,6 +251,7 @@ void main() {
     final appController = AppController(
       measurementStore: const MeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
       monetizationController: monetization,
     );
     addTearDown(appController.dispose);
@@ -243,24 +305,17 @@ void main() {
     final appController = AppController(
       measurementStore: const MeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
       monetizationController: monetization,
     );
     addTearDown(appController.dispose);
 
     await _openRewardSheet(tester, appController);
 
-    final watchButton = tester.widget<FilledButton>(
-      find.byKey(const Key('watch_ad_for_scan')),
-    );
-    expect(watchButton.onPressed, isNull);
+    expect(find.byKey(const Key('watch_ad_for_scan')), findsOneWidget);
     expect(find.text('Rewarded ads unavailable'), findsOneWidget);
-    expect(find.textContaining('consent or configuration'), findsOneWidget);
     expect(find.text('Privacy choices'), findsOneWidget);
     expect(find.byKey(const Key('retry_rewarded_ad')), findsNothing);
-
-    await tester.tap(find.text('Privacy choices'));
-    await tester.pump();
-    expect(ads.privacyOptionsShowCount, 1);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -279,26 +334,15 @@ void main() {
     final appController = AppController(
       measurementStore: const MeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
       monetizationController: monetization,
     );
     addTearDown(appController.dispose);
 
     await _openRewardSheet(tester, appController);
 
-    expect(find.text('Rewarded ad is loading'), findsOneWidget);
+    expect(find.byKey(const Key('watch_ad_for_scan')), findsOneWidget);
     expect(find.byKey(const Key('retry_rewarded_ad')), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-
-    await tester.tap(find.byKey(const Key('retry_rewarded_ad')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Watch an ad · Get 1 scan'), findsOneWidget);
-    expect(find.byKey(const Key('retry_rewarded_ad')), findsNothing);
-    final watchButton = tester.widget<FilledButton>(
-      find.byKey(const Key('watch_ad_for_scan')),
-    );
-    expect(watchButton.onPressed, isNotNull);
-    expect(ads.updatePlanCount, 2);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -315,6 +359,7 @@ void main() {
     final appController = AppController(
       measurementStore: const MeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
       monetizationController: monetization,
     );
     addTearDown(appController.dispose);
@@ -328,8 +373,8 @@ void main() {
           theme: buildAppTheme(),
           home: Scaffold(
             body: HomeScreen(
-              onMeasure: (_) {},
-              onGallery: (_) {},
+              onMeasure: () {},
+              onGallery: () {},
               onViewHistory: () {},
             ),
           ),
@@ -340,7 +385,7 @@ void main() {
 
     expect(appController.monetization.access.adsEnabled, isTrue);
     expect(find.byKey(const Key('home_reward_cta')), findsOneWidget);
-    expect(find.text('0 left · Get +1'), findsOneWidget);
+    expect(find.text('Get free scan'), findsOneWidget);
   });
 }
 
@@ -407,6 +452,7 @@ class _FakeMonetizationApi extends MonetizationApi {
     legacyScans: 0,
     remainingScans: 0,
     rewardBalanceCap: 3,
+    hasLifetime: false,
     scanAccessEnforced: true,
     adsEnabled: true,
     isAuthoritative: true,

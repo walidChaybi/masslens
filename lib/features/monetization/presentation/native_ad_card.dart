@@ -11,7 +11,8 @@ class NativeAdCard extends StatefulWidget {
   const NativeAdCard({
     required this.enabled,
     required this.placement,
-    this.height = 100,
+    this.height = 120,
+    this.medium = false,
     this.onPaidEvent,
     super.key,
   });
@@ -19,6 +20,7 @@ class NativeAdCard extends StatefulWidget {
   final bool enabled;
   final String placement;
   final double height;
+  final bool medium;
   final PaidAdReporter? onPaidEvent;
 
   @override
@@ -44,6 +46,11 @@ class _NativeAdCardState extends State<NativeAdCard>
   @override
   void didUpdateWidget(covariant NativeAdCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.medium != oldWidget.medium) {
+      _disposeAd();
+      if (widget.enabled) _load();
+      return;
+    }
     if (widget.enabled && !oldWidget.enabled) _load();
     if (!widget.enabled && oldWidget.enabled) _disposeAd();
   }
@@ -56,9 +63,20 @@ class _NativeAdCardState extends State<NativeAdCard>
       request: const AdRequest(),
       listener: NativeAdListener(
         onAdLoaded: (_) {
-          if (mounted) setState(() => _loaded = true);
+          if (mounted) {
+            setState(() => _loaded = true);
+            updateKeepAlive();
+            if (kDebugMode) {
+              debugPrint('MassLens native ad loaded: ${widget.placement}');
+            }
+          }
         },
         onAdFailedToLoad: (ad, error) {
+          if (kDebugMode) {
+            debugPrint(
+              'MassLens native ad failed: ${widget.placement}, ${error.domain}, code ${error.code}',
+            );
+          }
           ad.dispose();
           if (mounted) {
             setState(() {
@@ -84,20 +102,26 @@ class _NativeAdCardState extends State<NativeAdCard>
         },
       ),
       nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.small,
-        mainBackgroundColor: AppColors.surface,
+        templateType: widget.medium ? TemplateType.medium : TemplateType.small,
+        mainBackgroundColor: context.palette.surface,
         cornerRadius: 18,
         callToActionTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white,
-          backgroundColor: AppColors.ink,
-          size: 13,
+          // The call to action is a filled button: its label has to contrast
+          // with its own fill, not with the card behind it.
+          textColor: widget.medium
+              ? context.palette.onLime
+              : context.palette.onInk,
+          backgroundColor: widget.medium
+              ? context.palette.lime
+              : context.palette.ink,
+          size: widget.medium ? 15 : 13,
         ),
         primaryTextStyle: NativeTemplateTextStyle(
-          textColor: AppColors.ink,
+          textColor: context.palette.ink,
           size: 14,
         ),
         secondaryTextStyle: NativeTemplateTextStyle(
-          textColor: AppColors.inkMuted,
+          textColor: context.palette.inkMuted,
           size: 12,
         ),
       ),
@@ -126,17 +150,17 @@ class _NativeAdCardState extends State<NativeAdCard>
         key: Key('native_ad_loading_${widget.placement}'),
         height: widget.height,
         decoration: BoxDecoration(
-          color: AppColors.surface.withValues(alpha: 0.72),
+          color: context.palette.surface.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.line),
+          border: Border.all(color: context.palette.line),
         ),
         alignment: Alignment.center,
         child: Text(
           _adError
               ? context.l10n.nativeTestRetrying
               : context.l10n.nativeTestLoading,
-          style: const TextStyle(
-            color: AppColors.inkMuted,
+          style: TextStyle(
+            color: context.palette.inkMuted,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -150,9 +174,9 @@ class _NativeAdCardState extends State<NativeAdCard>
           key: _adKey,
           height: widget.height,
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: context.palette.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.line),
+            border: Border.all(color: context.palette.line),
           ),
           clipBehavior: Clip.antiAlias,
           child: AdWidget(ad: _ad!),

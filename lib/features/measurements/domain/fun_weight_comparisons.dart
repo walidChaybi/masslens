@@ -58,10 +58,7 @@ FunWeightComparison? buildFunWeightComparisons(double estimateGrams) {
   // Primary reference: aim near "2×" for readability.
   const target1 = 2.0;
   final candidates1 = FunWeightUnit.values
-      .map((unit) => (
-            unit: unit,
-            quantity: estimateGrams / unit.gramsPerUnit,
-          ))
+      .map((unit) => (unit: unit, quantity: estimateGrams / unit.gramsPerUnit))
       .where((item) => item.quantity >= 0.5 && item.quantity <= 8.0)
       .toList();
   if (candidates1.isEmpty) return null;
@@ -72,8 +69,10 @@ FunWeightComparison? buildFunWeightComparisons(double estimateGrams) {
     return diffA.compareTo(diffB);
   });
   final first = candidates1.first;
-  final firstPart =
-      FunWeightPart(first.unit, _formatQuantityText(first.quantity));
+  final firstPart = FunWeightPart(
+    first.unit,
+    _formatQuantityText(first.quantity),
+  );
 
   // Secondary reference: try to keep it smaller and different.
   const target2 = 0.7;

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../../../core/services/installation_id_store.dart';
 import '../../measurements/domain/measurement.dart';
 import '../domain/estimate_repository.dart';
@@ -94,6 +96,7 @@ class CloudflareEstimateRepository implements EstimateRepository {
         ..set(HttpHeaders.contentTypeHeader, ContentType.json.mimeType)
         ..set('X-MassLens-Client-ID', clientId)
         ..set('X-MassLens-Request-ID', requestId);
+      if (kDebugMode) request.headers.set('X-MassLens-Build', 'debug');
       request.write(jsonEncode(body));
 
       final response = await request.close().timeout(timeout);

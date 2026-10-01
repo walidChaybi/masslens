@@ -146,6 +146,7 @@ class _LegalScreenState extends State<LegalScreen> {
       appBar: AppBar(title: Text(l10n.legalTitle)),
       body: SafeArea(
         top: false,
+        maintainBottomViewPadding: true,
         child: SelectionArea(
           child: ListView(
             key: const Key('legal_document_scroll'),
@@ -154,15 +155,15 @@ class _LegalScreenState extends State<LegalScreen> {
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: AppColors.ink,
+                  color: context.palette.ink,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.gavel_rounded,
-                      color: AppColors.aqua,
+                      color: context.palette.aqua,
                       size: 28,
                     ),
                     const SizedBox(width: 14),
@@ -229,14 +230,14 @@ class _LegalScreenState extends State<LegalScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: context.palette.surface,
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: AppColors.line),
+                      border: Border.all(color: context.palette.line),
                     ),
                     child: Text(
                       l10n.legalLastUpdated,
-                      style: const TextStyle(
-                        color: AppColors.inkMuted,
+                      style: TextStyle(
+                        color: context.palette.inkMuted,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
@@ -275,8 +276,8 @@ class _LegalScreenState extends State<LegalScreen> {
                 child: Text(
                   l10n.legalFooter,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
+                  style: TextStyle(
+                    color: context.palette.inkMuted,
                     fontSize: 11.5,
                     height: 1.45,
                   ),
@@ -309,9 +310,9 @@ class _LegalSectionCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: context.palette.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,8 +330,8 @@ class _LegalSectionCard extends StatelessWidget {
                 ),
                 child: Text(
                   '$index',
-                  style: const TextStyle(
-                    color: AppColors.ink,
+                  style: TextStyle(
+                    color: context.palette.ink,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -348,8 +349,8 @@ class _LegalSectionCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             section.body,
-            style: const TextStyle(
-              color: AppColors.inkMuted,
+            style: TextStyle(
+              color: context.palette.inkMuted,
               fontSize: 13,
               height: 1.58,
             ),

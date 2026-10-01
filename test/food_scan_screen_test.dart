@@ -40,7 +40,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Food Scale'), findsOneWidget);
+      expect(find.text('Food estimates'), findsOneWidget);
       expect(find.text('Photograph one whole plate'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('gallery_button')));
@@ -148,6 +148,7 @@ void main() {
         300,
         scrollable: foodResultScrollable,
       );
+      expect(find.byKey(const Key('nutrition_save_to_today')), findsOneWidget);
       await tester.tap(find.byKey(const Key('save_result_button')));
       await tester.pumpAndSettle();
 

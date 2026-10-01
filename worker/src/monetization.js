@@ -1,12 +1,17 @@
+import {
+  handleBillingRoute,
+  hasActiveLifetimeEntitlement,
+} from "./billing.js";
+
 const clientIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 const requestIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
 const rewardAttemptIdPattern = /^[A-Za-z0-9_-]{20,80}$/;
-const lifetimeStarterScans = 3;
+const lifetimeStarterScans = 2;
 const rewardBalanceCap = 3;
 const resultTtlMs = 24 * 60 * 60 * 1000;
 const pendingTtlMs = 2 * 60 * 1000;
 const rewardAttemptTtlMs = 24 * 60 * 60 * 1000;
-const rewardCooldownMs = 2 * 60 * 1000;
+const rewardCooldownMs = 30 * 1000;
 
 export async function handleMonetizationRoute(
   request,
@@ -16,7 +21,7 @@ export async function handleMonetizationRoute(
 ) {
   if (request.method === "GET" && url.pathname === "/access") {
     const clientIdHash = await readHashedClientId(request);
-    return jsonResponse(await getAccess(env, clientIdHash));
+    return jsonResponse(await getAccess(env, clientIdHash, request.headers.get("x-masslens-build") === "debug"));
   }
 
   if (request.method === "POST" && url.pathname === "/reward-attempts") {
@@ -33,7 +38,21 @@ export async function handleMonetizationRoute(
     return new Response(null, {status: 204});
   }
 
+  const billingResponse = await handleBillingRoute(
+    request,
+    env,
+    url,
+    dependencies,
+  );
+  if (billingResponse) return billingResponse;
+
   return null;
+}
+
+export function isDebugUnlimited(env, clientIdHash, debugBuild = false) {
+  return debugBuild === true && typeof env.DEBUG_UNLIMITED_CLIENT_HASH === "string" &&
+    /^[a-f0-9]{64}$/.test(env.DEBUG_UNLIMITED_CLIENT_HASH) &&
+    env.DEBUG_UNLIMITED_CLIENT_HASH === clientIdHash;
 }
 
 export function isScanAccessEnforced(env) {
@@ -52,7 +71,7 @@ export function readRequestId(request) {
   return requestId;
 }
 
-export async function reserveScan(env, clientIdHash, requestId) {
+export async function reserveScan(env, clientIdHash, requestId, debugBuild = false) {
   if (!isScanAccessEnforced(env)) return {kind: "disabled", requestId};
   const db = requireDatabase(env);
   const now = Date.now();
@@ -102,14 +121,19 @@ export async function reserveScan(env, clientIdHash, requestId) {
   ).bind(requestId, clientIdHash, now, now, now + resultTtlMs).run();
 
   let kind;
-  const starter = await db.prepare(
+  const hasLifetime = await hasActiveLifetimeEntitlement(db, clientIdHash);
+  if (hasLifetime || isDebugUnlimited(env, clientIdHash, debugBuild)) {
+    kind = "lifetime";
+  }
+
+  const starter = kind ? null : await db.prepare(
     `UPDATE ad_scan_wallets
         SET starter_used = starter_used + 1, updated_at_ms = ?
       WHERE client_id_hash = ? AND starter_used < ?`,
   ).bind(now, clientIdHash, lifetimeStarterScans).run();
-  if (changedRows(starter) === 1) {
+  if (!kind && changedRows(starter) === 1) {
     kind = "starter";
-  } else {
+  } else if (!kind) {
     // Historical purchased credits stay ad-free and are deliberately spent
     // before rewarded credits so ads resume only after legacy value is gone.
     const legacy = await db.prepare(
@@ -271,7 +295,7 @@ export async function readHashedClientId(request) {
   return hashIdentifier(clientId);
 }
 
-async function getAccess(env, clientIdHash) {
+export async function getAccess(env, clientIdHash, debugBuild = false) {
   const enforced = isScanAccessEnforced(env);
   if (!env.DB) {
     if (enforced) {
@@ -281,7 +305,7 @@ async function getAccess(env, clientIdHash) {
         "Scan access storage is not configured.",
       );
     }
-    return accessPayload({scanAccessEnforced: false});
+    return accessPayload({scanAccessEnforced: false, env});
   }
 
   const now = Date.now();
@@ -293,10 +317,13 @@ async function getAccess(env, clientIdHash) {
   const legacy = await env.DB.prepare(
     "SELECT balance FROM credit_wallets WHERE client_id_hash = ?",
   ).bind(clientIdHash).first();
+  const hasLifetime = await hasActiveLifetimeEntitlement(env.DB, clientIdHash);
   return accessPayload({
     starterUsed: Number(wallet?.starter_used || 0),
     rewardedScans: Number(wallet?.rewarded_balance || 0),
     legacyScans: Math.max(0, Number(legacy?.balance || 0)),
+    hasLifetime,
+    debugUnlimited: isDebugUnlimited(env, clientIdHash, debugBuild),
     scanAccessEnforced: enforced,
     env,
   });
@@ -306,6 +333,8 @@ export function accessPayload({
   starterUsed = 0,
   rewardedScans = 0,
   legacyScans = 0,
+  hasLifetime = false,
+  debugUnlimited = false,
   scanAccessEnforced = false,
   env = {},
 } = {}) {
@@ -321,11 +350,10 @@ export function accessPayload({
     legacyScans,
     remainingScans,
     rewardBalanceCap,
+    hasLifetime,
+    debugUnlimited,
     scanAccessEnforced,
-    // Billing was removed before launch. Migrated and support credits still
-    // preserve scan access, but they must not silently disable the ads-only
-    // experience or hide the rewarded path.
-    adsEnabled: scanAccessEnforced,
+    adsEnabled: scanAccessEnforced && !hasLifetime,
     analysisModel: env.OPENAI_MODEL || "gpt-5-nano",
     adPolicy: {
       interstitialEvery: readPositiveInteger(env.INTERSTITIAL_EVERY, 2),

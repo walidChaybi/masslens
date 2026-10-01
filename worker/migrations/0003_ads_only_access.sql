@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS ad_scan_wallets (
 );
 
 -- Carry forward beta usage without restoring the old monthly reset. Previously
--- consumed beta scans count against the three lifetime starter scans, while
+-- consumed beta scans count against the two lifetime starter scans, while
 -- every verified bonus remains available.
 INSERT OR IGNORE INTO ad_scan_wallets (
   client_id_hash, starter_used, rewarded_balance, updated_at_ms

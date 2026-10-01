@@ -1,11 +1,23 @@
 import '../features/measurements/domain/fun_weight_comparisons.dart';
 import '../features/measurements/domain/measurement.dart';
 import '../features/monetization/domain/access_status.dart';
+import '../features/nutrition/domain/nutrition_log.dart';
 import 'generated/app_localizations.dart';
+
+String localizedMealType(AppLocalizations l10n, MealType type) =>
+    switch (type) {
+      MealType.breakfast => l10n.nutritionBreakfast,
+      MealType.lunch => l10n.nutritionLunch,
+      MealType.dinner => l10n.nutritionDinner,
+      MealType.snack => l10n.nutritionSnack,
+    };
 
 String localizedScanUsage(AppLocalizations l10n, AccessStatus access) {
   if (!access.isAuthoritative) return l10n.accessLoadingBalance;
   if (!access.scanAccessEnforced) return l10n.accessPreview;
+  if (access.hasLifetime || access.debugUnlimited) {
+    return l10n.accessUnlimitedScans;
+  }
   return l10n.accessScansLeft(access.remainingScans);
 }
 
@@ -72,11 +84,12 @@ String localizedFunWeightUnit(AppLocalizations l10n, FunWeightUnit unit) =>
 String localizedFunWeightComparison(
   AppLocalizations l10n,
   FunWeightComparison comparison,
-) =>
-    comparison.parts
-        .map((part) =>
-            '≈ ${part.quantityText} × ${localizedFunWeightUnit(l10n, part.unit)}')
-        .join(', ');
+) => comparison.parts
+    .map(
+      (part) =>
+          '≈ ${part.quantityText} × ${localizedFunWeightUnit(l10n, part.unit)}',
+    )
+    .join(', ');
 
 String localizedDimensionAxis(AppLocalizations l10n, String value) =>
     switch (value) {

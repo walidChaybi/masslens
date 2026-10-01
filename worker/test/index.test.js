@@ -51,10 +51,10 @@ test("access endpoint exposes the ads-only starter wallet contract", async () =>
 
   assert.equal(response.status, 200);
   const access = await response.json();
-  assert.equal(access.starterScansRemaining, 3);
+  assert.equal(access.starterScansRemaining, 2);
   assert.equal(access.rewardedScans, 0);
   assert.equal(access.legacyScans, 0);
-  assert.equal(access.remainingScans, 3);
+  assert.equal(access.remainingScans, 2);
   assert.equal(access.rewardBalanceCap, 3);
   assert.equal(access.scanAccessEnforced, false);
   assert.equal(access.adsEnabled, false);
@@ -73,7 +73,7 @@ test("scan access cannot be enforced without D1 storage", async () => {
   assert.equal((await response.json()).error.code, "access_not_configured");
 });
 
-test("removed billing routes return 404", async () => {
+test("billing verify requires a configured database", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/billing/verify", {
       method: "POST",
@@ -82,15 +82,15 @@ test("removed billing routes return 404", async () => {
         "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
       },
       body: JSON.stringify({
-        productId: "attacker_product",
+        productId: "masslens_lifetime_unlimited",
         purchaseToken: "abcdefghijklmnopqrstuvwxyz123456",
       }),
     }),
     env,
   );
 
-  assert.equal(response.status, 404);
-  assert.equal((await response.json()).error.code, "not_found");
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "access_not_configured");
 });
 
 test("all preserved wallet credits keep the ads-only experience enabled", () => {
@@ -99,8 +99,8 @@ test("all preserved wallet credits keep the ads-only experience enabled", () => 
     legacyScans: 1,
     scanAccessEnforced: true,
   });
-  assert.equal(starterAndLegacy.starterScansRemaining, 1);
-  assert.equal(starterAndLegacy.remainingScans, 2);
+  assert.equal(starterAndLegacy.starterScansRemaining, 0);
+  assert.equal(starterAndLegacy.remainingScans, 1);
   assert.equal(starterAndLegacy.adsEnabled, true);
 
   const legacyAndRewarded = accessPayload({
@@ -126,6 +126,14 @@ test("all preserved wallet credits keep the ads-only experience enabled", () => 
   });
   assert.equal(rewardNeeded.remainingScans, 0);
   assert.equal(rewardNeeded.adsEnabled, true);
+
+  const lifetime = accessPayload({
+    starterUsed: 3,
+    scanAccessEnforced: true,
+    hasLifetime: true,
+  });
+  assert.equal(lifetime.adsEnabled, false);
+  assert.equal(lifetime.hasLifetime, true);
 
   const unenforced = accessPayload({
     starterUsed: 3,
@@ -204,7 +212,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
     seenImageCounts.push(imageParts.length);
     seenPrompts.push(prompt);
     seenDeveloperPrompts.push(body.input[0].content[0].text);
-    assert.ok(imageParts.every((part) => part.detail === "low"));
+    assert.ok(imageParts.every((part) => part.detail === "high"));
     return new Response(
       JSON.stringify({
         output: [{content: [{text: JSON.stringify(estimate)}]}],
@@ -252,6 +260,7 @@ test("one or two views are proxied without exposing the client identifier", asyn
           fillState: "Partly filled",
           referenceObject: "Standard card",
           knownDimension: {axis: "Length", value: 12.5, unit: "cm"},
+          arMeasuredDimension: {widthCm: 21.4},
           // A legacy client field must be tolerated but ignored completely.
           measuredDimensions: {
             widthMm: 142.4,
@@ -271,6 +280,27 @@ test("one or two views are proxied without exposing the client identifier", asyn
     assert.match(seenPrompts[1], /Fill state: Partly filled/);
     assert.match(seenPrompts[1], /Claimed visible reference: Standard card/);
     assert.match(seenPrompts[1], /Already-known side: Length: 12\.5 cm/);
+    assert.match(seenPrompts[1], /AR-estimated size: Approximately 21\.4 cm/);
+
+    const arResponse = await worker.fetch(
+      new Request("https://masslens.example/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MassLens-Client-ID": clientId,
+          "X-MassLens-Request-ID": "request_identifier_000003",
+        },
+        body: JSON.stringify({
+          images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+          arMeasuredDimension: {widthCm: 21.4},
+        }),
+      }),
+      env,
+    );
+    assert.equal(arResponse.status, 200);
+    assert.deepEqual(seenImageCounts, [1, 2, 1]);
+    assert.match(seenPrompts[2], /AR-estimated size: Approximately 21\.4 cm visible width/);
+    assert.match(seenPrompts[2], /uncertain evidence, not weight/);
     assert.doesNotMatch(
       seenPrompts[1],
       /142\.4|90\.1|removed_magic_camera/i,
@@ -404,6 +434,61 @@ test("AI estimates require positive dimensions and three evidence summaries", as
   }
 });
 
+test("a zero-weight object estimate is retried once with a positive constraint", async () => {
+  const originalFetch = globalThis.fetch;
+  const zero = {
+    object_label: "Unknown object",
+    category: "Other",
+    estimate_grams: 0,
+    lower_bound_grams: 0,
+    upper_bound_grams: 0,
+    confidence: "low",
+    dimensions_mm: {width: 10, height: 10, depth: 10},
+    assumptions: ["Size: unclear", "Material: unknown", "Uncertainty: high"],
+  };
+  const positive = {
+    ...zero,
+    object_label: "Small plastic object",
+    estimate_grams: 20,
+    lower_bound_grams: 10,
+    upper_bound_grams: 40,
+  };
+  const prompts = [];
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    prompts.push(body.input[0].content[0].text);
+    const estimate = prompts.length === 1 ? zero : positive;
+    return new Response(JSON.stringify({
+      output: [{content: [{text: JSON.stringify(estimate)}]}],
+    }), {status: 200, headers: {"Content-Type": "application/json"}});
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://masslens.example/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+          "X-MassLens-Request-ID": "request_identifier_zero_retry",
+        },
+        body: JSON.stringify({
+          images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+        }),
+      }),
+      env,
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), positive);
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1], /zero grams/);
+    assert.match(prompts[1], /never use zero/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("estimate endpoint rejects an invalid known dimension", async () => {
   const response = await worker.fetch(
     new Request("https://masslens.example/estimate", {
@@ -421,6 +506,26 @@ test("estimate endpoint rejects an invalid known dimension", async () => {
     env,
   );
 
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "invalid_request");
+});
+
+test("estimate endpoint rejects an invalid AR width", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/estimate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+        "X-MassLens-Request-ID": "request_identifier_ar_invalid",
+      },
+      body: JSON.stringify({
+        images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+        arMeasuredDimension: {widthCm: -4},
+      }),
+    }),
+    env,
+  );
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "invalid_request");
 });
@@ -449,4 +554,88 @@ test("estimate endpoint rejects more than two views", async () => {
 
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, "invalid_request");
+});
+
+test("object scans are refined with physics and camera measurements", async () => {
+  const originalFetch = globalThis.fetch;
+  let seenPrompt = "";
+  let seenSchema = null;
+  const modelEstimate = {
+    object_label: "Phone charger",
+    category: "Electronics",
+    estimate_grams: 220,
+    lower_bound_grams: 180,
+    upper_bound_grams: 260,
+    confidence: "medium",
+    dimensions_mm: {width: 70, height: 60, depth: 40},
+    assumptions: ["Size: a", "Material: b", "Uncertainty: c"],
+    physics: {
+      construction: "electronics_device",
+      primary_material: "plastic",
+      shape: "box",
+      known_product: false,
+      product_typical_grams: null,
+    },
+  };
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    seenSchema = body.text.format.schema;
+    seenPrompt = body.input[1].content[0].text;
+    return new Response(
+      JSON.stringify({output_text: JSON.stringify(modelEstimate)}),
+      {status: 200, headers: {"Content-Type": "application/json"}},
+    );
+  };
+  try {
+    const response = await worker.fetch(
+      new Request("https://masslens.example/estimate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+          "X-MassLens-Request-ID": "request_identifier_physics1",
+        },
+        body: JSON.stringify({
+          images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+          arMeasurement: {
+            lengthCm: 3.4,
+            widthCm: 3.3,
+            heightCm: 2.7,
+            confidence: {length: 0.9, width: 0.9, height: 0.9},
+            distanceCm: 38,
+          },
+        }),
+      }),
+      env,
+    );
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal("physics" in result, false);
+    assert.deepEqual(result.dimensions_mm, {width: 34, height: 27, depth: 33});
+    assert.ok(result.estimate_grams < 100, `got ${result.estimate_grams}`);
+    assert.equal(result.confidence, "low");
+    assert.ok(seenSchema.required.includes("physics"));
+    assert.match(seenPrompt, /Camera-measured size: length 3\.4 cm/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("estimate endpoint rejects an invalid AR measurement", async () => {
+  const response = await worker.fetch(
+    new Request("https://masslens.example/estimate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-MassLens-Client-ID": "abcdefghijklmnopqrstuvwx",
+        "X-MassLens-Request-ID": "request_identifier_physics2",
+      },
+      body: JSON.stringify({
+        images: [{imageBase64: "aW1hZ2U=", mimeType: "image/jpeg"}],
+        arMeasurement: {lengthCm: -1},
+      }),
+    }),
+    env,
+  );
+  assert.equal(response.status, 400);
 });

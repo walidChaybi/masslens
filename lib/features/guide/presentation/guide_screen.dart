@@ -13,6 +13,7 @@ class GuideScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return SafeArea(
+      maintainBottomViewPadding: true,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
@@ -27,7 +28,7 @@ class GuideScreen extends StatelessWidget {
             l10n.guideIntro,
             style: Theme.of(
               context,
-            ).textTheme.bodyLarge?.copyWith(color: AppColors.inkMuted),
+            ).textTheme.bodyLarge?.copyWith(color: context.palette.inkMuted),
           ),
           const SizedBox(height: 24),
           const _GuideHero(),
@@ -37,7 +38,7 @@ class GuideScreen extends StatelessWidget {
             icon: Icons.center_focus_strong_rounded,
             title: l10n.guideWholeObjectTitle,
             message: l10n.guideWholeObjectBody,
-            accent: AppColors.lime,
+            accent: context.palette.lime,
           ),
           const SizedBox(height: 12),
           _GuideStep(
@@ -45,7 +46,7 @@ class GuideScreen extends StatelessWidget {
             icon: Icons.wb_sunny_outlined,
             title: l10n.guideLightingTitle,
             message: l10n.guideLightingBody,
-            accent: AppColors.aqua,
+            accent: context.palette.aqua,
           ),
           const SizedBox(height: 12),
           _GuideStep(
@@ -61,7 +62,7 @@ class GuideScreen extends StatelessWidget {
             icon: Icons.add_photo_alternate_outlined,
             title: l10n.guideSideViewTitle,
             message: l10n.guideSideViewBody,
-            accent: AppColors.navySoft,
+            accent: context.palette.navySoft,
           ),
           const SizedBox(height: 28),
           Text(
@@ -91,7 +92,7 @@ class _GuideHero extends StatelessWidget {
     return Container(
       height: 226,
       decoration: BoxDecoration(
-        color: AppColors.ink,
+        color: context.palette.inkRaised,
         borderRadius: BorderRadius.circular(30),
       ),
       child: Stack(
@@ -107,13 +108,13 @@ class _GuideHero extends StatelessWidget {
             width: 112,
             height: 142,
             decoration: BoxDecoration(
-              color: AppColors.aqua.withValues(alpha: 0.18),
+              color: context.palette.aqua.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.aqua),
+              border: Border.all(color: context.palette.aqua),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.chair_alt_outlined,
-              color: AppColors.aqua,
+              color: context.palette.aqua,
               size: 66,
             ),
           ),
@@ -122,7 +123,8 @@ class _GuideHero extends StatelessWidget {
             child: StatusPill(
               label: l10n.guideClearSubject,
               icon: Icons.check_rounded,
-              background: AppColors.lime,
+              background: context.palette.lime,
+              foreground: context.palette.onLime,
             ),
           ),
           Positioned(
@@ -173,7 +175,7 @@ class _GuideStep extends StatelessWidget {
                 color: accent,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, color: AppColors.ink),
+              child: Icon(icon, color: context.palette.ink),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -190,8 +192,8 @@ class _GuideStep extends StatelessWidget {
                       ),
                       Text(
                         number,
-                        style: const TextStyle(
-                          color: AppColors.inkMuted,
+                        style: TextStyle(
+                          color: context.palette.inkMuted,
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1,
@@ -220,14 +222,14 @@ class _ConfidenceGuide extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: context.palette.line),
       ),
       child: Column(
         children: [
           _ConfidenceRow(
-            color: AppColors.coral,
+            color: context.palette.coral,
             label: l10n.confidenceLow,
             detail: l10n.guideLowDetail,
           ),
@@ -236,7 +238,7 @@ class _ConfidenceGuide extends StatelessWidget {
             child: Divider(),
           ),
           _ConfidenceRow(
-            color: AppColors.limeDark,
+            color: context.palette.limeDark,
             label: l10n.confidenceMedium,
             detail: l10n.guideMediumDetail,
           ),
@@ -280,8 +282,8 @@ class _ConfidenceRow extends StatelessWidget {
           width: 58,
           child: Text(
             label,
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: context.palette.ink,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -289,7 +291,7 @@ class _ConfidenceRow extends StatelessWidget {
         Expanded(
           child: Text(
             detail,
-            style: const TextStyle(color: AppColors.inkMuted, fontSize: 12),
+            style: TextStyle(color: context.palette.inkMuted, fontSize: 12),
           ),
         ),
       ],

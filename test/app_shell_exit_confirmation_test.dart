@@ -46,7 +46,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('exit_confirmation_dialog')), findsNothing);
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
     expect(systemExitCalls, 0);
 
     await tester.binding.handlePopRoute();
@@ -127,7 +127,7 @@ void main() {
 
     expect(find.byKey(const Key('nested_route')), findsNothing);
     expect(find.byKey(const Key('exit_confirmation_dialog')), findsNothing);
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
   });
 
   testWidgets('exit dialog fits compact Samsung-style safe content', (
@@ -143,6 +143,35 @@ void main() {
 
     expect(find.byKey(const Key('exit_confirmation_dialog')), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('gift wheel is absent from every shell destination', (
+    tester,
+  ) async {
+    final controller = await _pumpShell(tester);
+    addTearDown(controller.dispose);
+
+    expect(find.byKey(const Key('claim_gift_button')), findsNothing);
+    expect(find.text('Special Gift'), findsNothing);
+
+    for (final navKey in const [
+      'nav_ai_scan',
+      'nav_nutrition',
+      'nav_history',
+      'nav_guide',
+      'nav_settings',
+    ]) {
+      await tester.tap(find.byKey(const Key('open_navigation')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(navKey)));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('claim_gift_button')),
+        findsNothing,
+        reason: 'unexpected gift chip after $navKey',
+      );
+      expect(find.text('Special Gift'), findsNothing);
+    }
   });
 }
 

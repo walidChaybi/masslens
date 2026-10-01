@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome status-bar icon for meal reminders (the MassLens "M" mark). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M22,26 L22,82 L37,82 L37,52 L50,74 L58,74 L71,52 L71,82 L86,82 L86,26 L71,26 L54,54 L37,26 Z" />
+</vector>

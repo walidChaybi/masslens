@@ -1,17 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
 import '../../../l10n/l10n.dart';
 import '../../../l10n/display_labels.dart';
+import '../../barcode/data/recent_products_store.dart';
 import '../../legal/presentation/legal_screen.dart';
 import '../../measurements/domain/measurement.dart';
 import '../../monetization/presentation/rewarded_scan_sheet.dart';
+import '../../onboarding/presentation/onboarding_screen.dart';
+import '../../reminders/presentation/meal_reminder_widgets.dart';
 import '../../scan/data/estimate_repository_factory.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  static const _playListingUrl =
+      'https://play.google.com/store/apps/details'
+      '?id=com.lilai.masslens.photoestimates';
+
+  /// Google Play's own review sheet first, then the listing.
+  ///
+  /// Play decides whether the in-app sheet appears — a spent quota or a missing
+  /// Play Store returns false — so the listing keeps the tap from doing
+  /// nothing at all.
+  Future<void> _rateApp(BuildContext context) async {
+    final l10n = context.l10n;
+    final shown = await AppScope.of(context).requestAppReview();
+    if (shown || !context.mounted) return;
+
+    var opened = false;
+    try {
+      opened = await launchUrl(
+        Uri.parse(_playListingUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    } on Object {
+      // A missing platform URL handler is reported with the message below.
+    }
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.settingsRateAppUnavailable),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _replayWalkthrough(BuildContext context) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const OnboardingScreen(replay: true),
+      ),
+    );
+  }
 
   Future<void> _clearHistory(BuildContext context) async {
     final controller = AppScope.of(context);
@@ -31,7 +76,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.palette.coral,
+            ),
             child: Text(l10n.settingsClearHistoryAction),
           ),
         ],
@@ -65,7 +112,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.palette.coral,
+            ),
             child: Text(l10n.settingsClearNutritionAction),
           ),
         ],
@@ -73,6 +122,7 @@ class SettingsScreen extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
     await controller.nutritionDiary.clear();
+    await const RecentProductsStore().clear();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -88,6 +138,7 @@ class SettingsScreen extends StatelessWidget {
     final monetization = controller.monetization;
     final l10n = context.l10n;
     return SafeArea(
+      maintainBottomViewPadding: true,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         children: [
@@ -145,11 +196,49 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const Divider(),
-              _SettingRow(
-                icon: Icons.bluetooth_rounded,
-                title: l10n.settingsBluetoothSupport,
-                value: l10n.settingsStandardBle,
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsHeader(title: l10n.settingsAppearance),
+          const SizedBox(height: 10),
+          _SettingsCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(17),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SettingLabel(
+                      icon: Icons.brightness_6_outlined,
+                      title: l10n.settingsTheme,
+                      subtitle: l10n.settingsThemeBody,
+                    ),
+                    const SizedBox(height: 16),
+                    SegmentedButton<ThemeMode>(
+                      key: const Key('settings_theme_mode'),
+                      expandedInsets: EdgeInsets.zero,
+                      segments: [
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          label: Text(l10n.settingsThemeSystem),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          label: Text(l10n.settingsThemeLight),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          label: Text(l10n.settingsThemeDark),
+                        ),
+                      ],
+                      selected: {controller.themeMode},
+                      onSelectionChanged: (selection) {
+                        controller.setThemeMode(selection.single);
+                      },
+                      showSelectedIcon: false,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -180,17 +269,21 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          _SettingsHeader(title: l10n.settingsReminders),
+          const SizedBox(height: 10),
+          const _SettingsCard(children: [MealReminderSettingsRows()]),
+          const SizedBox(height: 24),
           _SettingsHeader(title: l10n.settingsScanCredits),
           const SizedBox(height: 10),
           _SettingsCard(
             children: [
               _ActionRow(
-                icon: Icons.play_circle_outline_rounded,
+                icon: Icons.all_inclusive_rounded,
                 title: l10n.settingsEarnAiScans,
                 subtitle: l10n.settingsEarnAiScansBody(
                   localizedScanUsage(l10n, monetization.access),
                 ),
-                color: AppColors.ink,
+                color: context.palette.ink,
                 onTap: () => showRewardedScanSheet(context),
               ),
             ],
@@ -204,7 +297,7 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.gavel_rounded,
                 title: l10n.legalTitle,
                 subtitle: l10n.legalSettingsBody,
-                color: AppColors.ink,
+                color: context.palette.ink,
                 onTap: () {
                   Navigator.of(context).push<void>(
                     MaterialPageRoute<void>(
@@ -225,7 +318,7 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.privacy_tip_outlined,
                   title: l10n.settingsAdPrivacyChoices,
                   subtitle: l10n.settingsReviewConsent,
-                  color: AppColors.ink,
+                  color: context.palette.ink,
                   onTap: monetization.showPrivacyOptions,
                 ),
               ],
@@ -236,7 +329,7 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: controller.measurements.isEmpty
                     ? l10n.settingsNoSavedEstimates
                     : l10n.settingsSavedCount(controller.measurements.length),
-                color: AppColors.coral,
+                color: context.palette.coral,
                 onTap: () => _clearHistory(context),
               ),
               const Divider(),
@@ -248,8 +341,32 @@ class SettingsScreen extends StatelessWidget {
                     : l10n.settingsNutritionCount(
                         controller.nutritionDiary.entries.length,
                       ),
-                color: AppColors.coral,
+                color: context.palette.coral,
                 onTap: () => _clearNutritionHistory(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsHeader(title: l10n.settingsHelp),
+          const SizedBox(height: 10),
+          _SettingsCard(
+            children: [
+              _ActionRow(
+                key: const Key('settings_replay_walkthrough'),
+                icon: Icons.school_outlined,
+                title: l10n.settingsReplayWalkthrough,
+                subtitle: l10n.settingsReplayWalkthroughBody,
+                color: context.palette.ink,
+                onTap: () => _replayWalkthrough(context),
+              ),
+              const Divider(),
+              _ActionRow(
+                key: const Key('settings_rate_app'),
+                icon: Icons.star_outline_rounded,
+                title: l10n.settingsRateApp,
+                subtitle: l10n.settingsRateAppBody,
+                color: context.palette.ink,
+                onTap: () => _rateApp(context),
               ),
             ],
           ),
@@ -268,8 +385,8 @@ class SettingsScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(17),
                 child: Text(
                   l10n.settingsSafetyBody,
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
+                  style: TextStyle(
+                    color: context.palette.inkMuted,
                     fontSize: 12.5,
                     height: 1.5,
                   ),
@@ -303,9 +420,9 @@ class _SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.palette.surface,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: context.palette.line),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
@@ -388,6 +505,7 @@ class _ActionRow extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.onTap,
+    super.key,
   });
 
   final IconData icon;
@@ -430,13 +548,16 @@ class _ActionRow extends StatelessWidget {
 }
 
 class _SettingIcon extends StatelessWidget {
-  const _SettingIcon({required this.icon, this.color = AppColors.ink});
+  const _SettingIcon({required this.icon, this.color});
 
   final IconData icon;
-  final Color color;
+
+  /// Defaults to the palette's primary ink.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? context.palette.ink;
     return Container(
       width: 40,
       height: 40,

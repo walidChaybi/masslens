@@ -180,7 +180,7 @@ void main() {
       expect(await historyShow, isTrue);
       expect(placements, [
         'drawer_ai_scan_interstitial',
-        'drawer_digital_scale_interstitial',
+        'drawer_ai_scan_interstitial',
         'drawer_history_interstitial',
       ]);
       loader.completeNext(null);
@@ -262,6 +262,7 @@ void main() {
     final appController = AppController(
       measurementStore: const _FakeMeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
       monetizationController: monetization,
     );
     addTearDown(appController.dispose);
@@ -274,15 +275,15 @@ void main() {
 
     await tester.tap(find.byKey(const Key('open_navigation')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nav_ai_scan')));
+    await tester.tap(find.byKey(const Key('nav_history')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(aiAd.showCount, 1);
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
-    expect(find.byKey(const Key('home_scan_button')), findsNothing);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+    expect(find.byKey(const Key('history_screen')), findsNothing);
 
     aiAd.dismiss();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+    expect(find.byKey(const Key('history_screen')), findsOneWidget);
 
     final scaleAd = _FakeInterstitialAd();
     loader.completeNext(scaleAd);
@@ -290,14 +291,14 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const Key('open_navigation')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nav_digital_scale')));
+    await tester.tap(find.byKey(const Key('nav_ai_scan')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(scaleAd.showCount, 1);
-    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+    expect(find.byKey(const Key('history_screen')), findsOneWidget);
 
     scaleAd.dismiss();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
 
     final historyAd = _FakeInterstitialAd();
     loader.completeNext(historyAd);
@@ -308,7 +309,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nav_history')));
     await tester.pump(const Duration(milliseconds: 300));
     expect(historyAd.showCount, 1);
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
     expect(find.byKey(const Key('history_screen')), findsNothing);
 
     historyAd.dismiss();
@@ -401,11 +402,12 @@ final class _AdsEnabledApi extends MonetizationApi {
 
   @override
   Future<AccessStatus> getAccess(String clientId) async => const AccessStatus(
-    starterScansRemaining: 3,
+    starterScansRemaining: 2,
     rewardedScans: 0,
     legacyScans: 0,
-    remainingScans: 3,
+    remainingScans: 2,
     rewardBalanceCap: 3,
+    hasLifetime: false,
     scanAccessEnforced: true,
     adsEnabled: true,
     isAuthoritative: true,

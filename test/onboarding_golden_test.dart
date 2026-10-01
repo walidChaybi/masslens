@@ -12,7 +12,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('all five first-open screens keep their visual contract', (
+  testWidgets('welcome and paywall screens keep their visual contract', (
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -37,12 +37,12 @@ void main() {
     await _matchScreen(tester, 3);
 
     await _continue(tester);
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 250)),
+    );
+    await tester.pump();
     await _matchScreen(tester, 4);
-
-    await tester.pump(const Duration(milliseconds: 1500));
-    await tester.pumpAndSettle();
-    await _matchScreen(tester, 5);
   });
 }
 

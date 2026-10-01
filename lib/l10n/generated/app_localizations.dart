@@ -103,7 +103,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'MassLens'**
+  /// **'MassLens: Photo Estimates'**
   String get appTitle;
 
   /// No description provided for @commonCancel.
@@ -595,7 +595,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingAccessTitle.
   ///
   /// In en, this message translates to:
-  /// **'Three real AI scans are included.'**
+  /// **'Two real AI scans are included.'**
   String get onboardingAccessTitle;
 
   /// No description provided for @onboardingAccessBody.
@@ -607,19 +607,19 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingAdsEyebrow.
   ///
   /// In en, this message translates to:
-  /// **'Ads support every scan'**
+  /// **'Scan access options'**
   String get onboardingAdsEyebrow;
 
   /// No description provided for @onboardingAdsTitle.
   ///
   /// In en, this message translates to:
-  /// **'No subscription. No scan packs.'**
+  /// **'2 free scans, then 1 scan per ad'**
   String get onboardingAdsTitle;
 
   /// No description provided for @onboardingAdsBody.
   ///
   /// In en, this message translates to:
-  /// **'After your included scans, finish one rewarded ad to add one real AI scan.'**
+  /// **'Get two real AI scans free. After that, watch one rewarded ad for one scan, or unlock unlimited scans and remove ads with a one-time lifetime purchase.'**
   String get onboardingAdsBody;
 
   /// No description provided for @onboardingAccessPreparing.
@@ -655,7 +655,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingHeroBody.
   ///
   /// In en, this message translates to:
-  /// **'Photograph an object to get an honest weight range, visual dimensions, and the evidence behind the estimate.'**
+  /// **'Estimate an object’s likely weight range from visible features. Photos cannot measure actual weight or reveal hidden contents.'**
   String get onboardingHeroBody;
 
   /// No description provided for @onboardingHeroCta.
@@ -709,7 +709,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingPreparingBody.
   ///
   /// In en, this message translates to:
-  /// **'We’re preparing your three starter scans and ad-supported access.'**
+  /// **'Preparing your two free scans and rewarded-ad access.'**
   String get onboardingPreparingBody;
 
   /// No description provided for @onboardingPreparingCta.
@@ -727,7 +727,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingReadyBody.
   ///
   /// In en, this message translates to:
-  /// **'Your first 3 AI scans are included.'**
+  /// **'Your first 2 AI scans are free.'**
   String get onboardingReadyBody;
 
   /// No description provided for @onboardingReadyCta.
@@ -775,7 +775,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingThreeStarterScans.
   ///
   /// In en, this message translates to:
-  /// **'3 starter scans'**
+  /// **'2 free scans'**
   String get onboardingThreeStarterScans;
 
   /// No description provided for @onboardingPreparingStatus.
@@ -799,13 +799,13 @@ abstract class AppLocalizations {
   /// No description provided for @homeAiWeight.
   ///
   /// In en, this message translates to:
-  /// **'AI weight'**
+  /// **'Photo estimate'**
   String get homeAiWeight;
 
   /// No description provided for @homeScansLeftGetOne.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{0 left · Get +1} =1{1 left · Get +1} other{{count} left · Get +1}}'**
+  /// **'{count, plural, =0{Get free scan} =1{Get free scan} other{Get free scan}}'**
   String homeScansLeftGetOne(int count);
 
   /// No description provided for @homeLatestEstimate.
@@ -874,16 +874,10 @@ abstract class AppLocalizations {
   /// **'{count} kcal logged today'**
   String nutritionHomeTodayCalories(int count);
 
-  /// No description provided for @shellDigitalScale.
-  ///
-  /// In en, this message translates to:
-  /// **'Digital Scale'**
-  String get shellDigitalScale;
-
   /// No description provided for @shellAiWeightScan.
   ///
   /// In en, this message translates to:
-  /// **'AI Weight Scan'**
+  /// **'Photo estimates'**
   String get shellAiWeightScan;
 
   /// No description provided for @shellNutrition.
@@ -919,13 +913,13 @@ abstract class AppLocalizations {
   /// No description provided for @shellChooseMode.
   ///
   /// In en, this message translates to:
-  /// **'Choose a physical scale or an AI photo estimate.'**
+  /// **'Photo estimates and your nutrition diary.'**
   String get shellChooseMode;
 
   /// No description provided for @shellMeasurementNotice.
   ///
   /// In en, this message translates to:
-  /// **'Bluetooth readings are measurements. Touch mode is a simulator; AI scans are real visual estimates.'**
+  /// **'Photo results are uncertain estimates. The phone does not measure weight. Use a physical scale for measurements.'**
   String get shellMeasurementNotice;
 
   /// No description provided for @shellExitTitle.
@@ -939,6 +933,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Are you sure you want to exit the app?'**
   String get shellExitBody;
+
+  /// No description provided for @navScanShort.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Scan'**
+  String get navScanShort;
+
+  /// No description provided for @navGuideShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Guide'**
+  String get navGuideShort;
+
+  /// No description provided for @homeHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore an object from a photo'**
+  String get homeHeroTitle;
+
+  /// No description provided for @homeHeroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Get an approximate weight range from visible features. A photo cannot measure weight or reveal hidden contents.'**
+  String get homeHeroBody;
+
+  /// No description provided for @homeTipWhole.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole object'**
+  String get homeTipWhole;
+
+  /// No description provided for @homeTipLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Good light'**
+  String get homeTipLight;
+
+  /// No description provided for @homeTipReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Size reference'**
+  String get homeTipReference;
 
   /// No description provided for @nutritionEyebrow.
   ///
@@ -1098,7 +1134,7 @@ abstract class AppLocalizations {
   /// No description provided for @nutritionNoEntriesBody.
   ///
   /// In en, this message translates to:
-  /// **'Add a saved Food Scale result or enter calories and macros manually.'**
+  /// **'Add a saved food estimate or enter calories and macros manually.'**
   String get nutritionNoEntriesBody;
 
   /// No description provided for @nutritionFromScans.
@@ -1316,6 +1352,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stored only on this device. Nutrition values are approximate and are not medical advice or dietary guidance.'**
   String get nutritionDisclaimer;
+
+  /// No description provided for @nutritionScanAMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan a meal'**
+  String get nutritionScanAMeal;
+
+  /// No description provided for @nutritionOpenGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get nutritionOpenGallery;
+
+  /// No description provided for @nutritionRemainingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'remaining'**
+  String get nutritionRemainingLabel;
+
+  /// No description provided for @nutritionEatenKcal.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} eaten'**
+  String nutritionEatenKcal(String value);
+
+  /// No description provided for @nutritionOverGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} over goal'**
+  String nutritionOverGoal(String value);
+
+  /// No description provided for @nutritionStreakZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a streak'**
+  String get nutritionStreakZero;
+
+  /// No description provided for @nutritionStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1-day streak} other{{count}-day streak}}'**
+  String nutritionStreak(int count);
+
+  /// No description provided for @nutritionDailyGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily goals'**
+  String get nutritionDailyGoals;
+
+  /// No description provided for @nutritionCalorieGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily calories'**
+  String get nutritionCalorieGoal;
+
+  /// No description provided for @nutritionEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log your first meal'**
+  String get nutritionEmptyTitle;
+
+  /// No description provided for @nutritionEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Photograph a plate to estimate calories and macros. Values are approximate USDA matches, not medical advice.'**
+  String get nutritionEmptyBody;
+
+  /// No description provided for @nutritionSaveToToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to today'**
+  String get nutritionSaveToToday;
+
+  /// No description provided for @nutritionSaveHistoryOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to history only'**
+  String get nutritionSaveHistoryOnly;
+
+  /// No description provided for @nutritionScanLoggedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to today’s meals'**
+  String get nutritionScanLoggedMessage;
+
+  /// No description provided for @nutritionScanReviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame the whole plate'**
+  String get nutritionScanReviewTitle;
+
+  /// No description provided for @nutritionScanReviewBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the whole meal is visible'**
+  String get nutritionScanReviewBody;
+
+  /// No description provided for @nutritionScanWholePlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole plate'**
+  String get nutritionScanWholePlate;
+
+  /// No description provided for @nutritionHomeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Food logging lives in Nutrition'**
+  String get nutritionHomeHint;
+
+  /// No description provided for @nutritionMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get nutritionMoreActions;
+
+  /// No description provided for @nutritionGoalsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save goals'**
+  String get nutritionGoalsSave;
+
+  /// No description provided for @nutritionOfGoalGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'{consumed} / {goal} g'**
+  String nutritionOfGoalGrams(String consumed, String goal);
+
+  /// No description provided for @nutritionEditGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit daily goals'**
+  String get nutritionEditGoals;
 
   /// No description provided for @guideEyebrow.
   ///
@@ -1605,17 +1773,77 @@ abstract class AppLocalizations {
   /// **'Imperial'**
   String get settingsImperial;
 
-  /// No description provided for @settingsBluetoothSupport.
+  /// No description provided for @settingsAppearance.
   ///
   /// In en, this message translates to:
-  /// **'Bluetooth scale support'**
-  String get settingsBluetoothSupport;
+  /// **'Appearance'**
+  String get settingsAppearance;
 
-  /// No description provided for @settingsStandardBle.
+  /// No description provided for @settingsTheme.
   ///
   /// In en, this message translates to:
-  /// **'Standard BLE WSS'**
-  String get settingsStandardBle;
+  /// **'Theme'**
+  String get settingsTheme;
+
+  /// No description provided for @settingsThemeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow your device, or pin light or dark.'**
+  String get settingsThemeBody;
+
+  /// No description provided for @settingsThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get settingsThemeSystem;
+
+  /// No description provided for @settingsThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get settingsThemeLight;
+
+  /// No description provided for @settingsThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get settingsThemeDark;
+
+  /// No description provided for @settingsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get settingsHelp;
+
+  /// No description provided for @settingsReplayWalkthrough.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay the walkthrough'**
+  String get settingsReplayWalkthrough;
+
+  /// No description provided for @settingsReplayWalkthroughBody.
+  ///
+  /// In en, this message translates to:
+  /// **'See the capture tips from the first launch again.'**
+  String get settingsReplayWalkthroughBody;
+
+  /// No description provided for @settingsRateApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate this app'**
+  String get settingsRateApp;
+
+  /// No description provided for @settingsRateAppBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave a rating on Google Play.'**
+  String get settingsRateAppBody;
+
+  /// No description provided for @settingsRateAppUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play is unavailable right now.'**
+  String get settingsRateAppUnavailable;
 
   /// No description provided for @settingsEngine.
   ///
@@ -1668,7 +1896,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsEarnAiScansBody.
   ///
   /// In en, this message translates to:
-  /// **'{usage} · watch one ad for one scan'**
+  /// **'{usage} · Watch one ad for one scan'**
   String settingsEarnAiScansBody(String usage);
 
   /// No description provided for @settingsPrivacy.
@@ -1764,7 +1992,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalLastUpdated.
   ///
   /// In en, this message translates to:
-  /// **'15 Aug 2026'**
+  /// **'21 Aug 2026'**
   String get legalLastUpdated;
 
   /// No description provided for @legalPublishedPolicy.
@@ -1824,7 +2052,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalPrivacyLocalBody.
   ///
   /// In en, this message translates to:
-  /// **'Scan results and a private image copy are saved only when you choose Save. Preferences, local scan history, and Nutrition & Trends entries are stored inside the app on your device. Nutrition entries are added only when you explicitly import a saved food scan or enter values manually; they are not uploaded. Bluetooth device information is used only to find and connect to compatible scales and is not sent to MassLens. Android backup behavior may depend on your device settings.'**
+  /// **'Scan results and a private image copy are saved only when you choose Save. Preferences, scan history, and nutrition diary entries are stored on your device. Nutrition entries are added only when you import a saved food scan or enter values manually; they are not uploaded. Android backup behavior may depend on your device settings.'**
   String get legalPrivacyLocalBody;
 
   /// No description provided for @legalPrivacyServiceTitle.
@@ -1836,7 +2064,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalPrivacyServiceBody.
   ///
   /// In en, this message translates to:
-  /// **'MassLens creates a random installation identifier to manage starter scans, rewarded scan credits, retries, and abuse prevention. The service hashes it before database use and records request identifiers, credit state, reward state, limited technical events, and anonymous daily totals such as completed scan mode and AI cost. A completed result JSON, never the photo, may be retained for up to 24 hours for idempotent retries. Credit and anti-abuse records are kept as needed to operate those features. Hosting and network providers may process IP addresses and routine security logs.'**
+  /// **'MassLens transmits device or other IDs off the device. It creates a random installation identifier—not an IMEI, serial number, or hardware MAC—and sends it to the MassLens service to manage starter scans, rewarded scan credits, lifetime purchase verification, retries, and abuse prevention. The service hashes it before database use and records request identifiers, credit state, reward state, purchase tokens for lifetime unlocks, limited technical events, and anonymous daily totals such as completed scan mode and AI cost. A completed result JSON, never the photo, may be retained for up to 24 hours for idempotent retries. Credit, purchase, and anti-abuse records are kept as needed to operate those features. Hosting and network providers may process IP addresses and routine security logs.'**
   String get legalPrivacyServiceBody;
 
   /// No description provided for @legalPrivacyAdsTitle.
@@ -1848,7 +2076,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalPrivacyAdsBody.
   ///
   /// In en, this message translates to:
-  /// **'MassLens uses Google Mobile Ads for rewarded scan credits and other ad placements. Google and its advertising partners may process advertising identifiers, device information, approximate location derived from network signals, diagnostics, consent choices, and ad interactions under their own policies. Where required, the app requests consent. If Google makes privacy options available for you, they can be reviewed from Settings.'**
+  /// **'MassLens uses Google Mobile Ads (AdMob) for rewarded scan credits and other ad placements. Google and its advertising partners collect and share device or other IDs, including the Android advertising ID and App Set ID, plus device information, approximate location derived from IP address, diagnostics, consent choices, and ad interactions, for advertising, analytics, and fraud prevention under their own policies. Where required, the app requests consent. You can reset the advertising ID in Android settings. If Google makes privacy options available for you, they can be reviewed from Settings.'**
   String get legalPrivacyAdsBody;
 
   /// No description provided for @legalPrivacySharingTitle.
@@ -1872,7 +2100,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalPrivacyChoicesBody.
   ///
   /// In en, this message translates to:
-  /// **'You can deny camera or Bluetooth permission, use the simulator or compatible Bluetooth scale without AI, cancel before analysis, decline to save results, delete individual scans, clear all estimate history, clear Nutrition & Trends separately, review available ad privacy choices, or uninstall the app. Uninstalling removes app-local data subject to Android backup settings. For privacy requests that cannot be completed on-device, use the developer contact details on the MassLens Google Play listing. Do not send photos or sensitive health information with your request.'**
+  /// **'You can deny camera permission, use the manual nutrition diary without AI, cancel before analysis, decline to save results, delete individual scans, clear estimate history, clear the nutrition diary separately, review ad privacy choices, or uninstall the app. Uninstalling removes app-local data subject to Android backup settings. For other privacy requests, use the developer contact on the Google Play listing. Do not send photos or sensitive health information.'**
   String get legalPrivacyChoicesBody;
 
   /// No description provided for @legalPrivacySecurityTitle.
@@ -1920,7 +2148,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalTermsServiceBody.
   ///
   /// In en, this message translates to:
-  /// **'MassLens provides compatible Bluetooth-scale readings, a clearly labeled touch simulator, AI-assisted visual estimates for objects and food plates, USDA-based approximate nutrition, local history, and an optional local nutrition diary. Features may require a supported device, internet access, permissions, ad availability, or a remaining scan credit.'**
+  /// **'MassLens provides AI-assisted visual estimates for objects and food plates, USDA-based approximate nutrition, local history, and an optional local nutrition diary. Photo analysis requires internet access and scan access. Some functions require permissions or ad availability.'**
   String get legalTermsServiceBody;
 
   /// No description provided for @legalTermsEstimatesTitle.
@@ -1956,7 +2184,7 @@ abstract class AppLocalizations {
   /// No description provided for @legalTermsCreditsBody.
   ///
   /// In en, this message translates to:
-  /// **'A new installation may receive a limited number of starter scans. A completed rewarded advertisement may grant a scan credit after confirmation by the app and service. Credits have no cash value, cannot be transferred, and may be limited to prevent abuse. Ad availability is not guaranteed. Failed qualifying scans are normally refunded, but access may be delayed by outages, fraud checks, or technical errors. Advertising formats and credit rules may change with reasonable notice.'**
+  /// **'A new installation may receive a limited number of starter scans. A completed rewarded advertisement may grant a scan credit after confirmation by the app and service. A one-time Google Play purchase may unlock unlimited scans and remove ads for that Google account on supported devices, subject to fair-use limits and refund rules described by Google Play. Credits and lifetime access have no cash value, cannot be transferred between accounts, and may be limited to prevent abuse. Ad availability is not guaranteed. Failed qualifying scans are normally refunded, but access may be delayed by outages, fraud checks, purchase verification, or technical errors. Advertising formats, credit rules, and pricing may change with reasonable notice.'**
   String get legalTermsCreditsBody;
 
   /// No description provided for @legalTermsThirdPartyTitle.
@@ -2118,7 +2346,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSafetyBody.
   ///
   /// In en, this message translates to:
-  /// **'A compatible Bluetooth scale provides physical readings. Touch mode is an interactive simulator and AI scans are real visual estimates. Never use MassLens for medical dosing, legal trade, or other safety-critical decisions.'**
+  /// **'Photos provide uncertain visual estimates, not measurements. Use a physical scale when accuracy matters. Never use MassLens for medical dosing, legal trade, or safety-critical decisions.'**
   String get settingsSafetyBody;
 
   /// No description provided for @cameraUnavailable.
@@ -2412,7 +2640,7 @@ abstract class AppLocalizations {
   /// No description provided for @scanTryAnother.
   ///
   /// In en, this message translates to:
-  /// **'Try another'**
+  /// **'Scan another'**
   String get scanTryAnother;
 
   /// No description provided for @scanSecondViewTitle.
@@ -2490,7 +2718,7 @@ abstract class AppLocalizations {
   /// No description provided for @scanFoodScale.
   ///
   /// In en, this message translates to:
-  /// **'Food Scale'**
+  /// **'Food estimates'**
   String get scanFoodScale;
 
   /// No description provided for @scanPhotographMeal.
@@ -2715,250 +2943,22 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get scanRemove;
 
-  /// No description provided for @scaleWatchAdGetScan.
-  ///
-  /// In en, this message translates to:
-  /// **'Watch ad · Get +1 scan'**
-  String get scaleWatchAdGetScan;
-
-  /// No description provided for @scaleSimulatorStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'SIMULATOR · NOT A MEASUREMENT'**
-  String get scaleSimulatorStatus;
-
-  /// No description provided for @scaleLiveStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'LIVE · BLUETOOTH SCALE'**
-  String get scaleLiveStatus;
-
-  /// No description provided for @scaleDisconnectedStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'BLUETOOTH · NOT CONNECTED'**
-  String get scaleDisconnectedStatus;
-
-  /// No description provided for @scaleSimulatorSemantics.
-  ///
-  /// In en, this message translates to:
-  /// **'Touch scale simulator, not a physical measurement'**
-  String get scaleSimulatorSemantics;
-
-  /// No description provided for @scaleLiveSemantics.
-  ///
-  /// In en, this message translates to:
-  /// **'Live Bluetooth scale reading'**
-  String get scaleLiveSemantics;
-
-  /// No description provided for @scaleDisconnectedSemantics.
-  ///
-  /// In en, this message translates to:
-  /// **'Bluetooth scale disconnected'**
-  String get scaleDisconnectedSemantics;
-
-  /// No description provided for @scaleOpenNavigation.
-  ///
-  /// In en, this message translates to:
-  /// **'Open navigation menu'**
-  String get scaleOpenNavigation;
-
-  /// No description provided for @scaleOpenAiScan.
-  ///
-  /// In en, this message translates to:
-  /// **'AI weight scan'**
-  String get scaleOpenAiScan;
-
-  /// No description provided for @scaleBluetooth.
-  ///
-  /// In en, this message translates to:
-  /// **'Bluetooth scale'**
-  String get scaleBluetooth;
-
-  /// No description provided for @scaleGenericDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'Bluetooth weight scale'**
-  String get scaleGenericDevice;
-
-  /// No description provided for @scaleUnit.
-  ///
-  /// In en, this message translates to:
-  /// **'UNIT'**
-  String get scaleUnit;
-
-  /// No description provided for @scaleTare.
-  ///
-  /// In en, this message translates to:
-  /// **'TARE'**
-  String get scaleTare;
-
-  /// No description provided for @scaleCloseBluetooth.
-  ///
-  /// In en, this message translates to:
-  /// **'Close Bluetooth panel'**
-  String get scaleCloseBluetooth;
-
-  /// No description provided for @scaleReceivingMeasurements.
-  ///
-  /// In en, this message translates to:
-  /// **'Receiving standard Weight Scale measurements'**
-  String get scaleReceivingMeasurements;
-
-  /// No description provided for @scaleBleSupport.
-  ///
-  /// In en, this message translates to:
-  /// **'Supports BLE Weight Scale Service (0x181D)'**
-  String get scaleBleSupport;
-
-  /// No description provided for @scaleDisconnect.
-  ///
-  /// In en, this message translates to:
-  /// **'Disconnect scale'**
-  String get scaleDisconnect;
-
-  /// No description provided for @scaleSearching.
-  ///
-  /// In en, this message translates to:
-  /// **'Searching…'**
-  String get scaleSearching;
-
-  /// No description provided for @scaleFindCompatible.
-  ///
-  /// In en, this message translates to:
-  /// **'Find compatible scales'**
-  String get scaleFindCompatible;
-
-  /// No description provided for @scaleAvailableScales.
-  ///
-  /// In en, this message translates to:
-  /// **'AVAILABLE SCALES'**
-  String get scaleAvailableScales;
-
-  /// No description provided for @scaleCompatible.
-  ///
-  /// In en, this message translates to:
-  /// **'Compatible scale'**
-  String get scaleCompatible;
-
-  /// No description provided for @scaleSignal.
-  ///
-  /// In en, this message translates to:
-  /// **'Signal {rssi} dBm'**
-  String scaleSignal(int rssi);
-
-  /// No description provided for @scaleNoneFound.
-  ///
-  /// In en, this message translates to:
-  /// **'No standard scale found. Make sure the scale is awake and not connected to another app, then try again.'**
-  String get scaleNoneFound;
-
-  /// No description provided for @scalePrivateProtocolNotice.
-  ///
-  /// In en, this message translates to:
-  /// **'Many kitchen scales use private manufacturer protocols. Those need a model-specific integration even if they appear in phone Bluetooth settings.'**
-  String get scalePrivateProtocolNotice;
-
-  /// No description provided for @scalePermissionNeeded.
-  ///
-  /// In en, this message translates to:
-  /// **'Nearby devices permission is required to find a scale.'**
-  String get scalePermissionNeeded;
-
-  /// No description provided for @scalePowerOnBluetooth.
-  ///
-  /// In en, this message translates to:
-  /// **'Turn on Bluetooth, then search again.'**
-  String get scalePowerOnBluetooth;
-
-  /// No description provided for @scaleCommunicationFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not communicate with this scale.'**
-  String get scaleCommunicationFailed;
-
-  /// No description provided for @scalePhaseIdle.
-  ///
-  /// In en, this message translates to:
-  /// **'No scale connected'**
-  String get scalePhaseIdle;
-
-  /// No description provided for @scalePhasePermission.
-  ///
-  /// In en, this message translates to:
-  /// **'Requesting permission'**
-  String get scalePhasePermission;
-
-  /// No description provided for @scalePhaseScanning.
-  ///
-  /// In en, this message translates to:
-  /// **'Searching nearby'**
-  String get scalePhaseScanning;
-
-  /// No description provided for @scalePhaseConnecting.
-  ///
-  /// In en, this message translates to:
-  /// **'Connecting'**
-  String get scalePhaseConnecting;
-
-  /// No description provided for @scalePhaseDiscovering.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking compatibility'**
-  String get scalePhaseDiscovering;
-
-  /// No description provided for @scalePhaseSubscribing.
-  ///
-  /// In en, this message translates to:
-  /// **'Starting live readings'**
-  String get scalePhaseSubscribing;
-
-  /// No description provided for @scalePhaseConnected.
-  ///
-  /// In en, this message translates to:
-  /// **'Scale connected'**
-  String get scalePhaseConnected;
-
-  /// No description provided for @scalePhaseDisconnecting.
-  ///
-  /// In en, this message translates to:
-  /// **'Disconnecting'**
-  String get scalePhaseDisconnecting;
-
-  /// No description provided for @scalePhaseUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Bluetooth unavailable'**
-  String get scalePhaseUnavailable;
-
-  /// No description provided for @scalePhaseError.
-  ///
-  /// In en, this message translates to:
-  /// **'Connection needs attention'**
-  String get scalePhaseError;
-
-  /// No description provided for @scalePhaseClosed.
-  ///
-  /// In en, this message translates to:
-  /// **'Reader closed'**
-  String get scalePhaseClosed;
-
   /// No description provided for @rewardAdsFundAnalysis.
   ///
   /// In en, this message translates to:
-  /// **'Ads fund real AI analysis'**
+  /// **'Choose how to unlock scans'**
   String get rewardAdsFundAnalysis;
 
   /// No description provided for @rewardHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Watch one ad. Get one scan.'**
+  /// **'Get more AI scans'**
   String get rewardHeadline;
 
   /// No description provided for @rewardBody.
   ///
   /// In en, this message translates to:
-  /// **'Finish the ad and MassLens adds one scan. No subscription, purchase, or fabricated result.'**
+  /// **'Watch one rewarded ad for one scan, or unlock unlimited scans and remove ads with a one-time purchase.'**
   String get rewardBody;
 
   /// No description provided for @rewardMaxBalance.
@@ -3057,6 +3057,18 @@ abstract class AppLocalizations {
   /// **'Try loading again'**
   String get rewardTryLoadingAgain;
 
+  /// No description provided for @rewardUnlockUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock unlimited'**
+  String get rewardUnlockUnlimited;
+
+  /// No description provided for @drawerUpgradeUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Unlimited'**
+  String get drawerUpgradeUnlimited;
+
   /// No description provided for @rewardCreditStillSyncing.
   ///
   /// In en, this message translates to:
@@ -3072,7 +3084,7 @@ abstract class AppLocalizations {
   /// No description provided for @accessLoadingBalance.
   ///
   /// In en, this message translates to:
-  /// **'Loading scan balance…'**
+  /// **'Loading…'**
   String get accessLoadingBalance;
 
   /// No description provided for @accessPreview.
@@ -3084,13 +3096,13 @@ abstract class AppLocalizations {
   /// No description provided for @accessScansLeft.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{No scans available} =1{1 scan left} other{{count} scans left}}'**
+  /// **'{count, plural, =1{1 scan} other{{count} scans}}'**
   String accessScansLeft(int count);
 
   /// No description provided for @accessScansAvailable.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{No scans available} =1{1 scan available} other{{count} scans available}}'**
+  /// **'{count, plural, =1{1 scan} other{{count} scans}}'**
   String accessScansAvailable(int count);
 
   /// No description provided for @accessBreakdown.
@@ -3102,7 +3114,7 @@ abstract class AppLocalizations {
   /// No description provided for @accessStarterThenAd.
   ///
   /// In en, this message translates to:
-  /// **'3 starter scans, then watch an ad'**
+  /// **'2 free scans, then 1 scan per ad'**
   String get accessStarterThenAd;
 
   /// No description provided for @accessGetOne.
@@ -3110,6 +3122,258 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Get +1'**
   String get accessGetOne;
+
+  /// No description provided for @accessUnlimitedScans.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited scans'**
+  String get accessUnlimitedScans;
+
+  /// No description provided for @accessLifetimeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime unlock active'**
+  String get accessLifetimeActive;
+
+  /// No description provided for @accessBuyLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock unlimited · {price}'**
+  String accessBuyLifetime(String price);
+
+  /// No description provided for @accessRestorePurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore purchases'**
+  String get accessRestorePurchases;
+
+  /// No description provided for @accessLifetimeUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime access is active on this device.'**
+  String get accessLifetimeUnlocked;
+
+  /// No description provided for @accessLifetimeLoadingPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading store price…'**
+  String get accessLifetimeLoadingPrice;
+
+  /// No description provided for @paywallEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Real AI photo analysis'**
+  String get paywallEyebrow;
+
+  /// No description provided for @paywallHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo estimates.'**
+  String get paywallHeadline;
+
+  /// No description provided for @paywallHeadlineAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get paywallHeadlineAccent;
+
+  /// No description provided for @paywallHeadlineRest.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore with AI.'**
+  String get paywallHeadlineRest;
+
+  /// No description provided for @paywallHeroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore visible objects and food from photos.\nApproximate estimates, not weight measurements.'**
+  String get paywallHeroSubtitle;
+
+  /// No description provided for @paywallSocialProof.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay once · keep forever'**
+  String get paywallSocialProof;
+
+  /// No description provided for @paywallSocialSubline.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited AI scans. Zero ads.'**
+  String get paywallSocialSubline;
+
+  /// No description provided for @paywallUnlockLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock lifetime access'**
+  String get paywallUnlockLifetime;
+
+  /// No description provided for @paywallTrustPriced.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time purchase · {price}'**
+  String paywallTrustPriced(String price);
+
+  /// No description provided for @paywallOneTimeCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time payment'**
+  String get paywallOneTimeCaption;
+
+  /// No description provided for @paywallLuggageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Luggage scan'**
+  String get paywallLuggageLabel;
+
+  /// No description provided for @paywallLuggageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Carry-on suitcase'**
+  String get paywallLuggageTitle;
+
+  /// No description provided for @paywallLuggageWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'2–4 kg'**
+  String get paywallLuggageWeight;
+
+  /// No description provided for @paywallLuggageConfidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Illustrative estimate'**
+  String get paywallLuggageConfidence;
+
+  /// No description provided for @paywallFeatureHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'SMALL THINGS. BIG EVERYDAY POSSIBILITIES.'**
+  String get paywallFeatureHeading;
+
+  /// No description provided for @paywallFeatureUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited scans'**
+  String get paywallFeatureUnlimited;
+
+  /// No description provided for @paywallFeatureNoAds.
+  ///
+  /// In en, this message translates to:
+  /// **'No ads'**
+  String get paywallFeatureNoAds;
+
+  /// No description provided for @paywallFeatureNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Know more about your plate'**
+  String get paywallFeatureNutrition;
+
+  /// No description provided for @paywallFeatureNutritionSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated calories, protein & macros'**
+  String get paywallFeatureNutritionSub;
+
+  /// No description provided for @paywallFeatureLuggage.
+  ///
+  /// In en, this message translates to:
+  /// **'Object estimates'**
+  String get paywallFeatureLuggage;
+
+  /// No description provided for @paywallFeatureLuggageSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible features only; contents are unknown'**
+  String get paywallFeatureLuggageSub;
+
+  /// No description provided for @paywallFeatureObjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Point. Snap. Estimate.'**
+  String get paywallFeatureObjects;
+
+  /// No description provided for @paywallFeatureObjectsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate ranges from visible features'**
+  String get paywallFeatureObjectsSub;
+
+  /// No description provided for @paywallPhotoScanLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AI PHOTO SCAN'**
+  String get paywallPhotoScanLabel;
+
+  /// No description provided for @paywallEstimateExample.
+  ///
+  /// In en, this message translates to:
+  /// **'AI estimate · example'**
+  String get paywallEstimateExample;
+
+  /// No description provided for @paywallIllustrativeReadings.
+  ///
+  /// In en, this message translates to:
+  /// **'Illustrations only. Photos cannot measure actual weight.'**
+  String get paywallIllustrativeReadings;
+
+  /// No description provided for @paywallLifetimeOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime access · No ads'**
+  String get paywallLifetimeOffer;
+
+  /// No description provided for @paywallPurchaseTrust.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay once. No subscription. Google Play.'**
+  String get paywallPurchaseTrust;
+
+  /// No description provided for @paywallTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms'**
+  String get paywallTerms;
+
+  /// No description provided for @paywallPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get paywallPrivacy;
+
+  /// No description provided for @paywallFeatureLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited + ad-free'**
+  String get paywallFeatureLifetime;
+
+  /// No description provided for @paywallFeatureLifetimeSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock once. Own it.'**
+  String get paywallFeatureLifetimeSub;
+
+  /// No description provided for @paywallOneTimeBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'One-time'**
+  String get paywallOneTimeBadge;
+
+  /// No description provided for @paywallLifetimePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime access'**
+  String get paywallLifetimePlan;
+
+  /// No description provided for @paywallContinueFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with free scans'**
+  String get paywallContinueFree;
+
+  /// No description provided for @paywallPurchaseUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase unavailable'**
+  String get paywallPurchaseUnavailable;
 
   /// No description provided for @nativeSponsored.
   ///
@@ -3128,6 +3392,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Test ad retrying…'**
   String get nativeTestRetrying;
+
+  /// No description provided for @accessGetFreeScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Get free scan'**
+  String get accessGetFreeScan;
+
+  /// No description provided for @settingsReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders'**
+  String get settingsReminders;
+
+  /// No description provided for @mealReminderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily meal reminder'**
+  String get mealReminderTitle;
+
+  /// No description provided for @mealReminderOnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day at {time}, unless you just logged a meal'**
+  String mealReminderOnBody(String time);
+
+  /// No description provided for @mealReminderOffBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Get one nudge a day to log your meals'**
+  String get mealReminderOffBody;
+
+  /// No description provided for @mealReminderTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder time'**
+  String get mealReminderTime;
+
+  /// No description provided for @mealReminderPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are blocked. Allow them for MassLens in your phone settings.'**
+  String get mealReminderPermissionDenied;
+
+  /// No description provided for @mealReminderEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder set for {time} every day.'**
+  String mealReminderEnabled(String time);
+
+  /// No description provided for @mealReminderPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your streak going'**
+  String get mealReminderPromptTitle;
+
+  /// No description provided for @mealReminderPromptBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Get one daily reminder to log your meals. You can change the time anytime in Settings.'**
+  String get mealReminderPromptBody;
+
+  /// No description provided for @mealReminderPromptAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on reminder'**
+  String get mealReminderPromptAction;
+
+  /// No description provided for @mealReminderPromptDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get mealReminderPromptDismiss;
+
+  /// No description provided for @mealReminderNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Time to log your meal'**
+  String get mealReminderNotificationTitle;
+
+  /// No description provided for @mealReminderNotificationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Snap your plate in MassLens to track calories and keep your streak.'**
+  String get mealReminderNotificationBody;
+
+  /// No description provided for @mealReminderChannelName.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal reminders'**
+  String get mealReminderChannelName;
+
+  /// No description provided for @barcodeScanAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan a barcode'**
+  String get barcodeScanAction;
+
+  /// No description provided for @barcodeScanActionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Packaged foods · free, no scan credit used'**
+  String get barcodeScanActionBody;
+
+  /// No description provided for @barcodeFreeBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'FREE'**
+  String get barcodeFreeBadge;
+
+  /// No description provided for @barcodeScannerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Center the barcode inside the frame'**
+  String get barcodeScannerHint;
+
+  /// No description provided for @barcodeTypeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the number'**
+  String get barcodeTypeNumber;
+
+  /// No description provided for @barcodeTorch.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashlight'**
+  String get barcodeTorch;
+
+  /// No description provided for @barcodeEnterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the barcode number'**
+  String get barcodeEnterTitle;
+
+  /// No description provided for @barcodeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid 8, 12 or 13-digit barcode.'**
+  String get barcodeInvalid;
+
+  /// No description provided for @barcodeLookingUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up the product…'**
+  String get barcodeLookingUp;
+
+  /// No description provided for @barcodeNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product not found'**
+  String get barcodeNotFoundTitle;
+
+  /// No description provided for @barcodeNotFoundBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode {code} isn\'t in Open Food Facts or USDA FoodData Central yet. You can enter the values from the label.'**
+  String barcodeNotFoundBody(String code);
+
+  /// No description provided for @barcodeUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t look up this product'**
+  String get barcodeUnavailableTitle;
+
+  /// No description provided for @barcodeUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your connection and try again.'**
+  String get barcodeUnavailableBody;
+
+  /// No description provided for @barcodeRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get barcodeRetry;
+
+  /// No description provided for @barcodeEnterManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter manually'**
+  String get barcodeEnterManually;
+
+  /// No description provided for @barcodeScanAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan again'**
+  String get barcodeScanAgain;
+
+  /// No description provided for @barcodePer100.
+  ///
+  /// In en, this message translates to:
+  /// **'Per 100 {unit}'**
+  String barcodePer100(String unit);
+
+  /// No description provided for @barcodeServing.
+  ///
+  /// In en, this message translates to:
+  /// **'1 serving · {amount}'**
+  String barcodeServing(String amount);
+
+  /// No description provided for @barcodeWholePack.
+  ///
+  /// In en, this message translates to:
+  /// **'Whole pack · {amount}'**
+  String barcodeWholePack(String amount);
+
+  /// No description provided for @barcodeYourPortion.
+  ///
+  /// In en, this message translates to:
+  /// **'Your portion'**
+  String get barcodeYourPortion;
+
+  /// No description provided for @barcodeAmountEaten.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount eaten'**
+  String get barcodeAmountEaten;
+
+  /// No description provided for @barcodePartialNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Some macros are missing from this product\'s data and count as 0.'**
+  String get barcodePartialNutrition;
+
+  /// No description provided for @barcodeAddToDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to diary'**
+  String get barcodeAddToDiary;
+
+  /// No description provided for @barcodeSourceOpenFoodFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Label data from Open Food Facts (ODbL). Check the package: values can be incomplete or out of date.'**
+  String get barcodeSourceOpenFoodFacts;
+
+  /// No description provided for @barcodeSourceUsda.
+  ///
+  /// In en, this message translates to:
+  /// **'Label data from USDA FoodData Central. Check the package: values can be incomplete or out of date.'**
+  String get barcodeSourceUsda;
+
+  /// No description provided for @barcodeRecentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent products'**
+  String get barcodeRecentTitle;
+
+  /// No description provided for @barcodeRecentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Log a product you scanned before'**
+  String get barcodeRecentBody;
+
+  /// No description provided for @barcodeKcalPer100.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kcal / 100 {unit}'**
+  String barcodeKcalPer100(String value, String unit);
 }
 
 class _AppLocalizationsDelegate

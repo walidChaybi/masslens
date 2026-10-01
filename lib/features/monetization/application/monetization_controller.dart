@@ -7,8 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/installation_id_store.dart';
 import '../data/app_ad_service.dart';
+import '../data/billing_config.dart';
 import '../data/monetization_api.dart';
 import '../data/monetization_config.dart';
+import '../data/play_billing_service.dart';
 import '../domain/access_status.dart';
 import '../domain/reward_attempt.dart';
 
@@ -27,9 +29,11 @@ class MonetizationController extends ChangeNotifier {
     required this.enabled,
     required MonetizationApi? api,
     required AppAdService adService,
+    PlayBillingService? billingService,
     DateTime Function()? now,
   }) : _api = api,
        _adService = adService,
+       _billingService = billingService,
        _now = now ?? DateTime.now;
 
   factory MonetizationController.create() {
@@ -43,10 +47,14 @@ class MonetizationController extends ChangeNotifier {
       },
       onStateChanged: () => controller._notifyAdStateChanged(),
     );
+    final billingService = api != null && BillingConfig.supported
+        ? PlayBillingService(api: api)
+        : null;
     controller = MonetizationController._(
       enabled: api != null,
       api: api,
       adService: adService,
+      billingService: billingService,
     );
     return controller;
   }
@@ -61,11 +69,13 @@ class MonetizationController extends ChangeNotifier {
   factory MonetizationController.forTesting({
     required MonetizationApi api,
     required AppAdService adService,
+    PlayBillingService? billingService,
     DateTime Function()? now,
   }) => MonetizationController._(
     enabled: true,
     api: api,
     adService: adService,
+    billingService: billingService,
     now: now,
   );
 
@@ -77,12 +87,13 @@ class MonetizationController extends ChangeNotifier {
       'mass_lens.pending_history_interstitial_count';
   static const _rewardStateKey = 'mass_lens.reward_attempt_state.v1';
   static const _rewardAttemptLifetime = Duration(hours: 24);
-  static const _rewardAdGuard = Duration(minutes: 2);
+  static const _rewardAdGuard = Duration(seconds: 30);
   static const _reconcileRequestLimit = Duration(seconds: 5);
 
   final bool enabled;
   final MonetizationApi? _api;
   final AppAdService _adService;
+  final PlayBillingService? _billingService;
   final DateTime Function() _now;
 
   AccessStatus _access = const AccessStatus.fallback();
@@ -109,6 +120,14 @@ class MonetizationController extends ChangeNotifier {
   bool get canRequestNativeAds =>
       _adService.canRequestNativeAds && _access.adsEnabled;
   bool get rewardedAdReady => _adService.rewardedReady;
+  bool get hasLifetime => _access.hasLifetime;
+  bool get billingSupported => _billingService != null;
+  bool get billingStoreAvailable => _billingService?.storeAvailable ?? false;
+  bool get billingLoadingProduct => _billingService?.loadingProduct ?? false;
+  bool get billingProductQueryCompleted =>
+      _billingService?.productQueryCompleted ?? false;
+  String get lifetimePriceLabel => _billingService?.lifetimePriceLabel ?? '';
+  String? get billingMessage => _billingService?.message;
   bool get privacyOptionsRequired => _adService.privacyOptionsRequired;
   RewardFlowState get rewardFlowState => _rewardFlowState;
   bool get rewardActionBusy => _rewardActionBusy || _reconcilingRewards;
@@ -168,8 +187,14 @@ class MonetizationController extends ChangeNotifier {
       // Access and ad cadence can continue if local preferences are unavailable.
     }
     notifyListeners();
-    await refreshAccess();
+    final billingReady = _billingService?.initialize(
+      clientId: _clientId,
+      onEntitlementChanged: refreshAccess,
+      onChanged: notifyListeners,
+    );
+    await Future.wait<void>([refreshAccess(), ?billingReady]);
     await reconcileRewardAttempts();
+    notifyListeners();
   }
 
   Future<void> refreshAccess() async {
@@ -180,10 +205,24 @@ class MonetizationController extends ChangeNotifier {
       final access = await _api.getAccess(_clientId);
       _access = access;
       _message = null;
-      await _adService.updatePlan(
-        adsAllowed: access.adsEnabled,
-        policy: access.adPolicy,
-      );
+      // Ad SDK failures must not turn valid server access into a scan failure.
+      try {
+        await _adService.updatePlan(
+          adsAllowed: access.adsEnabled,
+          policy: access.adPolicy,
+        );
+      } on Object {
+        if (kDebugMode) {
+          debugPrint(
+            'MassLens: ad initialization failed; scan access is valid.',
+          );
+        }
+      }
+      if (kDebugMode) {
+        debugPrint(
+          'MassLens access: unlimited=${access.debugUnlimited}, ads=${access.adsEnabled}, testAds=${AdMobConfig.useTestIds}, enabled=${AdMobConfig.enabled}',
+        );
+      }
     } on Object {
       // The Worker remains the authority; stale data never grants an AI scan.
       _message = 'Could not refresh scan access.';
@@ -291,6 +330,35 @@ class MonetizationController extends ChangeNotifier {
     } on Object {
       // History remains usable if local ad-cadence persistence is unavailable.
     }
+  }
+
+  Future<bool> buyLifetime() async {
+    final billing = _billingService;
+    if (billing == null || hasLifetime) return false;
+    final started = await billing.buyLifetime();
+    if (!started && billing.message != null) {
+      _message = billing.message;
+      notifyListeners();
+    }
+    return started;
+  }
+
+  Future<void> restorePurchases() async {
+    final billing = _billingService;
+    if (billing == null) return;
+    _message = 'Restoring purchases…';
+    notifyListeners();
+    await billing.restorePurchases();
+    await refreshAccess();
+    _message = hasLifetime
+        ? 'Lifetime access restored.'
+        : billing.message ?? 'No lifetime purchase was found for this account.';
+    notifyListeners();
+  }
+
+  Future<void> refreshBillingProduct() async {
+    await _billingService?.refreshProductDetails();
+    notifyListeners();
   }
 
   Future<bool> watchAdForScan() async {
@@ -427,7 +495,7 @@ class MonetizationController extends ChangeNotifier {
           )
           .timeout(_reconcileRequestLimit);
       if (status.state == RewardAttemptServerState.verified) {
-        return _finalizeVerified(attemptId);
+        return await _finalizeVerified(attemptId);
       }
       if (status.state != RewardAttemptServerState.pending) {
         await _finalizeTerminal(attemptId, status.state);
@@ -709,6 +777,7 @@ class MonetizationController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _billingService?.dispose();
     _adService.dispose();
     super.dispose();
   }

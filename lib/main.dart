@@ -1,28 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'app/app_controller.dart';
-import 'app/mass_lens_app.dart';
+import 'app/launch_gate.dart';
+import 'core/theme/app_theme.dart';
 import 'features/monetization/data/monetization_config.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   MonetizationConfig.validateProduction();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // System UI setup and local data loading no longer hold back the first
+  // frame; LaunchGate paints the splash immediately.
+  unawaited(
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
+  );
+  unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+  // The saved appearance is not loaded yet; MassLensApp corrects the bars a
+  // frame later if the user pinned light or dark.
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Color(0xFFFFFDF8),
-      systemNavigationBarIconBrightness: Brightness.dark,
-      systemNavigationBarContrastEnforced: true,
+    systemUiOverlayStyleFor(
+      WidgetsBinding.instance.platformDispatcher.platformBrightness,
     ),
   );
-
-  final controller = await AppController.bootstrap();
-  runApp(MassLensApp(controller: controller));
+  runApp(const LaunchGate());
 }

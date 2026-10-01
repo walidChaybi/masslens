@@ -1,0 +1,41 @@
+APP NAME
+MassLens: AI Weight Estimator
+
+SHORT DESCRIPTION
+Estimate object & food weight from photos. Log calories and macros.
+
+FULL DESCRIPTION
+Get approximate weight estimates from a photo and keep your food diary in one place.
+
+MassLens is an AI weight estimator for everyday objects and visible food portions. Take a photo or choose one from your gallery to explore an estimated weight range. For meals, review approximate calories and macros, adjust portions, and save the results to your nutrition diary.
+
+AI WEIGHT ESTIMATES
+Explore the likely weight of visible objects using photo analysis. See an approximate range, estimated dimensions, and the assumptions behind each result. MassLens estimates weight from visual clues; it cannot measure actual mass or identify hidden contents.
+
+FOOD PORTIONS, CALORIES AND MACROS
+Use the AI food scanner to identify visible foods on your plate and estimate portion weights. As a food weight estimator, MassLens helps you explore approximate portions before adding them to your diary.
+
+Where a USDA FoodData Central match is available, view estimated calories, protein, carbohydrates and fat. Review each detected food, correct portion weights, or remove incorrect detections before saving. Missing food matches can leave nutrition totals incomplete.
+
+YOUR DAILY FOOD DIARY
+Keep a record of meals and snacks with a nutrition tracker stored on your device.
+- Add corrected food scans to your diary.
+- Enter calories and macros manually.
+- Review daily totals and nutrition trends.
+- Delete saved entries or clear your history in Settings.
+
+HOW TO GET STARTED
+1. Choose Object or Food & macros mode.
+2. Take a clear photo or select an image from your gallery.
+3. Review the estimate and its limitations.
+4. Save the result, or add a food estimate to your nutrition diary.
+
+SCAN ACCESS
+Two starter photo analyses are included. Afterward, watch an available rewarded ad to earn one scan, or choose an optional one-time purchase for unlimited scans and no ads. No subscription is required. Photo analysis needs an internet connection, and ad availability varies.
+
+UNDERSTAND THE ESTIMATES
+MassLens provides approximate photo estimates, not physical measurements. A photo cannot establish actual density, mass, or hidden ingredients. Use a physical scale whenever accurate weight matters. Do not use estimates for medication, shipping charges, baggage limits, regulated trade, or safety decisions. Food and nutrition estimates are informational and are not medical or dietary advice.
+
+PHOTOS AND PRIVACY
+Photos are sent for AI processing only when you start an analysis. Image metadata is removed before upload through our service to OpenAI. Saved history and your nutrition diary stay on your device. See the privacy policy for details about processing, advertising and purchase data.
+

@@ -20,7 +20,7 @@ const migrations = migrationUrls.map((url) =>
   readFileSync(new URL(url, import.meta.url), "utf8"),
 );
 const initialNow = 1_786_200_000_000;
-const cooldownMs = 2 * 60 * 1000;
+const cooldownMs = 30 * 1000;
 const clientId = "reward_client_identifier_01";
 const otherClientId = "reward_client_identifier_02";
 

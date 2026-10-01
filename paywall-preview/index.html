@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MassLens paywall — Variation 2</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --card: #11141b;
+      --text: #f4f6fb;
+      --muted: #9aa3b5;
+      --lime: #b9f44a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 28px 20px 48px;
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.04em; }
+    p { margin: 0 0 28px; color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 420px));
+      gap: 28px;
+      justify-content: center;
+    }
+    figure {
+      margin: 0;
+      background: var(--card);
+      border-radius: 24px;
+      padding: 16px 16px 20px;
+    }
+    img {
+      width: 100%;
+      height: auto;
+      border-radius: 16px;
+      display: block;
+      background: #000;
+    }
+    figcaption { padding: 14px 6px 0; }
+    figcaption strong { display: block; font-size: 18px; margin-bottom: 4px; }
+    figcaption span { color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .cta { color: var(--lime); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>MassLens paywall</h1>
+  <p>2B is now in the app. The built screen is first.</p>
+  <div class="grid">
+    <figure>
+      <img src="built-paywall.png" alt="Built MassLens paywall" />
+      <figcaption>
+        <strong>Built in the app</strong>
+        <span>Scan once. Own it forever. Digital scale + lifetime unlock.</span>
+      </figcaption>
+    </figure>
+  </div>
+  <p style="margin-top:36px">Earlier mockups</p>
+  <div class="grid">
+    <figure>
+      <img src="v2a-outcome.png" alt="Paywall 2A: Never Guess Weight Again" />
+      <figcaption>
+        <strong>2A — Outcome</strong>
+        <span>Headline: Never Guess Weight Again<br />
+        <span class="cta">Unlock Unlimited · $4.99</span></span>
+      </figcaption>
+    </figure>
+    <figure>
+      <img src="v2b-ownership.png" alt="Paywall 2B: Scan once. Own it forever." />
+      <figcaption>
+        <strong>2B — Ownership</strong>
+        <span>Headline: Scan once. Own it forever.<br />
+        <span class="cta">Unlock Lifetime</span></span>
+      </figcaption>
+    </figure>
+  </div>
+</body>
+</html>

@@ -6,6 +6,7 @@ import 'package:mass_lens/features/measurements/data/measurement_store.dart';
 import 'package:mass_lens/features/measurements/domain/measurement.dart';
 import 'package:mass_lens/features/nutrition/application/nutrition_diary_controller.dart';
 import 'package:mass_lens/features/nutrition/data/nutrition_log_store.dart';
+import 'package:mass_lens/features/nutrition/domain/nutrition_goals.dart';
 import 'package:mass_lens/features/nutrition/domain/nutrition_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,6 +39,7 @@ void main() {
     expect(restored.nutrition.caloriesKcal, 540);
     expect(restored.isPartial, isTrue);
     expect(restored.sourceMeasurementId, 'scan-1');
+    expect(restored.imagePath, isNull);
   });
 
   test(
@@ -58,6 +60,22 @@ void main() {
       expect(loaded.single.id, 'valid');
     },
   );
+
+  test('goals persist independently of diary entries', () async {
+    const store = NutritionLogStore();
+    await store.saveGoals(
+      const NutritionGoals(
+        calorieGoalKcal: 1800,
+        proteinGrams: 140,
+        carbsGrams: 180,
+        fatGrams: 60,
+      ),
+    );
+
+    final loaded = await store.loadGoals();
+    expect(loaded.calorieGoalKcal, 1800);
+    expect(loaded.proteinGrams, 140);
+  });
 
   test('period contains missing days and averages only logged days', () {
     final entries = [
@@ -87,6 +105,16 @@ void main() {
     expect(period.days[2].totals.caloriesKcal, 0);
   });
 
+  test('streak counts consecutive local days and survives a quiet today', () {
+    final entries = [
+      _entry('a', DateTime(2026, 8, 13, 8), calories: 400),
+      _entry('b', DateTime(2026, 8, 14, 19), calories: 500),
+    ];
+
+    expect(nutritionLoggingStreak(entries, now: DateTime(2026, 8, 15, 10)), 2);
+    expect(nutritionLoggingStreak(entries, now: DateTime(2026, 8, 16, 10)), 0);
+  });
+
   test('food scan import snapshots corrected nutrition and partial status', () {
     final measurement = _foodMeasurement();
 
@@ -103,6 +131,7 @@ void main() {
     expect(entry.nutrition.proteinGrams, 25);
     expect(entry.isPartial, isTrue);
     expect(entry.sourceMeasurementId, measurement.id);
+    expect(entry.imagePath, measurement.imagePath);
   });
 
   test('nutrition history and scan history clear independently', () async {

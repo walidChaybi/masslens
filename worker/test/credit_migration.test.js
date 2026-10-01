@@ -10,6 +10,8 @@ import {
   MonetizationError,
   refundScan,
   reserveScan,
+  getAccess,
+  isDebugUnlimited,
 } from "../src/monetization.js";
 
 const initialMigration = readFileSync(
@@ -22,6 +24,10 @@ const creditsMigration = readFileSync(
 );
 const adsOnlyMigration = readFileSync(
   new URL("../migrations/0003_ads_only_access.sql", import.meta.url),
+  "utf8",
+);
+const lifetimeMigration = readFileSync(
+  new URL("../migrations/0006_lifetime_entitlements.sql", import.meta.url),
   "utf8",
 );
 
@@ -162,6 +168,7 @@ test("starter reservation refunds failures and replays completed JSON", async ()
   sqlite.exec(initialMigration);
   sqlite.exec(creditsMigration);
   sqlite.exec(adsOnlyMigration);
+  sqlite.exec(lifetimeMigration);
   const DB = d1Adapter(sqlite);
   const env = {DB, SCAN_ACCESS_ENFORCED: "true"};
   const clientHash = "a".repeat(64);
@@ -198,19 +205,20 @@ test("starter reservation refunds failures and replays completed JSON", async ()
   );
 
   const payload = accessPayload({starterUsed: 1, scanAccessEnforced: true});
-  assert.equal(payload.remainingScans, 2);
+  assert.equal(payload.remainingScans, 1);
   sqlite.close();
 });
 
-test("exactly three lifetime starter scans are available", async () => {
+test("exactly two lifetime starter scans are available", async () => {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(initialMigration);
   sqlite.exec(creditsMigration);
   sqlite.exec(adsOnlyMigration);
+  sqlite.exec(lifetimeMigration);
   const env = {DB: d1Adapter(sqlite), SCAN_ACCESS_ENFORCED: "true"};
   const clientHash = "b".repeat(64);
 
-  for (let index = 1; index <= 3; index += 1) {
+  for (let index = 1; index <= 2; index += 1) {
     const reservation = await reserveScan(
       env,
       clientHash,
@@ -220,7 +228,7 @@ test("exactly three lifetime starter scans are available", async () => {
   }
 
   await assert.rejects(
-    reserveScan(env, clientHash, "starter_request_identifier_4"),
+    reserveScan(env, clientHash, "starter_request_identifier_3"),
     (error) => error instanceof MonetizationError &&
       error.status === 402 &&
       error.code === "scan_limit_reached",
@@ -229,12 +237,47 @@ test("exactly three lifetime starter scans are available", async () => {
     sqlite.prepare(
       "SELECT starter_used FROM ad_scan_wallets WHERE client_id_hash = ?",
     ).get(clientHash).starter_used,
-    3,
+    2,
   );
   assert.equal(
-    accessPayload({starterUsed: 3, scanAccessEnforced: true}).remainingScans,
+    accessPayload({starterUsed: 2, scanAccessEnforced: true}).remainingScans,
     0,
   );
+  sqlite.close();
+});
+
+test("debug unlimited is scoped to one installation and preserves normal quotas", async () => {
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(initialMigration);
+  sqlite.exec(creditsMigration);
+  sqlite.exec(adsOnlyMigration);
+  sqlite.exec(lifetimeMigration);
+  const debugHash = "d".repeat(64);
+  const env = {DB: d1Adapter(sqlite), SCAN_ACCESS_ENFORCED: "true", DEBUG_UNLIMITED_CLIENT_HASH: debugHash};
+  assert.equal(isDebugUnlimited({}, debugHash, true), false);
+  assert.equal(isDebugUnlimited(env, "e".repeat(64), true), false);
+  for (let i = 0; i < 5; i++) {
+    const reservation = await reserveScan(env, debugHash, `debug_unlimited_request_${i}`, true);
+    assert.equal(reservation.kind, "lifetime");
+    await completeScan(env, debugHash, reservation, {estimate_grams: 100});
+  }
+  const access = await getAccess(env, debugHash, true);
+  assert.equal(access.debugUnlimited, true);
+  assert.equal(access.hasLifetime, false);
+  assert.equal(access.adsEnabled, true);
+  assert.equal(access.starterScansRemaining, 2);
+  // The same approved installation in a release build still has normal limits.
+  assert.equal(isDebugUnlimited(env, debugHash), false);
+  assert.equal((await getAccess(env, debugHash)).debugUnlimited, false);
+  assert.equal((await getAccess(env, debugHash)).adsEnabled, true);
+  await reserveScan(env, debugHash, "release_request_identifier_1");
+  await reserveScan(env, debugHash, "release_request_identifier_2");
+  await assert.rejects(reserveScan(env, debugHash, "release_request_identifier_3"), error => error.status === 402);
+  const other = "e".repeat(64);
+  await reserveScan(env, other, "normal_request_identifier_1");
+  await reserveScan(env, other, "normal_request_identifier_2");
+  await assert.rejects(reserveScan(env, other, "normal_request_identifier_3"), error => error.status === 402);
+  assert.equal((await getAccess(env, other)).debugUnlimited, false);
   sqlite.close();
 });
 
@@ -243,6 +286,7 @@ test("daily AI cost ceiling blocks before another provider call", async () => {
   sqlite.exec(initialMigration);
   sqlite.exec(creditsMigration);
   sqlite.exec(adsOnlyMigration);
+  sqlite.exec(lifetimeMigration);
   const today = new Date().toISOString().slice(0, 10);
   sqlite.prepare(
     `INSERT INTO daily_metrics (
@@ -281,3 +325,35 @@ function d1Adapter(sqlite) {
     },
   };
 }
+
+
+test("a user who used one free scan gets a second, then spends rewarded credit", async () => {
+  const sqlite = new DatabaseSync(":memory:");
+  for (const migration of [initialMigration, creditsMigration, adsOnlyMigration, lifetimeMigration]) {
+    sqlite.exec(migration);
+  }
+  const env = {DB: d1Adapter(sqlite), SCAN_ACCESS_ENFORCED: "true"};
+  const clientHash = "existing-one-scan-user";
+  const first = await reserveScan(env, clientHash, "existing_first_scan_request");
+  assert.equal(first.kind, "starter");
+  await refundScan(env, clientHash, first);
+  const retry = await reserveScan(env, clientHash, "existing_retry_scan_request");
+  await completeScan(env, clientHash, retry, {estimate_grams: 10});
+  assert.equal(accessPayload({starterUsed: 1, env}).starterScansRemaining, 1);
+
+  const second = await reserveScan(env, clientHash, "existing_second_scan_request");
+  assert.equal(second.kind, "starter");
+  await completeScan(env, clientHash, second, {estimate_grams: 10});
+  await assert.rejects(
+    reserveScan(env, clientHash, "existing_third_scan_request"),
+    error => error.status === 402 && error.code === "scan_limit_reached",
+  );
+
+  sqlite.prepare("UPDATE ad_scan_wallets SET rewarded_balance = 1 WHERE client_id_hash = ?")
+    .run(clientHash);
+  const rewarded = await reserveScan(env, clientHash, "existing_rewarded_scan_request");
+  assert.equal(rewarded.kind, "rewarded");
+  await completeScan(env, clientHash, rewarded, {estimate_grams: 10});
+  assert.equal(accessPayload({starterUsed: 2, rewardedScans: 0, env}).remainingScans, 0);
+  sqlite.close();
+});

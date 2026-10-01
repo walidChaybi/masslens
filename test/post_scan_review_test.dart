@@ -38,10 +38,7 @@ void main() {
     addTearDown(appController.dispose);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getBool('mass_lens.post_scan_review_requested'),
-      isNull,
-    );
+    expect(prefs.getBool('mass_lens.post_scan_review_requested'), isNull);
 
     await monetization.onScanCompleted();
     await monetization.onScanCompleted();
@@ -52,8 +49,9 @@ void main() {
     await appController.maybeRequestPostScanReview();
     expect(review.requestCount, 1);
     expect(
-      (await SharedPreferences.getInstance())
-          .getBool('mass_lens.post_scan_review_requested'),
+      (await SharedPreferences.getInstance()).getBool(
+        'mass_lens.post_scan_review_requested',
+      ),
       isTrue,
     );
 
@@ -82,16 +80,16 @@ class _AdsEnabledApi extends MonetizationApi {
 
   @override
   Future<AccessStatus> getAccess(String clientId) async => const AccessStatus(
-        starterScansRemaining: 3,
-        rewardedScans: 0,
-        legacyScans: 0,
-        remainingScans: 3,
-        rewardBalanceCap: 3,
-        scanAccessEnforced: true,
-        adsEnabled: true,
-        isAuthoritative: true,
-        analysisModel: 'gpt-5-nano',
-        adPolicy: AdPolicy(),
-      );
+    starterScansRemaining: 2,
+    rewardedScans: 0,
+    legacyScans: 0,
+    remainingScans: 2,
+    rewardBalanceCap: 3,
+    hasLifetime: false,
+    scanAccessEnforced: true,
+    adsEnabled: true,
+    isAuthoritative: true,
+    analysisModel: 'gpt-5-nano',
+    adPolicy: AdPolicy(),
+  );
 }
-

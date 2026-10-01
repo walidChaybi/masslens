@@ -4,9 +4,12 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../l10n/l10n.dart';
+import '../../../measurements/domain/measurement.dart';
 
 class CameraCaptureScreen extends StatefulWidget {
-  const CameraCaptureScreen({super.key});
+  const CameraCaptureScreen({this.scanMode = ScanMode.object, super.key});
+
+  final ScanMode scanMode;
 
   @override
   State<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
@@ -109,6 +112,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
+    final isFoodPlate = widget.scanMode == ScanMode.foodPlate;
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -161,7 +165,57 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
                 ],
               ),
             ),
-            const Center(child: _CameraReticle()),
+            if (isFoodPlate) ...[
+              Positioned(
+                key: const Key('camera_food_label'),
+                top: 12,
+                left: 72,
+                right: 72,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.58),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.restaurant_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            context.l10n.scanFoodScale,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 84,
+                left: 28,
+                right: 28,
+                bottom: 126,
+                child: _FoodPlateGuide(helper: context.l10n.scanPhotographMeal),
+              ),
+            ] else
+              const Center(child: _CameraReticle()),
             Positioned(
               left: 0,
               right: 0,
@@ -199,6 +253,70 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
       ),
     );
   }
+}
+
+class _FoodPlateGuide extends StatelessWidget {
+  const _FoodPlateGuide({required this.helper});
+
+  final String helper;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: CustomPaint(
+            painter: const _CornerReticlePainter(),
+            child: const SizedBox.expand(key: Key('camera_food_plate_guide')),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          key: const Key('camera_food_helper'),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.58),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Text(
+            helper,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CornerReticlePainter extends CustomPainter {
+  const _CornerReticlePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    const length = 28.0;
+    void corner(Offset origin, double xDir, double yDir) {
+      canvas.drawLine(origin, origin + Offset(length * xDir, 0), paint);
+      canvas.drawLine(origin, origin + Offset(0, length * yDir), paint);
+    }
+
+    corner(Offset.zero, 1, 1);
+    corner(Offset(size.width, 0), -1, 1);
+    corner(Offset(0, size.height), 1, -1);
+    corner(Offset(size.width, size.height), -1, -1);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _CameraIconButton extends StatelessWidget {

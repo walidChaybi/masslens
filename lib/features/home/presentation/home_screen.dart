@@ -5,9 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../app/app_controller.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_components.dart';
-import '../../../l10n/l10n.dart';
 import '../../../l10n/display_labels.dart';
-import '../../measurements/domain/measurement.dart';
+import '../../../l10n/l10n.dart';
 import '../../measurements/presentation/measurement_detail_screen.dart';
 import '../../monetization/presentation/access_card.dart';
 import '../../monetization/presentation/native_ad_card.dart';
@@ -22,8 +21,8 @@ class HomeScreen extends StatelessWidget {
     super.key,
   });
 
-  final ValueChanged<ScanMode> onMeasure;
-  final ValueChanged<ScanMode> onGallery;
+  final VoidCallback onMeasure;
+  final VoidCallback onGallery;
   final VoidCallback onViewHistory;
   final VoidCallback onOpenNutrition;
 
@@ -32,52 +31,54 @@ class HomeScreen extends StatelessWidget {
     final controller = AppScope.of(context);
     final l10n = context.l10n;
     final access = controller.monetization.access;
-    final recent = controller.measurements.firstOrNull;
+    final recent = controller.measurements
+        .where((measurement) => !measurement.isFoodPlate)
+        .firstOrNull;
     final horizontalPadding = math.max(
       20.0,
       (MediaQuery.sizeOf(context).width - 720) / 2,
     );
 
-    final canEarnReward = access.adsEnabled && access.canEarnReward;
+    final canEarnReward =
+        !access.debugUnlimited && access.adsEnabled && access.canEarnReward;
     return SafeArea(
       maintainBottomViewPadding: true,
       child: ListView(
         padding: EdgeInsets.fromLTRB(
           horizontalPadding,
-          28,
+          6,
           horizontalPadding,
           32,
         ),
         children: [
-          _HomeHeader(
-            title: l10n.homeAiWeight,
-            scanLabel: canEarnReward && access.isAuthoritative
-                ? l10n.homeScansLeftGetOne(access.remainingScans)
+          _ScanHero(
+            scanLabel: access.debugUnlimited
+                ? l10n.accessUnlimitedScans
                 : localizedScanUsage(l10n, access),
             canEarnReward: canEarnReward,
-            onTap: () => showRewardedScanSheet(context),
+            onBalanceTap: () => showRewardedScanSheet(context),
+            onMeasure: onMeasure,
+            onGallery: onGallery,
           ),
-          const SizedBox(height: 24),
-          _HomeCapturePanel(onMeasure: onMeasure, onGallery: onGallery),
-          const SizedBox(height: 14),
-          _NutritionEntryCard(onTap: onOpenNutrition),
           if (recent != null) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 26),
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    l10n.homeLatestEstimate,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
+                Expanded(child: Eyebrow(l10n.homeLatestEstimate)),
                 TextButton(
                   onPressed: onViewHistory,
-                  child: Text(l10n.homeHistory),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(l10n.homeHistory),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             MeasurementCard(
               measurement: recent,
               unitSystem: controller.unitSystem,
@@ -89,11 +90,11 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           NativeAdCard(
             enabled: controller.monetization.canRequestNativeAds,
             placement: 'ai_home',
-            height: 100,
+            height: 120,
             onPaidEvent: controller.monetization.reportPaidAd,
           ),
           const SizedBox(height: 12),
@@ -111,62 +112,189 @@ class HomeScreen extends StatelessWidget {
 
 void _noop() {}
 
-class _NutritionEntryCard extends StatelessWidget {
-  const _NutritionEntryCard({required this.onTap});
+/// The whole "scan" story in one dark instrument panel: what it does, a
+/// viewfinder with capture tips, and the two ways to start.
+class _ScanHero extends StatelessWidget {
+  const _ScanHero({
+    required this.scanLabel,
+    required this.canEarnReward,
+    required this.onBalanceTap,
+    required this.onMeasure,
+    required this.onGallery,
+  });
 
+  final String scanLabel;
+  final bool canEarnReward;
+  final VoidCallback onBalanceTap;
+  final VoidCallback onMeasure;
+  final VoidCallback onGallery;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [context.palette.inkRaised, context.palette.inkDeep],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink.withValues(alpha: 0.22),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Eyebrow(
+                    l10n.homeAiWeight,
+                    color: context.palette.lime,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: _BalanceChip(
+                    label: scanLabel,
+                    highlighted: canEarnReward,
+                    onTap: onBalanceTap,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.homeHeroTitle,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 27,
+                height: 1.08,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.homeHeroBody,
+              style: TextStyle(
+                color: context.palette.onInkMuted,
+                fontSize: 13.5,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 176,
+              child: _Viewfinder(
+                tips: [
+                  (Icons.crop_free_rounded, l10n.homeTipWhole),
+                  (Icons.wb_sunny_outlined, l10n.homeTipLight),
+                  (Icons.straighten_rounded, l10n.homeTipReference),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              key: const Key('home_scan_button'),
+              onPressed: onMeasure,
+              style: FilledButton.styleFrom(
+                backgroundColor: context.palette.lime,
+                foregroundColor: context.palette.onLime,
+                minimumSize: const Size.fromHeight(56),
+                shape: const StadiumBorder(),
+                textStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              icon: const Icon(Icons.photo_camera_rounded),
+              label: Text(l10n.homeScanObject),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              key: const Key('home_gallery_button'),
+              onPressed: onGallery,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48),
+                shape: StadiumBorder(
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              icon: const Icon(Icons.photo_library_outlined, size: 20),
+              label: Text(l10n.homePhoto),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BalanceChip extends StatelessWidget {
+  const _BalanceChip({
+    required this.label,
+    required this.highlighted,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool highlighted;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final summary = AppScope.of(
-      context,
-    ).nutritionDiary.daySummary(DateTime.now());
-    final l10n = context.l10n;
-    return Card(
-      key: const Key('home_nutrition_button'),
-      color: AppColors.ink,
+    final foreground = highlighted ? context.palette.onLime : Colors.white;
+    return Material(
+      color: highlighted
+          ? context.palette.lime
+          : Colors.white.withValues(alpha: 0.10),
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        key: highlighted
+            ? const Key('home_reward_cta')
+            : const Key('home_scan_balance'),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.lime,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.insights_rounded, color: AppColors.ink),
+              Icon(
+                highlighted ? Icons.play_arrow_rounded : Icons.bolt_rounded,
+                size: 16,
+                color: highlighted
+                    ? context.palette.onLime
+                    : context.palette.lime,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.nutritionHomeTitle,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      summary.hasEntries
-                          ? l10n.nutritionHomeTodayCalories(
-                              summary.totals.caloriesKcal.round(),
-                            )
-                          : l10n.nutritionHomeBody,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                    ),
-                  ],
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  key: const Key('scan_balance'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
-              const Icon(Icons.arrow_forward_rounded, color: AppColors.lime),
             ],
           ),
         ),
@@ -175,178 +303,35 @@ class _NutritionEntryCard extends StatelessWidget {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.title,
-    required this.scanLabel,
-    required this.canEarnReward,
-    required this.onTap,
-  });
+class _Viewfinder extends StatelessWidget {
+  const _Viewfinder({required this.tips});
 
-  final String title;
-  final String scanLabel;
-  final bool canEarnReward;
-  final VoidCallback onTap;
+  final List<(IconData, String)> tips;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final badge = InkWell(
-          key: canEarnReward
-              ? const Key('home_reward_cta')
-              : const Key('home_scan_balance'),
-          borderRadius: BorderRadius.circular(99),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: canEarnReward ? AppColors.lime : Colors.transparent,
-              borderRadius: BorderRadius.circular(99),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Stack(
+        children: [
+          Positioned.fill(child: CustomPaint(painter: _ViewfinderPainter())),
+          Positioned.fill(
+            child: InstrumentCorners(
+              color: context.palette.lime.withValues(alpha: 0.9),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          ),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                if (canEarnReward) ...[
-                  const Icon(
-                    Icons.play_arrow_rounded,
-                    size: 16,
-                    color: AppColors.ink,
-                  ),
-                  const SizedBox(width: 3),
-                ],
-                Flexible(
-                  child: Text(
-                    scanLabel,
-                    key: const Key('scan_balance'),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: TextStyle(
-                      color: canEarnReward ? AppColors.ink : AppColors.inkMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
+                for (final tip in tips) _TipChip(icon: tip.$1, label: tip.$2),
               ],
             ),
-          ),
-        );
-        final titleWidget = Text(
-          title,
-          style: Theme.of(context).textTheme.headlineLarge,
-        );
-
-        if (constraints.maxWidth < 380) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              titleWidget,
-              const SizedBox(height: 10),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: math.min(260.0, constraints.maxWidth),
-                  ),
-                  child: badge,
-                ),
-              ),
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: titleWidget),
-            const SizedBox(width: 12),
-            Flexible(child: badge),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _HomeCapturePanel extends StatefulWidget {
-  const _HomeCapturePanel({required this.onMeasure, required this.onGallery});
-
-  final ValueChanged<ScanMode> onMeasure;
-  final ValueChanged<ScanMode> onGallery;
-
-  @override
-  State<_HomeCapturePanel> createState() => _HomeCapturePanelState();
-}
-
-class _HomeCapturePanelState extends State<_HomeCapturePanel> {
-  ScanMode _mode = ScanMode.object;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.line),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SegmentedButton<ScanMode>(
-            key: const Key('home_scan_mode_selector'),
-            expandedInsets: EdgeInsets.zero,
-            segments: [
-              ButtonSegment(
-                value: ScanMode.object,
-                label: Text(l10n.homeModeObject),
-                icon: const Icon(Icons.inventory_2_outlined),
-              ),
-              ButtonSegment(
-                value: ScanMode.foodPlate,
-                label: Text(l10n.homeModeFoodMacros),
-                icon: const Icon(Icons.restaurant_outlined),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (selection) {
-              setState(() => _mode = selection.single);
-            },
-            showSelectedIcon: false,
-          ),
-          const SizedBox(height: 12),
-          const AspectRatio(aspectRatio: 16 / 9, child: _QuietViewfinder()),
-          if (_mode == ScanMode.foodPlate) ...[
-            const SizedBox(height: 10),
-            Text(
-              l10n.homeFoodModeHint,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.inkMuted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            key: const Key('home_scan_button'),
-            onPressed: () => widget.onMeasure(_mode),
-            icon: const Icon(Icons.photo_camera_outlined),
-            label: Text(
-              _mode == ScanMode.foodPlate
-                  ? l10n.homeScanFood
-                  : l10n.homeScanObject,
-            ),
-          ),
-          const SizedBox(height: 4),
-          TextButton.icon(
-            key: const Key('home_gallery_button'),
-            onPressed: () => widget.onGallery(_mode),
-            icon: const Icon(Icons.photo_library_outlined),
-            label: Text(l10n.homePhoto),
           ),
         ],
       ),
@@ -354,74 +339,119 @@ class _HomeCapturePanelState extends State<_HomeCapturePanel> {
   }
 }
 
-class _QuietViewfinder extends StatelessWidget {
-  const _QuietViewfinder();
+class _TipChip extends StatelessWidget {
+  const _TipChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _QuietViewfinderPainter(),
-      child: const SizedBox.expand(),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 5, 10, 5),
+      decoration: BoxDecoration(
+        color: context.palette.inkDeep.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: context.palette.lime),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _QuietViewfinderPainter extends CustomPainter {
+class _ViewfinderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-      Paint()..color = const Color(0xFFEFF4F3),
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(0, -0.2),
+          radius: 0.9,
+          colors: [Color(0xFF22385A), Color(0xFF0A1322)],
+        ).createShader(rect),
     );
 
-    final gridPaint = Paint()
-      ..color = AppColors.ink.withValues(alpha: 0.08)
+    // Faint measuring grid.
+    final grid = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
       ..strokeWidth = 1;
-    for (var i = 1; i < 3; i++) {
-      final x = size.width * i / 3;
-      final y = size.height * i / 3;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    const step = 22.0;
+    for (var x = step; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (var y = step; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
     }
 
-    final cornerPaint = Paint()
-      ..color = AppColors.ink
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-    const inset = 16.0;
-    const length = 28.0;
-    for (final origin in [
-      Offset(inset, inset),
-      Offset(size.width - inset, inset),
-      Offset(inset, size.height - inset),
-      Offset(size.width - inset, size.height - inset),
-    ]) {
-      final xSign = origin.dx < size.width / 2 ? 1.0 : -1.0;
-      final ySign = origin.dy < size.height / 2 ? 1.0 : -1.0;
-      canvas.drawLine(origin, origin + Offset(length * xSign, 0), cornerPaint);
-      canvas.drawLine(origin, origin + Offset(0, length * ySign), cornerPaint);
-    }
-
-    final center = size.center(Offset.zero);
-    canvas.drawCircle(
-      center,
-      15,
+    // Static scan beam with a soft trailing glow.
+    final beamY = size.height * 0.40;
+    final glowRect = Rect.fromLTRB(28, beamY - 34, size.width - 28, beamY);
+    canvas.drawRect(
+      glowRect,
       Paint()
-        ..color = AppColors.surface
-        ..style = PaintingStyle.fill,
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.lime.withValues(alpha: 0),
+            AppColors.lime.withValues(alpha: 0.16),
+          ],
+        ).createShader(glowRect),
     );
+    final beamRect = Rect.fromLTRB(28, beamY - 1, size.width - 28, beamY + 1);
+    canvas.drawRect(
+      beamRect,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            AppColors.lime.withValues(alpha: 0),
+            AppColors.lime,
+            AppColors.lime.withValues(alpha: 0),
+          ],
+        ).createShader(beamRect),
+    );
+
+    // Reticle.
+    final center = Offset(size.width / 2, beamY);
     canvas.drawCircle(
       center,
-      15,
+      17,
       Paint()
-        ..color = AppColors.ink
+        ..color = Colors.white.withValues(alpha: 0.75)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6,
+        ..strokeWidth = 1.5,
     );
-    canvas.drawCircle(center, 3, Paint()..color = AppColors.limeDark);
+    canvas.drawCircle(center, 3.5, Paint()..color = AppColors.lime);
+    final tick = Paint()
+      ..color = Colors.white.withValues(alpha: 0.75)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(center.translate(0, -25), center.translate(0, -20), tick);
+    canvas.drawLine(center.translate(0, 20), center.translate(0, 25), tick);
+    canvas.drawLine(center.translate(-25, 0), center.translate(-20, 0), tick);
+    canvas.drawLine(center.translate(20, 0), center.translate(25, 0), tick);
   }
 
   @override
-  bool shouldRepaint(covariant _QuietViewfinderPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _ViewfinderPainter oldDelegate) => false;
 }

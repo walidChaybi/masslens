@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AdPolicy {
   const AdPolicy({
     this.interstitialEvery = 2,
@@ -69,6 +71,8 @@ class AccessStatus {
     required this.legacyScans,
     required this.remainingScans,
     required this.rewardBalanceCap,
+    required this.hasLifetime,
+    this.debugUnlimited = false,
     required this.scanAccessEnforced,
     required this.adsEnabled,
     required this.isAuthoritative,
@@ -77,11 +81,13 @@ class AccessStatus {
   });
 
   const AccessStatus.fallback()
-    : starterScansRemaining = 3,
+    : starterScansRemaining = 2,
       rewardedScans = 0,
       legacyScans = 0,
-      remainingScans = 3,
+      remainingScans = 2,
       rewardBalanceCap = 3,
+      hasLifetime = false,
+      debugUnlimited = false,
       scanAccessEnforced = false,
       adsEnabled = false,
       isAuthoritative = false,
@@ -97,6 +103,8 @@ class AccessStatus {
       legacyScans: (json['legacyScans'] as num?)?.toInt() ?? 0,
       remainingScans: (json['remainingScans'] as num?)?.toInt() ?? 0,
       rewardBalanceCap: (json['rewardBalanceCap'] as num?)?.toInt() ?? 3,
+      hasLifetime: json['hasLifetime'] as bool? ?? false,
+      debugUnlimited: kDebugMode && json['debugUnlimited'] == true,
       scanAccessEnforced: json['scanAccessEnforced'] as bool? ?? false,
       adsEnabled: json['adsEnabled'] as bool? ?? false,
       isAuthoritative: true,
@@ -112,6 +120,8 @@ class AccessStatus {
   final int legacyScans;
   final int remainingScans;
   final int rewardBalanceCap;
+  final bool hasLifetime;
+  final bool debugUnlimited;
   final bool scanAccessEnforced;
   final bool adsEnabled;
   final bool isAuthoritative;
@@ -119,8 +129,11 @@ class AccessStatus {
   final AdPolicy adPolicy;
 
   /// AI access fails closed until the production Worker confirms both the
-  /// enforced wallet contract and a positive balance.
+  /// enforced wallet contract and a positive balance or lifetime unlock.
   bool get canScan =>
-      isAuthoritative && scanAccessEnforced && remainingScans > 0;
-  bool get canEarnReward => rewardedScans < rewardBalanceCap;
+      isAuthoritative &&
+      scanAccessEnforced &&
+      (hasLifetime || debugUnlimited || remainingScans > 0);
+  bool get canEarnReward =>
+      !hasLifetime && adsEnabled && rewardedScans < rewardBalanceCap;
 }

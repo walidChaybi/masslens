@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 
 enum ScanImageWarning { dark, blurry }
@@ -29,10 +30,46 @@ class PreparedScanImage {
 class ScanImageProcessor {
   const ScanImageProcessor();
 
+  static const _channel = MethodChannel('com.masslens.mass_lens/scan_image');
+
+  /// One preparation per photo: [inspect] and [prepare] share the result, so a
+  /// scan no longer decodes the same photo two to four times.
+  static final _cache = <String, Future<PreparedScanImage>>{};
+  static const _cacheSize = 4;
+
+  /// Dart fallback work runs one photo at a time (never concurrent isolates).
+  static Future<void> _fallbackTail = Future<void>.value();
+
+  /// Test hook: force the native (Android) path on or off.
+  @visibleForTesting
+  static bool? debugUseNativePath;
+
+  @visibleForTesting
+  static void debugClearCache() => _cache.clear();
+
+  static bool get _useNativePath =>
+      debugUseNativePath ?? (!kIsWeb && Platform.isAndroid);
+
   Future<List<ScanImageWarning>> inspect(String path) async =>
       (await prepare(path)).warnings;
 
-  Future<PreparedScanImage> prepare(String path) async {
+  Future<PreparedScanImage> prepare(String path) {
+    final cached = _cache[path];
+    if (cached != null) return cached;
+    if (_cache.length >= _cacheSize) _cache.remove(_cache.keys.first);
+    final future = _prepareUncached(path);
+    _cache[path] = future;
+    future.then<void>(
+      (_) {},
+      onError: (Object _) {
+        // Failed attempts are not cached so the user can retry.
+        if (identical(_cache[path], future)) _cache.remove(path);
+      },
+    );
+    return future;
+  }
+
+  Future<PreparedScanImage> _prepareUncached(String path) async {
     final file = File(path);
     if (!await file.exists()) {
       throw const ScanImageException(
@@ -40,19 +77,82 @@ class ScanImageProcessor {
         'The photo could not be found.',
       );
     }
+    if (_useNativePath) {
+      try {
+        return await _prepareNative(path);
+      } on MissingPluginException {
+        // No native handler (e.g. plugin not registered): use the Dart path.
+      }
+    }
     final bytes = await file.readAsBytes();
     try {
-      return await Isolate.run(() => _prepareBytes(bytes));
+      return await _serialized(() => Isolate.run(() => _prepareBytes(bytes)));
     } on ScanImageException {
       rethrow;
     } on Object {
-      throw const ScanImageException(
-        ScanImageErrorCode.corrupt,
-        'This photo is corrupt or unsupported. Retake it as a JPEG image.',
-      );
+      throw _corrupt;
     }
   }
+
+  /// Android: decode, resize, re-encode and score the photo on a native worker
+  /// thread. Keeping this heavy work out of the Dart isolate group avoids the
+  /// main-thread ANRs (dart::IsolateGroup::IncreaseMutatorCount).
+  Future<PreparedScanImage> _prepareNative(String path) async {
+    final Map<String, Object?>? result;
+    try {
+      result = await _channel.invokeMapMethod<String, Object?>('prepare', {
+        'path': path,
+      });
+    } on PlatformException catch (error) {
+      throw switch (error.code) {
+        'missing' => const ScanImageException(
+          ScanImageErrorCode.missing,
+          'The photo could not be found.',
+        ),
+        'tooSmall' => _tooSmall,
+        _ => _corrupt,
+      };
+    }
+    final outputPath = result?['path'];
+    if (outputPath is! String) throw _corrupt;
+    final output = File(outputPath);
+    final Uint8List bytes;
+    try {
+      bytes = await output.readAsBytes();
+    } on Object {
+      throw _corrupt;
+    } finally {
+      try {
+        await output.delete();
+      } on Object {
+        // Native side also cleans up stale prepared files.
+      }
+    }
+    return PreparedScanImage(
+      bytes: bytes,
+      warnings: [
+        if (result?['dark'] == true) ScanImageWarning.dark,
+        if (result?['blurry'] == true) ScanImageWarning.blurry,
+      ],
+    );
+  }
+
+  static Future<T> _serialized<T>(Future<T> Function() task) {
+    final run = _fallbackTail.then((_) => task());
+    _fallbackTail = run.then<void>((_) {}, onError: (Object _) {});
+    return run;
+  }
 }
+
+const _corrupt = ScanImageException(
+  ScanImageErrorCode.corrupt,
+  'This photo is corrupt or unsupported. Retake it as a JPEG image.',
+);
+
+const _tooSmall = ScanImageException(
+  ScanImageErrorCode.tooSmall,
+  'This photo is too small. Use an image at least 320 × 320 pixels.',
+);
 
 PreparedScanImage _prepareBytes(Uint8List sourceBytes) {
   var image = img.decodeImage(sourceBytes);

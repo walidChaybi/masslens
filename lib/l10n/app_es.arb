@@ -1,6 +1,6 @@
 {
   "@@locale": "es",
-  "appTitle": "MassLens",
+  "appTitle": "MassLens: Estimaciones foto",
   "commonCancel": "Cancelar",
   "commonNo": "No",
   "commonOk": "OK",
@@ -64,7 +64,6 @@
   "axisWidth": "Anchura",
   "axisHeight": "Altura",
   "axisDepth": "Profundidad",
-
   "onboardingSkip": "Omitir",
   "onboardingStartScanning": "Empezar a escanear",
   "onboardingNoAccountNeeded": "No necesitas una cuenta",
@@ -83,17 +82,17 @@
   "onboardingPrivateTitle": "Tus objetos siguen siendo tuyos.",
   "onboardingPrivateBody": "Se eliminan los metadatos de las fotos antes de enviarlas de forma segura para un análisis de IA real. El historial guardado permanece privado en tu dispositivo.",
   "onboardingAccessEyebrow": "Acceso a escaneos",
-  "onboardingAccessTitle": "Se incluyen tres escaneos de IA reales.",
+  "onboardingAccessTitle": "Se incluyen dos escaneos de IA reales.",
   "onboardingAccessBody": "MassLens comprueba tu saldo seguro antes del análisis. Capturar o revisar una foto nunca consume un escaneo.",
-  "onboardingAdsEyebrow": "Los anuncios financian los escaneos",
-  "onboardingAdsTitle": "Sin suscripción. Sin paquetes de escaneos.",
-  "onboardingAdsBody": "Después de los escaneos incluidos, termina un anuncio recompensado para añadir un escaneo de IA real.",
+  "onboardingAdsEyebrow": "Opciones de acceso",
+  "onboardingAdsTitle": "2 escaneos gratis, luego 1 por anuncio",
+  "onboardingAdsBody": "Obtén dos escaneos de IA gratis. Después, mira un anuncio recompensado para conseguir un escaneo, o desbloquea escaneos ilimitados sin anuncios con una compra única de por vida.",
   "onboardingAccessPreparing": "Preparando el acceso a escaneos…",
   "onboardingAccessReady": "Acceso a escaneos listo",
   "onboardingAccessRetry": "Reintentar el acceso a escaneos",
   "onboardingAccessUnavailable": "El acceso a escaneos no está disponible. Comprueba tu conexión e inténtalo de nuevo.",
   "onboardingHeroTitle": "Más información de un vistazo",
-  "onboardingHeroBody": "Fotografía un objeto para obtener un intervalo de peso honesto, dimensiones visuales y la evidencia en la que se basa la estimación.",
+  "onboardingHeroBody": "Estima el peso probable de un objeto a partir de lo visible. Las fotos no miden el peso real ni revelan el contenido oculto.",
   "onboardingHeroCta": "Empezar",
   "onboardingFramingTitle": "Mantén visible todo el objeto",
   "onboardingFramingBody": "Deja espacio alrededor de todos los bordes y evita que manos u otros elementos tapen el objeto.",
@@ -102,10 +101,10 @@
   "onboardingLightBody": "Una buena iluminación y una foto estable ayudan a la IA a reconocer la forma y el material con más precisión.",
   "onboardingLightCta": "Continuar",
   "onboardingPreparingTitle": "Casi listo",
-  "onboardingPreparingBody": "Estamos preparando tus tres escaneos iniciales y el acceso financiado con anuncios.",
+  "onboardingPreparingBody": "Preparando tus dos escaneos gratis y el acceso con anuncios recompensados.",
   "onboardingPreparingCta": "Comprobando…",
   "onboardingReadyTitle": "Ya puedes escanear",
-  "onboardingReadyBody": "Tus 3 primeros escaneos de IA están incluidos.",
+  "onboardingReadyBody": "Tus 2 primeros escaneos de IA son gratis.",
   "onboardingReadyCta": "Empezar",
   "onboardingReviewTitle": "Ayuda a crecer a MassLens",
   "onboardingReviewBody": "¿Te gustaría dejar una reseña sincera en Google Play? Solo lleva un momento y nos ayuda a mejorar.",
@@ -113,13 +112,12 @@
   "onboardingReviewAction": "Escribir reseña",
   "onboardingScanAccessLabel": "Acceso a escaneos",
   "onboardingAdSupportLabel": "Financiado con anuncios",
-  "onboardingThreeStarterScans": "3 escaneos iniciales",
+  "onboardingThreeStarterScans": "2 escaneos gratis",
   "onboardingPreparingStatus": "Preparando…",
   "onboardingReadyStatus": "Listo",
   "onboardingRetryStatus": "Reintentar",
-
-  "homeAiWeight": "Peso por IA",
-  "homeScansLeftGetOne": "{count, plural, =0{0 disponibles · +1} =1{Queda 1 · +1} other{Quedan {count} · +1}}",
+  "homeAiWeight": "Estimación fotográfica",
+  "homeScansLeftGetOne": "{count, plural, =0{Get free scan} =1{Get free scan} other{Get free scan}}",
   "homeLatestEstimate": "Última estimación",
   "homeHistory": "Historial",
   "homeScanObject": "Escanear objeto",
@@ -131,20 +129,30 @@
   "nutritionHomeTitle": "Nutrición y tendencias",
   "nutritionHomeBody": "Registra calorías y macros en este dispositivo",
   "nutritionHomeTodayCalories": "{count} kcal registradas hoy",
-  "@nutritionHomeTodayCalories": {"placeholders": {"count": {"type": "int"}}},
-
-  "shellDigitalScale": "Báscula digital",
-  "shellAiWeightScan": "Escaneo de peso por IA",
+  "@nutritionHomeTodayCalories": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "shellAiWeightScan": "Estimaciones de fotos",
   "shellNutrition": "Nutrición",
   "shellHistory": "Historial",
   "shellCaptureGuide": "Guía de captura",
   "shellSettings": "Ajustes",
   "shellOpenNavigationMenu": "Abrir el menú de navegación",
-  "shellChooseMode": "Elige una báscula física o una estimación fotográfica con IA.",
-  "shellMeasurementNotice": "Las lecturas por Bluetooth son mediciones. El modo táctil es un simulador; los escaneos de IA son estimaciones visuales reales.",
+  "shellChooseMode": "Estimaciones de fotos y diario de nutrición.",
+  "shellMeasurementNotice": "Los resultados son estimaciones inciertas. El teléfono no mide el peso. Usa una báscula física para medir.",
   "shellExitTitle": "¿Salir de MassLens?",
   "shellExitBody": "¿Seguro que quieres salir de la aplicación?",
-
+  "navScanShort": "Escaneo IA",
+  "navGuideShort": "Guía",
+  "homeHeroTitle": "Explora un objeto con una foto",
+  "homeHeroBody": "Obtén un intervalo de peso aproximado a partir de lo visible. Una foto no mide el peso ni revela el contenido oculto.",
+  "homeTipWhole": "Objeto completo",
+  "homeTipLight": "Buena luz",
+  "homeTipReference": "Referencia de tamaño",
   "nutritionEyebrow": "Registro diario privado",
   "nutritionTitle": "Nutrición y tendencias",
   "nutritionLocalBadge": "En el dispositivo",
@@ -155,9 +163,21 @@
   "nutritionToday": "Hoy",
   "nutritionCaloriesUnit": "kcal",
   "nutritionKcal": "{value} kcal",
-  "@nutritionKcal": {"placeholders": {"value": {"type": "String"}}},
+  "@nutritionKcal": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "nutritionGrams": "{value} g",
-  "@nutritionGrams": {"placeholders": {"value": {"type": "String"}}},
+  "@nutritionGrams": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "nutritionProtein": "Proteína",
   "nutritionCarbs": "Carbohidratos",
   "nutritionFat": "Grasa",
@@ -165,16 +185,43 @@
   "nutritionCarbsShort": "C",
   "nutritionFatShort": "G",
   "nutritionMacroCompact": "P {protein} g · C {carbs} g · G {fat} g",
-  "@nutritionMacroCompact": {"placeholders": {"protein": {"type": "int"}, "carbs": {"type": "int"}, "fat": {"type": "int"}}},
+  "@nutritionMacroCompact": {
+    "placeholders": {
+      "protein": {
+        "type": "int"
+      },
+      "carbs": {
+        "type": "int"
+      },
+      "fat": {
+        "type": "int"
+      }
+    }
+  },
   "nutritionMacroRingSemantics": "{calories} calorías, {protein} gramos de proteína, {carbs} gramos de carbohidratos y {fat} gramos de grasa",
-  "@nutritionMacroRingSemantics": {"placeholders": {"calories": {"type": "int"}, "protein": {"type": "int"}, "carbs": {"type": "int"}, "fat": {"type": "int"}}},
+  "@nutritionMacroRingSemantics": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      },
+      "protein": {
+        "type": "int"
+      },
+      "carbs": {
+        "type": "int"
+      },
+      "fat": {
+        "type": "int"
+      }
+    }
+  },
   "nutritionPartialNotice": "Total parcial: al menos un alimento no tenía una coincidencia nutricional completa de USDA.",
   "nutritionTrendPartialNotice": "Este periodo incluye totales parciales de alimentos sin coincidencia completa.",
   "nutritionPartialShort": "Parcial",
   "nutritionMealsTitle": "Comidas",
   "nutritionAddFood": "Añadir",
   "nutritionNoEntriesTitle": "Nada registrado este día",
-  "nutritionNoEntriesBody": "Añade un resultado de Food Scale guardado o introduce calorías y macros manualmente.",
+  "nutritionNoEntriesBody": "Añade una estimación de alimentos guardada o introduce calorías y macros manualmente.",
   "nutritionFromScans": "Desde escaneos de comida",
   "nutritionFromScansBody": "Copiar la nutrición corregida de un plato guardado",
   "nutritionManual": "Entrada manual",
@@ -201,7 +248,13 @@
   "nutritionEntryActions": "Acciones de la entrada nutricional",
   "nutritionDeleteTitle": "¿Eliminar la entrada?",
   "nutritionDeleteBody": "¿Quitar «{label}» del registro nutricional local?",
-  "@nutritionDeleteBody": {"placeholders": {"label": {"type": "String"}}},
+  "@nutritionDeleteBody": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
   "nutritionTrendsTitle": "Resumen nutricional",
   "nutritionSevenDays": "7 días",
   "nutritionThirtyDays": "30 días",
@@ -210,11 +263,78 @@
   "nutritionCaloriesTrend": "Calorías diarias",
   "nutritionMacroTrend": "Tendencia de macros (gramos)",
   "nutritionCaloriesChartSemantics": "Gráfico de calorías de {days} días con {calories} calorías totales",
-  "@nutritionCaloriesChartSemantics": {"placeholders": {"days": {"type": "int"}, "calories": {"type": "int"}}},
+  "@nutritionCaloriesChartSemantics": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
   "nutritionMacrosChartSemantics": "Gráfico de proteína, carbohidratos y grasa de {days} días",
-  "@nutritionMacrosChartSemantics": {"placeholders": {"days": {"type": "int"}}},
+  "@nutritionMacrosChartSemantics": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "nutritionDisclaimer": "Guardado solo en este dispositivo. Los valores nutricionales son aproximados y no constituyen consejo médico ni dietético.",
-
+  "nutritionScanAMeal": "Escanear una comida",
+  "nutritionOpenGallery": "Elegir de la galería",
+  "nutritionRemainingLabel": "restantes",
+  "nutritionEatenKcal": "{value} consumidas",
+  "@nutritionEatenKcal": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "nutritionOverGoal": "{value} por encima del objetivo",
+  "@nutritionOverGoal": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "nutritionStreakZero": "Empieza una racha",
+  "nutritionStreak": "{count, plural, =1{Racha de 1 día} other{Racha de {count} días}}",
+  "@nutritionStreak": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nutritionDailyGoals": "Objetivos diarios",
+  "nutritionCalorieGoal": "Calorías diarias",
+  "nutritionEmptyTitle": "Registra tu primera comida",
+  "nutritionEmptyBody": "Fotografía un plato para estimar calorías y macros. Los valores son coincidencias USDA aproximadas, no consejo médico.",
+  "nutritionSaveToToday": "Guardar en hoy",
+  "nutritionSaveHistoryOnly": "Guardar solo en el historial",
+  "nutritionScanLoggedMessage": "Añadido a las comidas de hoy",
+  "nutritionScanReviewTitle": "Encuadra todo el plato",
+  "nutritionScanReviewBody": "Confirma que se ve toda la comida",
+  "nutritionScanWholePlate": "Plato completo",
+  "nutritionHomeHint": "El registro de comidas está en Nutrición",
+  "nutritionMoreActions": "Más",
+  "nutritionGoalsSave": "Guardar objetivos",
+  "nutritionOfGoalGrams": "{consumed} / {goal} g",
+  "@nutritionOfGoalGrams": {
+    "placeholders": {
+      "consumed": {
+        "type": "String"
+      },
+      "goal": {
+        "type": "String"
+      }
+    }
+  },
+  "nutritionEditGoals": "Editar objetivos diarios",
   "guideEyebrow": "Mejor entrada, mejor intervalo",
   "guideTitle": "Guía de captura",
   "guideIntro": "Cuatro decisiones sencillas hacen más útil una estimación visual.",
@@ -233,7 +353,6 @@
   "guideLowDetail": "Una foto, escala o categoría inferida",
   "guideMediumDetail": "Categoría y estructura confirmadas",
   "guideHighDetail": "Dos ángulos nítidos y detalles útiles",
-
   "historyEyebrow": "Registro privado en el dispositivo",
   "historyTitle": "Historial de estimaciones",
   "historyNewEstimate": "Nueva estimación",
@@ -246,7 +365,6 @@
   "historySavedStat": "Guardadas",
   "historyCategoriesStat": "Categorías",
   "historyLocalBadge": "Local",
-
   "detailDeleteTitle": "¿Eliminar esta estimación?",
   "detailDeleteBody": "Se eliminarán el resultado guardado y su copia privada de la imagen.",
   "detailSavedEstimate": "Estimación guardada",
@@ -258,7 +376,6 @@
   "detailDimensionOrder": "Longitud × anchura × altura · hipótesis visual",
   "detailAssumptions": "Hipótesis",
   "detailSafetyNotice": "Esta es una estimación visual fundamentada, no una lectura de sensor. No la uses para decisiones críticas de seguridad.",
-
   "settingsEyebrow": "Preferencias y privacidad",
   "settingsTitle": "Ajustes",
   "settingsMeasurement": "Medición",
@@ -266,8 +383,18 @@
   "settingsUnitsBody": "Todos los valores se almacenan canónicamente en el sistema métrico.",
   "settingsMetric": "Métrico",
   "settingsImperial": "Imperial",
-  "settingsBluetoothSupport": "Compatibilidad con básculas Bluetooth",
-  "settingsStandardBle": "BLE WSS estándar",
+  "settingsAppearance": "Apariencia",
+  "settingsTheme": "Tema",
+  "settingsThemeBody": "Sigue tu dispositivo o fija el modo claro u oscuro.",
+  "settingsThemeSystem": "Sistema",
+  "settingsThemeLight": "Claro",
+  "settingsThemeDark": "Oscuro",
+  "settingsHelp": "Ayuda",
+  "settingsReplayWalkthrough": "Ver de nuevo la guía inicial",
+  "settingsReplayWalkthroughBody": "Vuelve a ver los consejos de captura del primer inicio.",
+  "settingsRateApp": "Valorar esta aplicación",
+  "settingsRateAppBody": "Deja una valoración en Google Play.",
+  "settingsRateAppUnavailable": "Google Play no está disponible ahora mismo.",
   "settingsEngine": "Motor",
   "settingsAnalysisMode": "Modo de análisis",
   "settingsAnalysisSecureCloudAi": "IA segura en la nube",
@@ -276,7 +403,7 @@
   "settingsProductionModel": "Modelo de producción",
   "settingsScanCredits": "Créditos de escaneo",
   "settingsEarnAiScans": "Conseguir escaneos de IA",
-  "settingsEarnAiScansBody": "{usage} · un anuncio por un escaneo",
+  "settingsEarnAiScansBody": "{usage} · Un anuncio por un escaneo",
   "settingsPrivacy": "Privacidad",
   "settingsSavedPhotos": "Fotos guardadas",
   "settingsPrivateStorage": "Almacenamiento privado",
@@ -292,7 +419,7 @@
   "legalIntroBody": "Cómo trata MassLens tus datos y las reglas aplicables cuando usas la aplicación.",
   "legalPrivacyPolicy": "Privacidad",
   "legalTermsOfUse": "Condiciones",
-  "legalLastUpdated": "15 ago 2026",
+  "legalLastUpdated": "21 ago 2026",
   "legalPublishedPolicy": "Ver la política publicada",
   "legalFooter": "MassLens · Documentos legales",
   "legalPrivacyScopeTitle": "Ámbito y proveedor de MassLens",
@@ -302,15 +429,15 @@
   "legalPrivacyNutritionTitle": "Escaneos de alimentos y datos del USDA",
   "legalPrivacyNutritionBody": "En los escaneos de Alimentos y macros, la IA devuelve nombres de alimentos, intervalos de peso aproximados y términos genéricos de búsqueda en inglés; no crea valores nutricionales. El servidor solo envía texto de búsqueda normalizado a USDA FoodData Central para obtener calorías y macros. El USDA nunca recibe tus fotos, el identificador de instalación ni el historial local. Todos los pesos, calorías y macros son estimaciones y pueden estar incompletos.",
   "legalPrivacyLocalTitle": "Información guardada en tu dispositivo",
-  "legalPrivacyLocalBody": "Los resultados y una copia privada de la imagen solo se guardan cuando eliges Guardar. Las preferencias, el historial local de escaneos y las entradas de Nutrición y tendencias se almacenan dentro de la aplicación en tu dispositivo. Las entradas nutricionales solo se añaden cuando importas expresamente un escaneo de alimentos guardado o introduces valores manualmente; no se cargan. La información de dispositivos Bluetooth solo se usa para encontrar y conectar básculas compatibles y no se envía a MassLens. El comportamiento de las copias de seguridad de Android puede depender de los ajustes del dispositivo.",
+  "legalPrivacyLocalBody": "Los resultados y una copia privada de la foto se guardan solo cuando eliges Guardar. Las preferencias, el historial y el diario de nutrición permanecen en tu dispositivo. Las entradas se añaden al importar voluntariamente una foto guardada o introducir datos manualmente; no se suben al servidor. La copia de seguridad de Android depende de la configuración del dispositivo.",
   "legalPrivacyServiceTitle": "Datos del servicio y conservación",
-  "legalPrivacyServiceBody": "MassLens crea un identificador de instalación aleatorio para gestionar los escaneos iniciales, créditos obtenidos con anuncios, reintentos y prevención de abusos. El servicio lo convierte en hash antes de usarlo en la base de datos y registra identificadores de solicitud, estado de créditos y recompensas, eventos técnicos limitados y totales diarios anónimos, como el modo de escaneo completado y el coste de IA. El JSON de un resultado completado, nunca la foto, puede conservarse hasta 24 horas para repetir una solicitud sin doble cobro. Los registros de créditos y prevención de abusos se conservan mientras sean necesarios para esas funciones. Los proveedores de alojamiento y red pueden tratar direcciones IP y registros de seguridad rutinarios.",
+  "legalPrivacyServiceBody": "MassLens transmite fuera del dispositivo identificadores de dispositivo u otros ID. Crea un identificador de instalación aleatorio —no un IMEI, número de serie ni dirección MAC de hardware— y lo envía al servicio MassLens para gestionar los escaneos iniciales, créditos obtenidos con anuncios, verificación de compras de por vida, reintentos y prevención de abusos. El servicio lo convierte en hash antes de usarlo en la base de datos y registra identificadores de solicitud, estado de créditos y recompensas, tokens de compra para acceso de por vida, eventos técnicos limitados y totales diarios anónimos, como el modo de escaneo completado y el coste de IA. El JSON de un resultado completado, nunca la foto, puede conservarse hasta 24 horas para repetir una solicitud sin doble cobro. Los registros de créditos, compras y prevención de abusos se conservan mientras sean necesarios para esas funciones. Los proveedores de alojamiento y red pueden tratar direcciones IP y registros de seguridad rutinarios.",
   "legalPrivacyAdsTitle": "Publicidad y consentimiento",
-  "legalPrivacyAdsBody": "MassLens usa Google Mobile Ads para conceder créditos de escaneo con recompensa y mostrar otros anuncios. Google y sus socios publicitarios pueden tratar identificadores publicitarios, información del dispositivo, ubicación aproximada deducida de señales de red, diagnósticos, opciones de consentimiento e interacciones con anuncios según sus propias políticas. Cuando sea obligatorio, la aplicación solicitará tu consentimiento. Si Google ofrece opciones de privacidad para ti, podrás revisarlas en Ajustes.",
+  "legalPrivacyAdsBody": "MassLens usa Google Mobile Ads (AdMob) para conceder créditos de escaneo con recompensa y mostrar otros anuncios. Google y sus socios publicitarios recopilan y comparten identificadores de dispositivo u otros ID, incluido el identificador publicitario de Android y el App Set ID, además de información del dispositivo, ubicación aproximada deducida de la dirección IP, diagnósticos, opciones de consentimiento e interacciones con anuncios, con fines publicitarios, de analítica y de prevención de fraude, según sus propias políticas. Cuando sea obligatorio, la aplicación solicitará tu consentimiento. Puedes restablecer el identificador publicitario en los ajustes de Android. Si Google ofrece opciones de privacidad para ti, podrás revisarlas en Ajustes.",
   "legalPrivacySharingTitle": "Proveedores, transferencias y venta",
   "legalPrivacySharingBody": "La información solo se comparte cuando es necesario con Cloudflare para ofrecer la API, OpenAI para analizar fotos, USDA FoodData Central para búsquedas nutricionales genéricas y Google para publicidad y consentimiento. Estos proveedores pueden tratar información en países distintos al tuyo conforme a sus propias condiciones y garantías. MassLens no vende tu historial local de escaneos ni tu diario nutricional y no los usa para publicidad o análisis nutricional a nivel de usuario.",
   "legalPrivacyChoicesTitle": "Tus opciones y la eliminación",
-  "legalPrivacyChoicesBody": "Puedes denegar los permisos de cámara o Bluetooth, usar el simulador o una báscula Bluetooth compatible sin IA, cancelar antes del análisis, no guardar resultados, eliminar escaneos individuales, borrar todo el historial de estimaciones, borrar Nutrición y tendencias por separado, revisar las opciones de privacidad publicitaria disponibles o desinstalar la aplicación. La desinstalación elimina los datos locales, sujeto a los ajustes de copia de seguridad de Android. Para solicitudes que no puedan completarse en el dispositivo, utiliza el contacto del desarrollador en la ficha de Google Play de MassLens. No envíes fotos ni información sanitaria sensible con tu solicitud.",
+  "legalPrivacyChoicesBody": "Puedes denegar el permiso de cámara, usar el diario manual sin IA, cancelar antes del análisis, no guardar resultados, eliminar escaneos o el historial, vaciar el diario por separado, revisar las opciones publicitarias o desinstalar la app. La eliminación de datos locales también depende de las copias de seguridad de Android. Para otras solicitudes, contacta al desarrollador en Google Play sin enviar fotos ni datos de salud sensibles.",
   "legalPrivacySecurityTitle": "Seguridad y menores",
   "legalPrivacySecurityBody": "MassLens usa HTTPS, eliminación de metadatos, identificadores de instalación convertidos en hash y controles de acceso diseñados para reducir riesgos. Ningún almacenamiento o transmisión por Internet puede garantizarse como totalmente seguro. MassLens no está dirigida a menores que no hayan alcanzado la edad mínima de consentimiento digital de su país y no solicitamos conscientemente perfiles personales a menores.",
   "legalPrivacyChangesTitle": "Cambios y contacto",
@@ -318,13 +445,13 @@
   "legalTermsAcceptanceTitle": "Aceptación y requisitos",
   "legalTermsAcceptanceBody": "Al instalar o usar MassLens, aceptas estas Condiciones de uso y la Política de privacidad. Si no las aceptas, no uses la aplicación. Debes tener capacidad legal para aceptar estas condiciones donde vivas; de lo contrario, un progenitor o tutor legal deberá revisarlas y aceptarlas por ti. Eres responsable de cumplir las leyes aplicables.",
   "legalTermsServiceTitle": "Qué ofrece el servicio",
-  "legalTermsServiceBody": "MassLens ofrece lecturas de básculas Bluetooth compatibles, un simulador táctil claramente identificado, estimaciones visuales asistidas por IA para objetos y platos de comida, nutrición aproximada basada en el USDA, historial local y un diario nutricional local opcional. Algunas funciones pueden requerir un dispositivo compatible, conexión a Internet, permisos, disponibilidad de anuncios o un crédito de escaneo restante.",
+  "legalTermsServiceBody": "MassLens ofrece estimaciones visuales con IA de objetos y platos, nutrición aproximada basada en USDA, historial local y un diario de nutrición opcional. El análisis de fotos requiere Internet y acceso a escaneos. Algunas funciones dependen de permisos o de la disponibilidad de anuncios.",
   "legalTermsEstimatesTitle": "Estimaciones, nutrición y seguridad",
   "legalTermsEstimatesBody": "Los escaneos de IA son estimaciones visuales, no lecturas de una báscula física. Los resultados pueden ser inexactos, incompletos o inadecuados para un objeto o comida concretos. MassLens no es un dispositivo médico ni ofrece asesoramiento médico, dietético, sobre alergias, dosificación, comercio regulado, envíos o seguridad. Nunca confíes en ella para medicamentos, comercio regulado, alérgenos, materiales peligrosos u otras decisiones críticas. Usa una báscula calibrada o un profesional cualificado cuando la precisión sea importante.",
   "legalTermsContentTitle": "Tus fotos y uso aceptable",
   "legalTermsContentBody": "Conservas tus derechos sobre las fotos y la información que envías. Concedes a MassLens y a sus proveedores necesarios un permiso limitado para tratarlas únicamente con el fin de ofrecer el escaneo solicitado, mantener la seguridad y permitir los reintentos descritos en la Política de privacidad. Debes tener derecho a usar las imágenes enviadas. No envíes contenido ilegal, imágenes íntimas, documentos confidenciales, imágenes que vulneren la privacidad o derechos de otras personas, código malicioso ni contenido ajeno al análisis legítimo de objetos o alimentos.",
   "legalTermsCreditsTitle": "Créditos de escaneo y publicidad",
-  "legalTermsCreditsBody": "Una instalación nueva puede recibir un número limitado de escaneos iniciales. Un anuncio con recompensa completado puede conceder un crédito tras la confirmación de la aplicación y el servicio. Los créditos no tienen valor monetario, no pueden transferirse y pueden limitarse para evitar abusos. La disponibilidad de anuncios no está garantizada. Los escaneos válidos que fallen suelen reembolsarse, pero el acceso puede retrasarse por interrupciones, controles antifraude o errores técnicos. Los formatos de anuncios y reglas de créditos pueden cambiar con un aviso razonable.",
+  "legalTermsCreditsBody": "Una instalación nueva puede recibir un número limitado de escaneos iniciales. Un anuncio con recompensa completado puede conceder un crédito tras la confirmación de la aplicación y el servicio. Una compra única en Google Play puede desbloquear escaneos ilimitados y eliminar anuncios para esa cuenta de Google en dispositivos compatibles, sujeta a límites de uso razonable y reglas de reembolso de Google Play. Los créditos y el acceso de por vida no tienen valor monetario, no pueden transferirse entre cuentas y pueden limitarse para evitar abusos. La disponibilidad de anuncios no está garantizada. Los escaneos válidos que fallen suelen reembolsarse, pero el acceso puede retrasarse por interrupciones, controles antifraude, verificación de compras o errores técnicos. Los formatos de anuncios, reglas de créditos y precios pueden cambiar con un aviso razonable.",
   "legalTermsThirdPartyTitle": "Datos locales y servicios de terceros",
   "legalTermsThirdPartyBody": "Los resultados y entradas nutricionales guardados se almacenan localmente y pueden perderse si los eliminas, borras los datos de la aplicación, desinstalas, cambias de dispositivo o pierdes el dispositivo. Eres responsable de cualquier copia de seguridad que necesites. MassLens depende de Cloudflare, OpenAI, USDA FoodData Central, Google Mobile Ads, Google Play y fabricantes de dispositivos. Sus servicios, contenidos y disponibilidad se rigen por sus propias condiciones; MassLens no los controla.",
   "legalTermsLicenseTitle": "Licencia y propiedad intelectual",
@@ -346,15 +473,26 @@
   "settingsClearNutrition": "Borrar historial nutricional",
   "settingsNoNutritionEntries": "No hay entradas nutricionales",
   "settingsNutritionCount": "{count, plural, =1{1 entrada nutricional} other{{count} entradas nutricionales}}",
-  "@settingsNutritionCount": {"placeholders": {"count": {"type": "int"}}},
+  "@settingsNutritionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsClearNutritionTitle": "¿Borrar el historial nutricional?",
   "settingsClearNutritionBody": "{count, plural, =1{Se eliminará la entrada nutricional guardada en este dispositivo. Los escaneos no cambiarán.} other{Se eliminarán las {count} entradas nutricionales guardadas en este dispositivo. Los escaneos no cambiarán.}}",
-  "@settingsClearNutritionBody": {"placeholders": {"count": {"type": "int"}}},
+  "@settingsClearNutritionBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsClearNutritionAction": "Borrar nutrición",
   "settingsNutritionCleared": "Se ha borrado el historial nutricional.",
   "settingsVersion": "Versión 1.1.0",
-  "settingsSafetyBody": "Una báscula Bluetooth compatible proporciona mediciones físicas. El modo táctil es un simulador interactivo y los escaneos de IA son estimaciones visuales reales. Nunca uses MassLens para dosis médicas, comercio regulado u otras decisiones críticas de seguridad.",
-
+  "settingsSafetyBody": "Las fotos ofrecen estimaciones visuales inciertas. Usa una báscula física cuando importe la precisión. Nunca uses MassLens para dosis médicas, comercio regulado o decisiones de seguridad.",
   "cameraUnavailable": "La cámara no está disponible.",
   "cameraAccessNeeded": "Se necesita acceso a la cámara para fotografiar el objeto.",
   "cameraUnavailableDevice": "La cámara no está disponible en este dispositivo.",
@@ -363,7 +501,6 @@
   "cameraTorchOffTooltip": "Apagar la linterna",
   "cameraTorchOnTooltip": "Encender la linterna",
   "cameraTakePhotoSemantics": "Tomar foto",
-
   "scanCameraOpenFailed": "No se pudo abrir la cámara.",
   "scanSelectedPhotoOpenFailed": "No se pudo abrir la foto seleccionada.",
   "scanSecondPhotoOpenFailed": "No se pudo abrir la segunda foto.",
@@ -404,7 +541,7 @@
   "scanAiVisualSize": "Tamaño visual por IA · L × An × Al",
   "scanConfidence": "Confianza",
   "scanHowEstimated": "Cómo se hizo la estimación",
-  "scanTryAnother": "Probar otro",
+  "scanTryAnother": "Otro objeto",
   "scanSecondViewTitle": "Añadir una vista lateral",
   "scanSecondViewBody": "Muévete entre 45 y 90° alrededor del mismo objeto y mantenlo completamente visible. Esta vista usa el mismo crédito de escaneo.",
   "scanChoosePhoto": "Elegir foto",
@@ -417,7 +554,7 @@
   "scanNoFoodDetected": "No se encontró comida visible. Encuadra un plato completo e inténtalo de nuevo; el escaneo fue reembolsado.",
   "scanNutritionUnavailable": "Los datos nutricionales de USDA no están disponibles temporalmente. Inténtalo más tarde; el escaneo fue reembolsado.",
   "scanNutritionNoMatch": "No se encontró una coincidencia nutricional completa de USDA. Prueba con una foto más clara; el escaneo fue reembolsado.",
-  "scanFoodScale": "Báscula de alimentos",
+  "scanFoodScale": "Estimaciones de alimentos",
   "scanPhotographMeal": "Fotografía un plato completo",
   "scanConfirmMeal": "Confirma que se vea toda la comida",
   "scanAnalyzeMeal": "Analizar comida y macros",
@@ -455,49 +592,9 @@
   "scanFoodAmountPositive": "Introduce una cantidad mayor que cero.",
   "scanFoodAtLeastOne": "Mantén al menos un componente de comida.",
   "scanRemove": "Eliminar",
-
-  "scaleWatchAdGetScan": "Ver anuncio · +1 escaneo",
-  "scaleSimulatorStatus": "SIMULADOR · NO ES UNA MEDICIÓN",
-  "scaleLiveStatus": "EN VIVO · BÁSCULA BLUETOOTH",
-  "scaleDisconnectedStatus": "BLUETOOTH · SIN CONEXIÓN",
-  "scaleSimulatorSemantics": "Simulador de báscula táctil, no una medición física",
-  "scaleLiveSemantics": "Lectura en vivo de una báscula Bluetooth",
-  "scaleDisconnectedSemantics": "Báscula Bluetooth desconectada",
-  "scaleOpenNavigation": "Abrir el menú de navegación",
-  "scaleOpenAiScan": "Escaneo de peso por IA",
-  "scaleBluetooth": "Báscula Bluetooth",
-  "scaleGenericDevice": "Báscula de peso Bluetooth",
-  "scaleUnit": "UNIDAD",
-  "scaleTare": "TARA",
-  "scaleCloseBluetooth": "Cerrar el panel de Bluetooth",
-  "scaleReceivingMeasurements": "Recibiendo mediciones estándar de la báscula",
-  "scaleBleSupport": "Compatible con el servicio BLE Weight Scale (0x181D)",
-  "scaleDisconnect": "Desconectar báscula",
-  "scaleSearching": "Buscando…",
-  "scaleFindCompatible": "Buscar básculas compatibles",
-  "scaleAvailableScales": "BÁSCULAS DISPONIBLES",
-  "scaleCompatible": "Báscula compatible",
-  "scaleSignal": "Señal {rssi} dBm",
-  "scaleNoneFound": "No se encontró ninguna báscula estándar. Asegúrate de que esté activa y no conectada a otra aplicación e inténtalo de nuevo.",
-  "scalePrivateProtocolNotice": "Muchas básculas de cocina usan protocolos privados del fabricante. Requieren una integración específica para cada modelo, aunque aparezcan en los ajustes de Bluetooth del teléfono.",
-  "scalePermissionNeeded": "Se necesita permiso para dispositivos cercanos a fin de encontrar una báscula.",
-  "scalePowerOnBluetooth": "Activa el Bluetooth y vuelve a buscar.",
-  "scaleCommunicationFailed": "No se pudo comunicar con esta báscula.",
-  "scalePhaseIdle": "No hay ninguna báscula conectada",
-  "scalePhasePermission": "Solicitando permiso",
-  "scalePhaseScanning": "Buscando cerca",
-  "scalePhaseConnecting": "Conectando",
-  "scalePhaseDiscovering": "Comprobando compatibilidad",
-  "scalePhaseSubscribing": "Iniciando lecturas en vivo",
-  "scalePhaseConnected": "Báscula conectada",
-  "scalePhaseDisconnecting": "Desconectando",
-  "scalePhaseUnavailable": "Bluetooth no disponible",
-  "scalePhaseError": "La conexión requiere atención",
-  "scalePhaseClosed": "Lector cerrado",
-
   "rewardAdsFundAnalysis": "Los anuncios financian el análisis de IA real",
-  "rewardHeadline": "Un anuncio. Un escaneo.",
-  "rewardBody": "Termina el anuncio y MassLens añadirá un escaneo. Sin suscripción, compra ni resultado ficticio.",
+  "rewardHeadline": "Consigue más escaneos de IA",
+  "rewardBody": "Mira un anuncio recompensado por un escaneo o desbloquea escaneos ilimitados y elimina los anuncios con una compra única.",
   "rewardMaxBalance": "Máx. {count}",
   "rewardSyncPending": "Sincronización del crédito pendiente",
   "rewardSafeToClose": "Puedes cerrar esta pantalla. Seguiremos comprobando durante 24 horas.",
@@ -514,16 +611,117 @@
   "rewardConsentUnavailable": "Los anuncios no están disponibles debido al consentimiento o la configuración. Tus escaneos actuales y las funciones sin IA siguen disponibles.",
   "rewardPrivacyChoices": "Opciones de privacidad",
   "rewardTryLoadingAgain": "Intentar cargar de nuevo",
+  "rewardUnlockUnlimited": "Desbloquear ilimitado",
+  "drawerUpgradeUnlimited": "Mejora a Ilimitado",
   "rewardCreditStillSyncing": "El crédito de escaneo aún se está sincronizando.",
   "rewardNoCreditAdded": "No se añadió ningún crédito de escaneo pendiente.",
-  "accessLoadingBalance": "Cargando saldo de escaneos…",
+  "accessLoadingBalance": "Cargando…",
   "accessPreview": "Vista previa del acceso",
-  "accessScansLeft": "{count, plural, =0{No hay escaneos disponibles} =1{Queda 1 escaneo} other{Quedan {count} escaneos}}",
-  "accessScansAvailable": "{count, plural, =0{No hay escaneos disponibles} =1{1 escaneo disponible} other{{count} escaneos disponibles}}",
+  "accessScansLeft": "{count, plural, =1{1 escaneo} other{{count} escaneos}}",
+  "accessScansAvailable": "{count, plural, =1{1 escaneo} other{{count} escaneos}}",
   "accessBreakdown": "{starter} iniciales · {rewarded} recompensados · {legacy} anteriores",
-  "accessStarterThenAd": "3 escaneos iniciales y después un anuncio",
+  "accessStarterThenAd": "2 escaneos gratis, luego 1 por anuncio",
   "accessGetOne": "+1",
+  "accessUnlimitedScans": "Escaneos ilimitados",
+  "accessLifetimeActive": "Acceso de por vida activo",
+  "accessBuyLifetime": "Desbloquear ilimitado · {price}",
+  "@accessBuyLifetime": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "accessRestorePurchases": "Restaurar compras",
+  "accessLifetimeUnlocked": "El acceso de por vida está activo en este dispositivo.",
+  "accessLifetimeLoadingPrice": "Cargando precio…",
+  "paywallEyebrow": "Análisis de fotos con IA real",
+  "paywallHeadline": "Estimaciones de fotos.",
+  "paywallHeadlineAccent": "Desbloquea",
+  "paywallHeadlineRest": "Explora con IA.",
+  "paywallHeroSubtitle": "Explora objetos y alimentos mediante fotos.\nEstimaciones aproximadas, no mediciones de peso.",
+  "paywallSocialProof": "Paga una vez · tuyo siempre",
+  "paywallSocialSubline": "Escaneos IA ilimitados. Cero anuncios.",
+  "paywallUnlockLifetime": "Desbloquear acceso de por vida",
+  "paywallTrustPriced": "Compra única · {price}",
+  "@paywallTrustPriced": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "paywallOneTimeCaption": "Pago único",
+  "paywallLuggageLabel": "Escaneo de equipaje",
+  "paywallLuggageTitle": "Maleta de cabina",
+  "paywallLuggageWeight": "2–4 kg",
+  "paywallLuggageConfidence": "Ejemplo de estimación",
+  "paywallFeatureHeading": "PEQUEÑOS OBJETOS. GRANDES POSIBILIDADES.",
+  "paywallFeatureUnlimited": "Escaneos ilimitados",
+  "paywallFeatureNoAds": "Sin anuncios",
+  "paywallFeatureNutrition": "Conoce mejor tu plato",
+  "paywallFeatureNutritionSub": "Calorías, proteínas y macros estimados",
+  "paywallFeatureLuggage": "Estimaciones de objetos",
+  "paywallFeatureLuggageSub": "Solo lo visible; el contenido es desconocido",
+  "paywallFeatureObjects": "Apunta. Captura. Estima.",
+  "paywallFeatureObjectsSub": "Intervalos aproximados según lo visible",
+  "paywallPhotoScanLabel": "ESCANEO DE FOTOS CON IA",
+  "paywallEstimateExample": "Estimación IA · ejemplo",
+  "paywallIllustrativeReadings": "Solo ilustraciones. Una foto no mide el peso real.",
+  "paywallLifetimeOffer": "Acceso de por vida · Sin anuncios",
+  "paywallPurchaseTrust": "Un pago. Sin suscripción. Google Play.",
+  "paywallTerms": "Condiciones",
+  "paywallPrivacy": "Privacidad",
+  "paywallFeatureLifetime": "Ilimitado + sin anuncios",
+  "paywallFeatureLifetimeSub": "Un pago. Tuyo.",
+  "paywallOneTimeBadge": "Pago único",
+  "paywallLifetimePlan": "Acceso de por vida",
+  "paywallContinueFree": "Continuar con escaneos gratis",
+  "paywallPurchaseUnavailable": "Compra no disponible",
   "nativeSponsored": "Contenido patrocinado",
   "nativeTestLoading": "Patrocinado · cargando anuncio de prueba…",
-  "nativeTestRetrying": "Reintentando el anuncio de prueba…"
+  "nativeTestRetrying": "Reintentando el anuncio de prueba…",
+  "accessGetFreeScan": "Escaneo gratis",
+  "settingsReminders": "Recordatorios",
+  "mealReminderTitle": "Recordatorio diario de comidas",
+  "mealReminderOnBody": "Cada día a las {time}, salvo si acabas de registrar una comida",
+  "mealReminderOffBody": "Recibe un aviso al día para registrar tus comidas",
+  "mealReminderTime": "Hora del recordatorio",
+  "mealReminderPermissionDenied": "Las notificaciones están bloqueadas. Actívalas para MassLens en los ajustes del teléfono.",
+  "mealReminderEnabled": "Recordatorio programado a las {time} cada día.",
+  "mealReminderPromptTitle": "Mantén tu racha",
+  "mealReminderPromptBody": "Recibe un recordatorio diario para registrar tus comidas. Puedes cambiar la hora en Ajustes.",
+  "mealReminderPromptAction": "Activar recordatorio",
+  "mealReminderPromptDismiss": "Ahora no",
+  "mealReminderNotificationTitle": "Hora de registrar tu comida",
+  "mealReminderNotificationBody": "Fotografía tu plato en MassLens para contar calorías y mantener tu racha.",
+  "mealReminderChannelName": "Recordatorios de comidas",
+  "barcodeScanAction": "Escanear código de barras",
+  "barcodeScanActionBody": "Productos envasados · gratis, sin gastar escaneos",
+  "barcodeFreeBadge": "GRATIS",
+  "barcodeScannerHint": "Centra el código de barras en el marco",
+  "barcodeTypeNumber": "Escribir el número",
+  "barcodeTorch": "Linterna",
+  "barcodeEnterTitle": "Introduce el número del código de barras",
+  "barcodeInvalid": "Introduce un código de barras válido de 8, 12 o 13 dígitos.",
+  "barcodeLookingUp": "Buscando el producto…",
+  "barcodeNotFoundTitle": "Producto no encontrado",
+  "barcodeNotFoundBody": "El código {code} aún no está en Open Food Facts ni en USDA FoodData Central. Puedes introducir los valores de la etiqueta.",
+  "barcodeUnavailableTitle": "No se pudo buscar este producto",
+  "barcodeUnavailableBody": "Revisa tu conexión e inténtalo de nuevo.",
+  "barcodeRetry": "Reintentar",
+  "barcodeEnterManually": "Introducir manualmente",
+  "barcodeScanAgain": "Escanear de nuevo",
+  "barcodePer100": "Por 100 {unit}",
+  "barcodeServing": "1 porción · {amount}",
+  "barcodeWholePack": "Envase entero · {amount}",
+  "barcodeYourPortion": "Tu porción",
+  "barcodeAmountEaten": "Cantidad consumida",
+  "barcodePartialNutrition": "Faltan algunos macros en los datos de este producto y cuentan como 0.",
+  "barcodeAddToDiary": "Añadir al diario",
+  "barcodeSourceOpenFoodFacts": "Datos de etiqueta de Open Food Facts (ODbL). Revisa el envase: los valores pueden estar incompletos o desactualizados.",
+  "barcodeSourceUsda": "Datos de etiqueta de USDA FoodData Central. Revisa el envase: los valores pueden estar incompletos o desactualizados.",
+  "barcodeRecentTitle": "Productos recientes",
+  "barcodeRecentBody": "Registra un producto que ya escaneaste",
+  "barcodeKcalPer100": "{value} kcal / 100 {unit}"
 }

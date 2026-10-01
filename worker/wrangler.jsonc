@@ -12,6 +12,10 @@
     "USDA_TIMEOUT_MS": "4000",
     "SCAN_ACCESS_ENFORCED": "true",
     "MAX_DAILY_AI_COST_MICROS": "5000000",
+    "PLAY_PACKAGE_NAME": "com.lilai.aivirtual",
+    "PLAY_ADDITIONAL_PACKAGE_NAMES": "com.lilai.masslens.photoestimates",
+    "PLAY_LIFETIME_PRODUCT_ID": "masslens_lifetime_unlimited",
+    "PLAY_LIFETIME_PRODUCT_IDS": "masslens_lifetime_unlimited,masslens_lifetime_off_30,masslens_lifetime_off_40,masslens_lifetime_off_50,masslens_lifetime_off_60,masslens_lifetime_off_70,masslens_lifetime_off_80,masslens_lifetime_off_90",
     "INTERSTITIAL_EVERY": "2",
     "INTERSTITIAL_COOLDOWN_SECONDS": "180",
     "APP_OPEN_COOLDOWN_SECONDS": "14400"

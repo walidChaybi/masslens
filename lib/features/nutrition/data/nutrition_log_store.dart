@@ -2,12 +2,14 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../domain/nutrition_goals.dart';
 import '../domain/nutrition_log.dart';
 
 class NutritionLogStore {
   const NutritionLogStore();
 
   static const storageKey = 'mass_lens.nutrition_log.v1';
+  static const goalsStorageKey = 'mass_lens.nutrition_goals.v1';
 
   Future<List<NutritionLogEntry>> load() async {
     try {
@@ -43,6 +45,30 @@ class NutritionLogStore {
       );
     } on Object {
       // The in-memory diary remains available for the current session.
+    }
+  }
+
+  Future<NutritionGoals> loadGoals() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final encoded = preferences.getString(goalsStorageKey);
+      if (encoded == null || encoded.isEmpty) {
+        return NutritionGoals.defaults();
+      }
+      final decoded = jsonDecode(encoded);
+      if (decoded is! Map) return NutritionGoals.defaults();
+      return NutritionGoals.fromJson(Map<String, Object?>.from(decoded));
+    } on Object {
+      return NutritionGoals.defaults();
+    }
+  }
+
+  Future<void> saveGoals(NutritionGoals goals) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(goalsStorageKey, jsonEncode(goals.toJson()));
+    } on Object {
+      // In-memory goals remain available for the current session.
     }
   }
 

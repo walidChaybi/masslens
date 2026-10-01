@@ -10,31 +10,65 @@ import '../../../l10n/l10n.dart';
 import '../../guide/presentation/guide_screen.dart';
 import '../../history/presentation/history_screen.dart';
 import '../../home/presentation/home_screen.dart';
-import '../../measurements/domain/measurement.dart';
+import '../../monetization/presentation/premium_cta.dart';
+import '../../monetization/presentation/rewarded_scan_sheet.dart';
 import '../../nutrition/presentation/nutrition_screen.dart';
-import '../../scale/presentation/digital_scale_screen.dart';
+import '../../reminders/presentation/meal_reminder_widgets.dart';
 import '../../scan/presentation/scan_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 
-enum _AppDestination {
-  digitalScale,
-  aiScan,
-  nutrition,
-  history,
-  guide,
-  settings,
-}
+enum _AppDestination { aiScan, nutrition, history, guide, settings }
 
 extension on _AppDestination {
   String label(AppLocalizations l10n) => switch (this) {
-    _AppDestination.digitalScale => l10n.shellDigitalScale,
     _AppDestination.aiScan => l10n.shellAiWeightScan,
     _AppDestination.nutrition => l10n.shellNutrition,
     _AppDestination.history => l10n.shellHistory,
     _AppDestination.guide => l10n.shellCaptureGuide,
     _AppDestination.settings => l10n.shellSettings,
   };
+
+  /// Short, single-line label for the bottom navigation bar.
+  String shortLabel(AppLocalizations l10n) => switch (this) {
+    _AppDestination.aiScan => l10n.navScanShort,
+    _AppDestination.nutrition => l10n.shellNutrition,
+    _AppDestination.history => l10n.shellHistory,
+    _AppDestination.guide => l10n.navGuideShort,
+    _AppDestination.settings => l10n.shellSettings,
+  };
+
+  String get navKey => switch (this) {
+    _AppDestination.aiScan => 'nav_ai_scan',
+    _AppDestination.nutrition => 'nav_nutrition',
+    _AppDestination.history => 'nav_history',
+    _AppDestination.guide => 'nav_guide',
+    _AppDestination.settings => 'nav_settings',
+  };
+
+  IconData get icon => switch (this) {
+    _AppDestination.aiScan => Icons.center_focus_strong_outlined,
+    _AppDestination.nutrition => Icons.restaurant_outlined,
+    _AppDestination.history => Icons.history_rounded,
+    _AppDestination.guide => Icons.menu_book_outlined,
+    _AppDestination.settings => Icons.tune_rounded,
+  };
+
+  IconData get selectedIcon => switch (this) {
+    _AppDestination.aiScan => Icons.center_focus_strong_rounded,
+    _AppDestination.nutrition => Icons.restaurant_rounded,
+    _AppDestination.history => Icons.history_rounded,
+    _AppDestination.guide => Icons.menu_book_rounded,
+    _AppDestination.settings => Icons.settings_rounded,
+  };
 }
+
+/// Destinations shown in the bottom bar (settings lives in the drawer only).
+const _barDestinations = [
+  _AppDestination.aiScan,
+  _AppDestination.nutrition,
+  _AppDestination.history,
+  _AppDestination.guide,
+];
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -45,10 +79,22 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  _AppDestination _destination = _AppDestination.digitalScale;
+  _AppDestination _destination = _AppDestination.aiScan;
   bool _drawerTransitionBusy = false;
   bool _drawerOpen = false;
   bool _exitConfirmationVisible = false;
+  bool _remindersSynced = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_remindersSynced) return;
+    _remindersSynced = true;
+    // Alarms are cleared by force-stop; re-apply with the current language.
+    unawaited(
+      AppScope.of(context).mealReminders.resync(mealReminderText(context.l10n)),
+    );
+  }
 
   Future<void> _confirmExit() async {
     if (_exitConfirmationVisible || !mounted) return;
@@ -90,16 +136,40 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  Future<void> _openScan({
-    ScanMode scanMode = ScanMode.object,
-    bool startWithGallery = false,
-  }) async {
+  Future<void> _openScan({bool startWithGallery = false}) async {
     final appController = AppScope.of(context);
     final monetization = appController.monetization;
+    if (monetization.access.isAuthoritative &&
+        monetization.access.scanAccessEnforced &&
+        !monetization.access.canScan) {
+      final added = await showRewardedScanSheet(context);
+      if (!mounted || !added || !monetization.access.canScan) return;
+    }
+    if (!mounted) return;
     final completed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) =>
-            ScanScreen(scanMode: scanMode, startWithGallery: startWithGallery),
+        builder: (_) => ScanScreen(startWithGallery: startWithGallery),
+      ),
+    );
+    if (completed == true) {
+      await monetization.onResultScreenClosed();
+      await appController.maybeRequestPostScanReview();
+    }
+  }
+
+  Future<void> _openNutritionScan({bool startWithGallery = false}) async {
+    final appController = AppScope.of(context);
+    final monetization = appController.monetization;
+    if (monetization.access.isAuthoritative &&
+        monetization.access.scanAccessEnforced &&
+        !monetization.access.canScan) {
+      final added = await showRewardedScanSheet(context);
+      if (!mounted || !added || !monetization.access.canScan) return;
+    }
+    if (!mounted) return;
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => NutritionScanScreen(startWithGallery: startWithGallery),
       ),
     );
     if (completed == true) {
@@ -113,17 +183,38 @@ class _AppShellState extends State<AppShell> {
     setState(() => _destination = destination);
   }
 
-  Future<void> _selectDrawerDestination(_AppDestination destination) async {
+  Future<void> _closeDrawerThen(Future<void> Function() action) async {
     Navigator.of(context).pop();
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    if (!mounted) return;
+    await action();
+  }
+
+  Future<void> _openDrawerUpgrade() => _closeDrawerThen(() async {
+    await showPremiumAccessSheet(context);
+  });
+
+  Future<void> _openDrawerWatchAd() => _closeDrawerThen(() async {
+    await showRewardedScanSheet(context);
+  });
+
+  Future<void> _handleDestinationSelected(
+    _AppDestination destination, {
+    bool fromDrawer = false,
+  }) async {
+    if (fromDrawer) {
+      Navigator.of(context).pop();
+    }
     if (_destination == destination || _drawerTransitionBusy) return;
     final monetization = AppScope.of(context).monetization;
     _drawerTransitionBusy = true;
     try {
-      // Let the drawer finish closing before presenting a full-screen ad.
-      await Future<void>.delayed(const Duration(milliseconds: 260));
+      if (fromDrawer) {
+        // Let the drawer finish closing before presenting a full-screen ad.
+        await Future<void>.delayed(const Duration(milliseconds: 260));
+      }
       if (!mounted) return;
-      if (destination == _AppDestination.aiScan ||
-          destination == _AppDestination.digitalScale) {
+      if (destination == _AppDestination.aiScan) {
         await monetization.showDrawerModeInterstitial(
           aiScan: destination == _AppDestination.aiScan,
         );
@@ -140,120 +231,231 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final screens = [
-      DigitalScaleScreen(
-        onOpenAiScan: () => _selectDestination(_AppDestination.aiScan),
-        onOpenMenu: () => _scaffoldKey.currentState?.openDrawer(),
-      ),
       HomeScreen(
-        onMeasure: (mode) => _openScan(scanMode: mode),
-        onGallery: (mode) => _openScan(scanMode: mode, startWithGallery: true),
+        onMeasure: _openScan,
+        onGallery: () => _openScan(startWithGallery: true),
         onViewHistory: () => _selectDestination(_AppDestination.history),
         onOpenNutrition: () => _selectDestination(_AppDestination.nutrition),
       ),
-      const NutritionScreen(),
+      NutritionScreen(
+        onScan: _openNutritionScan,
+        onGallery: () => _openNutritionScan(startWithGallery: true),
+      ),
       HistoryScreen(onScan: _openScan),
       GuideScreen(onScan: _openScan),
       const SettingsScreen(),
     ];
     final selectedIndex = _AppDestination.values.indexOf(_destination);
+    final barIndex = _barDestinations.indexOf(_destination);
 
     return PopScope<void>(
       canPop: _drawerOpen,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_confirmExit());
       },
-      child: Scaffold(
-        key: _scaffoldKey,
-        onDrawerChanged: (isOpened) {
-          if (mounted) setState(() => _drawerOpen = isOpened);
-        },
-        appBar: _destination == _AppDestination.digitalScale
-            ? null
-            : AppBar(
-                leading: Builder(
-                  builder: (context) => IconButton(
-                    key: const Key('open_navigation'),
-                    tooltip: l10n.shellOpenNavigationMenu,
-                    onPressed: () => Scaffold.of(context).openDrawer(),
-                    icon: const Icon(Icons.menu_rounded),
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: systemUiOverlayStyleFor(Theme.of(context).brightness),
+        child: Scaffold(
+          key: _scaffoldKey,
+          onDrawerChanged: (isOpened) {
+            if (mounted) setState(() => _drawerOpen = isOpened);
+          },
+          drawer: NavigationDrawer(
+            key: const Key('app_navigation_drawer'),
+            backgroundColor: context.palette.surface,
+            indicatorColor: context.palette.lime,
+            indicatorShape: const StadiumBorder(),
+            selectedIndex: _destination.index,
+            onDestinationSelected: (index) {
+              unawaited(
+                _handleDestinationSelected(
+                  _AppDestination.values[index],
+                  fromDrawer: true,
+                ),
+              );
+            },
+            children: [
+              const _DrawerHeader(),
+              const SizedBox(height: 6),
+              for (final destination in _AppDestination.values) ...[
+                if (destination == _AppDestination.settings)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                    child: Divider(),
+                  ),
+                NavigationDrawerDestination(
+                  key: Key(destination.navKey),
+                  icon: Icon(destination.icon),
+                  selectedIcon: Icon(destination.selectedIcon),
+                  label: Text(destination.label(l10n)),
+                ),
+              ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: DrawerMonetizationFooter(
+                  monetization: AppScope.of(context).monetization,
+                  onUpgrade: () => unawaited(_openDrawerUpgrade()),
+                  onWatchAd: () => unawaited(_openDrawerWatchAd()),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 10, 28, 24),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.only(top: 1),
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        size: 15,
+                        color: context.palette.inkMuted,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.shellMeasurementNotice,
+                        style: TextStyle(
+                          color: context.palette.inkMuted,
+                          fontSize: 11.5,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: barIndex < 0 ? 0 : barIndex,
+            onDestinationSelected: (index) {
+              unawaited(_handleDestinationSelected(_barDestinations[index]));
+            },
+            destinations: [
+              for (final destination in _barDestinations)
+                NavigationDestination(
+                  icon: Icon(destination.icon),
+                  selectedIcon: Icon(destination.selectedIcon),
+                  label: destination.shortLabel(l10n),
+                  tooltip: destination.label(l10n),
+                ),
+            ],
+          ),
+          body: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  floating: true,
+                  pinned: false,
+                  toolbarHeight: 64,
+                  titleSpacing: 2,
+                  clipBehavior: Clip.none,
+                  leading: Builder(
+                    builder: (context) => IconButton(
+                      key: const Key('open_navigation'),
+                      tooltip: l10n.shellOpenNavigationMenu,
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                      icon: const Icon(Icons.menu_rounded),
+                    ),
+                  ),
+                  // Each screen owns its own headline; keep the app bar branded.
+                  title: MassLensLogo(
+                    compact: true,
+                    markSize: 34,
+                    showWordmark: MediaQuery.sizeOf(context).width >= 360,
                   ),
                 ),
-                title: Text(_destination.label(l10n)),
-              ),
-        drawer: NavigationDrawer(
-          key: const Key('app_navigation_drawer'),
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            unawaited(_selectDrawerDestination(_AppDestination.values[index]));
-          },
+              ];
+            },
+            body: IndexedStack(index: selectedIndex, children: screens),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerHeader extends StatelessWidget {
+  const _DrawerHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [context.palette.inkRaised, context.palette.inkDeep],
+          ),
+        ),
+        child: Stack(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 22, 24, 12),
-              child: MassLensLogo(),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
-              child: Text(
-                l10n.shellChooseMode,
-                style: const TextStyle(
-                  color: AppColors.inkMuted,
-                  fontSize: 13,
-                  height: 1.4,
-                ),
+            Positioned.fill(
+              child: InstrumentCorners(
+                color: context.palette.lime.withValues(alpha: 0.55),
               ),
             ),
-            const Divider(),
-            const SizedBox(height: 8),
-            NavigationDrawerDestination(
-              key: const Key('nav_digital_scale'),
-              icon: const Icon(Icons.scale_outlined),
-              selectedIcon: const Icon(Icons.scale_rounded),
-              label: Text(l10n.shellDigitalScale),
-            ),
-            NavigationDrawerDestination(
-              key: const Key('nav_ai_scan'),
-              icon: const Icon(Icons.center_focus_strong_outlined),
-              selectedIcon: const Icon(Icons.center_focus_strong_rounded),
-              label: Text(l10n.shellAiWeightScan),
-            ),
-            NavigationDrawerDestination(
-              key: const Key('nav_nutrition'),
-              icon: const Icon(Icons.insights_outlined),
-              selectedIcon: const Icon(Icons.insights_rounded),
-              label: Text(l10n.shellNutrition),
-            ),
-            NavigationDrawerDestination(
-              key: const Key('nav_history'),
-              icon: const Icon(Icons.history_rounded),
-              selectedIcon: const Icon(Icons.inventory_2_rounded),
-              label: Text(l10n.shellHistory),
-            ),
-            NavigationDrawerDestination(
-              key: const Key('nav_guide'),
-              icon: const Icon(Icons.menu_book_outlined),
-              selectedIcon: const Icon(Icons.menu_book_rounded),
-              label: Text(l10n.shellCaptureGuide),
-            ),
-            NavigationDrawerDestination(
-              key: const Key('nav_settings'),
-              icon: const Icon(Icons.tune_rounded),
-              selectedIcon: const Icon(Icons.settings_rounded),
-              label: Text(l10n.shellSettings),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-              child: Text(
-                l10n.shellMeasurementNotice,
-                style: const TextStyle(
-                  color: AppColors.inkMuted,
-                  fontSize: 11.5,
-                  height: 1.45,
-                ),
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: context.palette.lime,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Text(
+                          'M',
+                          style: TextStyle(
+                            color: context.palette.onLime,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Flexible(
+                        child: Text(
+                          'MassLens',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    context.l10n.shellChooseMode,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.palette.onInkMuted,
+                      fontSize: 12,
+                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        body: IndexedStack(index: selectedIndex, children: screens),
       ),
     );
   }

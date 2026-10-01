@@ -10,6 +10,7 @@ import 'package:mass_lens/features/scan/data/photo_picker.dart';
 import 'package:mass_lens/features/scan/domain/estimate_repository.dart';
 import 'package:mass_lens/features/scan/presentation/capture/camera_launcher.dart';
 import 'package:mass_lens/features/scan/presentation/scan_screen.dart';
+import 'package:mass_lens/features/settings/presentation/settings_screen.dart';
 import 'package:mass_lens/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,17 +19,17 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('opens directly on the labeled touch scale', (tester) async {
+  testWidgets('opens directly on AI Scan', (tester) async {
     final controller = AppController(
       measurementStore: const MeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
     );
     await tester.pumpWidget(MassLensApp(controller: controller));
     await tester.pump();
 
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
-    expect(find.text('SIMULATOR · NOT A MEASUREMENT'), findsOneWidget);
-    expect(find.byKey(const Key('scale_touch_surface')), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+    expect(find.byKey(const Key('scale_instrument')), findsNothing);
     expect(find.byKey(const Key('shell_scan_button')), findsNothing);
   });
 
@@ -50,12 +51,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 450));
     }
-    expect(find.text('Almost ready'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 1700));
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('You’re ready to scan'), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('onboarding_continue')));
-    await tester.tap(find.byKey(const Key('onboarding_continue')));
+    expect(find.byKey(const Key('onboarding_page_paywall')), findsOneWidget);
+    expect(find.byKey(const Key('buy_lifetime_unlock')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('paywall_skip')));
     await tester.pump();
     expect(find.byKey(const Key('onboarding_review_prompt')), findsOneWidget);
     await tester.tap(find.byKey(const Key('onboarding_review_later')));
@@ -63,7 +61,7 @@ void main() {
 
     expect(controller.onboardingComplete, isTrue);
     expect(find.byKey(const Key('onboarding_pages')), findsNothing);
-    expect(find.byKey(const Key('digital_scale_screen')), findsOneWidget);
+    expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
   });
 
   test(
@@ -77,27 +75,30 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      expect(controller.onboardingComplete, isTrue);
+      expect(controller.welcomeComplete, isTrue);
+      expect(controller.onboardingComplete, isFalse);
+      expect(controller.appUnlockedThisSession, isFalse);
       final preferences = await SharedPreferences.getInstance();
-      expect(preferences.getBool('mass_lens.onboarding_complete'), isTrue);
+      expect(preferences.getBool('mass_lens.onboarding_complete'), isNull);
     },
   );
 
-  test('fresh onboarding appears for one app launch only', () async {
+  test('welcome completion persists for paywall-only relaunches', () async {
     final first = await AppController.bootstrap(
       store: const _FakeMeasurementStore(),
     );
     addTearDown(first.dispose);
-    expect(first.onboardingComplete, isFalse);
+    expect(first.welcomeComplete, isFalse);
+    await first.markWelcomeComplete();
     final preferences = await SharedPreferences.getInstance();
-    expect(preferences.getBool('mass_lens.onboarding_seen'), isTrue);
+    expect(preferences.getBool('mass_lens.welcome_complete'), isTrue);
 
     final relaunched = await AppController.bootstrap(
       store: const _FakeMeasurementStore(),
     );
     addTearDown(relaunched.dispose);
-    expect(relaunched.onboardingComplete, isTrue);
-    expect(preferences.getBool('mass_lens.onboarding_complete'), isTrue);
+    expect(relaunched.welcomeComplete, isTrue);
+    expect(relaunched.appUnlockedThisSession, isFalse);
   });
 
   testWidgets('left navigation exposes AI scan, history, and settings', (
@@ -106,13 +107,17 @@ void main() {
     final controller = AppController(
       measurementStore: const _FakeMeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
     );
     await tester.pumpWidget(MassLensApp(controller: controller));
 
     await tester.tap(find.byKey(const Key('open_navigation')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('nav_digital_scale')), findsOneWidget);
+    expect(find.byKey(const Key('nav_digital_scale')), findsNothing);
     expect(find.byKey(const Key('nav_ai_scan')), findsOneWidget);
+    expect(find.byKey(const Key('drawer_upgrade_unlimited')), findsOneWidget);
+    expect(find.text('Upgrade to Unlimited'), findsOneWidget);
+    expect(find.byIcon(Icons.diamond_rounded), findsWidgets);
 
     await tester.tap(find.byKey(const Key('nav_history')));
     await tester.pumpAndSettle();
@@ -130,16 +135,40 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav_ai_scan')));
     await tester.pumpAndSettle();
-    expect(find.text('AI weight'), findsOneWidget);
     expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
+    expect(find.byKey(const Key('scan_balance')), findsOneWidget);
   });
 
-  testWidgets('scan access sheet is rewarded-only with no purchase products', (
+  testWidgets('drawer upgrade CTA opens the premium paywall', (tester) async {
+    final controller = AppController(
+      measurementStore: const _FakeMeasurementStore(),
+      onboardingComplete: true,
+      appUnlockedThisSession: true,
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(MassLensApp(controller: controller));
+
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('drawer_upgrade_unlimited')),
+    );
+    await tester.tap(find.byKey(const Key('drawer_upgrade_unlimited')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('paywall_headline')), findsOneWidget);
+    expect(find.byKey(const Key('buy_lifetime_unlock')), findsOneWidget);
+  });
+
+  testWidgets('scan access offers a rewarded ad and lifetime unlock', (
     tester,
   ) async {
     final controller = AppController(
       measurementStore: const _FakeMeasurementStore(),
       onboardingComplete: true,
+      appUnlockedThisSession: true,
     );
     await tester.pumpWidget(MassLensApp(controller: controller));
 
@@ -147,15 +176,24 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Earn AI scans'), 300);
+    await tester.scrollUntilVisible(
+      find.text('Earn AI scans'),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.tap(find.text('Earn AI scans'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Watch one ad. Get one scan.'), findsOneWidget);
-    expect(find.textContaining('No subscription'), findsOneWidget);
+    expect(find.byKey(const Key('watch_ad_for_scan')), findsOneWidget);
+    expect(find.byKey(const Key('earn_unlock_unlimited')), findsOneWidget);
+    expect(find.byKey(const Key('paywall_headline')), findsNothing);
     expect(find.textContaining('100 scans'), findsNothing);
     expect(find.textContaining('500 scans'), findsNothing);
-    expect(find.textContaining('One-time pack'), findsNothing);
     expect(find.text('Buy scans'), findsNothing);
   });
 
@@ -263,7 +301,6 @@ void main() {
     expect(estimateRepository.lastRequest?.knownDimension?.unit, 'cm');
     expect(find.text('Object category'), findsNothing);
     expect(find.byKey(const Key('result_weight')), findsOneWidget);
-    expect(find.text('LIKELY RANGE'), findsOneWidget);
     final photoRect = tester.getRect(find.byKey(const Key('result_photo')));
     final labelRect = tester.getRect(
       find.byKey(const Key('result_object_label')),
@@ -323,7 +360,6 @@ void main() {
 
     expect(estimateRepository.lastRequest?.imagePath, '/tmp/camera-object.jpg');
     expect(find.byKey(const Key('result_weight')), findsOneWidget);
-    expect(find.text('AI visual size · L × W × H'), findsOneWidget);
   });
 
   testWidgets('camera cancellation returns to the quiet capture view', (
@@ -494,8 +530,8 @@ void main() {
             theme: buildAppTheme(),
             home: Scaffold(
               body: HomeScreen(
-                onMeasure: (_) {},
-                onGallery: (_) {},
+                onMeasure: () {},
+                onGallery: () {},
                 onViewHistory: () {},
               ),
             ),
@@ -504,7 +540,6 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('AI weight'), findsOneWidget);
       expect(find.byKey(const Key('scan_balance')), findsOneWidget);
       expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
       expect(find.byKey(const Key('home_gallery_button')), findsOneWidget);
@@ -568,7 +603,10 @@ class _FakeCameraLauncher implements CameraLauncher {
   int launchCount = 0;
 
   @override
-  Future<String?> launch(BuildContext context) async {
+  Future<String?> launch(
+    BuildContext context, {
+    ScanMode scanMode = ScanMode.object,
+  }) async {
     launchCount++;
     return imagePath;
   }

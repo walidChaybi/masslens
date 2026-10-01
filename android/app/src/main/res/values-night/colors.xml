@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark launch canvas. Overriding only this name keeps the native splash,
+         windowBackground and Android 12 splash in step with the app's dark
+         theme, while the adaptive launcher icon keeps its own light
+         background from values/colors.xml. -->
+    <color name="mass_lens_canvas">#0B121C</color>
+</resources>

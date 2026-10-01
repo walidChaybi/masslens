@@ -33,12 +33,16 @@ void main() {
     expect(en.homeModeFoodMacros, 'Food & macros');
     expect(fr.homeModeFoodMacros, 'Aliments et macros');
     expect(es.homeModeFoodMacros, 'Comida y macros');
-    expect(en.scanFoodScale, 'Food Scale');
-    expect(fr.scanFoodScale, 'Balance alimentaire');
-    expect(es.scanFoodScale, 'Báscula de alimentos');
-    expect(en.accessScansLeft(1), '1 scan left');
-    expect(fr.accessScansLeft(2), '2 scans restants');
-    expect(es.accessScansLeft(0), 'No hay escaneos disponibles');
+    expect(en.scanFoodScale, 'Food estimates');
+    expect(fr.scanFoodScale, 'Estimations alimentaires');
+    expect(es.scanFoodScale, 'Estimaciones de alimentos');
+    expect(en.paywallHeadline, 'Photo estimates.');
+    expect(fr.paywallHeadline, 'Estimations photo.');
+    expect(es.paywallHeadline, 'Estimaciones de fotos.');
+    expect(en.paywallFeatureLifetime, 'Unlimited + ad-free');
+    expect(en.accessScansLeft(1), '1 scan');
+    expect(fr.accessScansLeft(2), '2 scans');
+    expect(es.accessScansLeft(0), '0 escaneos');
     expect(localizedMaterial(fr, 'Glass/Ceramic'), 'Verre/Céramique');
     expect(localizedMaterial(es, 'Plastic'), 'Plástico');
     expect(localizedMaterial(en, 'future-wire-value'), 'future-wire-value');
@@ -85,11 +89,11 @@ void main() {
         (
           name: 'home',
           screen: HomeScreen(
-            onMeasure: (_) {},
-            onGallery: (_) {},
+            onMeasure: () {},
+            onGallery: () {},
             onViewHistory: () {},
           ),
-          visibleText: l10n.homeAiWeight,
+          visibleText: l10n.homeScanObject,
         ),
         (
           name: 'history',

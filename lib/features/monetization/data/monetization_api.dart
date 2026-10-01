@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../domain/access_status.dart';
 import '../domain/reward_attempt.dart';
 
@@ -39,6 +41,24 @@ class MonetizationApi {
         'The reward service returned invalid data: ${error.message}',
       );
     }
+  }
+
+  Future<LifetimeVerifyResult> verifyLifetimePurchase({
+    required String clientId,
+    required String productId,
+    required String purchaseToken,
+  }) async {
+    final payload = await _request(
+      'POST',
+      '/billing/verify',
+      clientId: clientId,
+      body: {
+        'productId': productId,
+        'purchaseToken': purchaseToken,
+        'packageName': 'com.lilai.masslens.photoestimates',
+      },
+    );
+    return LifetimeVerifyResult.fromJson(payload);
   }
 
   Future<RewardAttemptStatus> getRewardAttempt({
@@ -123,6 +143,7 @@ class MonetizationApi {
       request.headers
         ..set(HttpHeaders.acceptHeader, ContentType.json.mimeType)
         ..set('X-MassLens-Client-ID', clientId);
+      if (kDebugMode) request.headers.set('X-MassLens-Build', 'debug');
       if (body != null) {
         request.headers.contentType = ContentType.json;
         request.write(jsonEncode(body));
@@ -165,4 +186,17 @@ class MonetizationApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class LifetimeVerifyResult {
+  const LifetimeVerifyResult({required this.hasLifetime, required this.status});
+
+  factory LifetimeVerifyResult.fromJson(Map<String, Object?> json) =>
+      LifetimeVerifyResult(
+        hasLifetime: json['hasLifetime'] as bool? ?? false,
+        status: json['status'] as String? ?? '',
+      );
+
+  final bool hasLifetime;
+  final String status;
 }

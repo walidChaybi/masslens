@@ -35,7 +35,9 @@ class MeasurementDetailScreen extends StatefulWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.palette.coral,
+            ).copyWith(),
             child: Text(l10n.commonDelete),
           ),
         ],
@@ -193,11 +195,11 @@ class MeasurementSummary extends StatelessWidget {
                 file.existsSync()
                     ? Image.file(file, fit: BoxFit.cover)
                     : Container(
-                        color: AppColors.navySoft,
-                        child: const Icon(
+                        color: context.palette.navySoft,
+                        child: Icon(
                           Icons.inventory_2_outlined,
                           size: 64,
-                          color: AppColors.inkMuted,
+                          color: context.palette.inkMuted,
                         ),
                       ),
                 const InstrumentCorners(),
@@ -215,8 +217,8 @@ class MeasurementSummary extends StatelessWidget {
                 children: [
                   Text(
                     localizedCategory(l10n, measurement.category).toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.limeDark,
+                    style: TextStyle(
+                      color: context.palette.limeDark,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
@@ -242,7 +244,7 @@ class MeasurementSummary extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: AppColors.ink,
+            color: context.palette.ink,
             borderRadius: BorderRadius.circular(28),
           ),
           child: Column(
@@ -283,13 +285,13 @@ class MeasurementSummary extends StatelessWidget {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.lime,
+                      color: context.palette.lime,
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: ConfidenceBadge(level: measurement.confidence),
                   ),
                   const Spacer(),
-                  const Icon(Icons.show_chart_rounded, color: AppColors.aqua),
+                  Icon(Icons.show_chart_rounded, color: context.palette.aqua),
                 ],
               ),
             ],
@@ -360,19 +362,19 @@ class MeasurementSummary extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.lime.withValues(alpha: 0.3),
+            color: context.palette.lime.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(22),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline_rounded, color: AppColors.ink),
+              Icon(Icons.info_outline_rounded, color: context.palette.ink),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   l10n.detailSafetyNotice,
-                  style: const TextStyle(
-                    color: AppColors.ink,
+                  style: TextStyle(
+                    color: context.palette.ink,
                     height: 1.45,
                     fontSize: 12.5,
                   ),
@@ -422,11 +424,11 @@ class _FoodMeasurementSummary extends StatelessWidget {
                 file.existsSync()
                     ? Image.file(file, fit: BoxFit.cover)
                     : Container(
-                        color: AppColors.navySoft,
-                        child: const Icon(
+                        color: context.palette.navySoft,
+                        child: Icon(
                           Icons.restaurant_rounded,
                           size: 64,
-                          color: AppColors.inkMuted,
+                          color: context.palette.inkMuted,
                         ),
                       ),
                 const InstrumentCorners(),
@@ -444,8 +446,8 @@ class _FoodMeasurementSummary extends StatelessWidget {
                 children: [
                   Text(
                     l10n.scanFoodScale.toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.limeDark,
+                    style: TextStyle(
+                      color: context.palette.limeDark,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
@@ -474,7 +476,7 @@ class _FoodMeasurementSummary extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: AppColors.ink,
+            color: context.palette.ink,
             borderRadius: BorderRadius.circular(28),
           ),
           child: Column(
@@ -525,15 +527,15 @@ class _FoodMeasurementSummary extends StatelessWidget {
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.lime,
+                      color: context.palette.lime,
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: ConfidenceBadge(level: measurement.confidence),
                   ),
                   const Spacer(),
-                  const Icon(
+                  Icon(
                     Icons.restaurant_menu_rounded,
-                    color: AppColors.aqua,
+                    color: context.palette.aqua,
                   ),
                 ],
               ),
@@ -558,8 +560,8 @@ class _FoodMeasurementSummary extends StatelessWidget {
                               Text(
                                 number.format(nutrition.caloriesKcal),
                                 key: const Key('food_total_calories'),
-                                style: const TextStyle(
-                                  color: AppColors.ink,
+                                style: TextStyle(
+                                  color: context.palette.ink,
                                   fontSize: 42,
                                   height: 0.95,
                                   fontWeight: FontWeight.w900,
@@ -588,8 +590,8 @@ class _FoodMeasurementSummary extends StatelessWidget {
                         ? l10n.scanPartialTotal
                         : l10n.scanCompleteTotal,
                     background: measurement.hasPartialNutrition
-                        ? AppColors.aqua.withValues(alpha: 0.25)
-                        : AppColors.lime.withValues(alpha: 0.45),
+                        ? context.palette.aqua.withValues(alpha: 0.25)
+                        : context.palette.lime.withValues(alpha: 0.45),
                   ),
                 ],
               ),
@@ -598,8 +600,8 @@ class _FoodMeasurementSummary extends StatelessWidget {
                 Text(
                   '${l10n.scanLikelyRange}: '
                   '${number.format(calorieLowerBound)}–${number.format(calorieUpperBound)} kcal',
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
+                  style: TextStyle(
+                    color: context.palette.inkMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -630,8 +632,8 @@ class _FoodMeasurementSummary extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   l10n.scanNutritionMissing,
-                  style: const TextStyle(
-                    color: AppColors.inkMuted,
+                  style: TextStyle(
+                    color: context.palette.inkMuted,
                     fontSize: 12,
                     height: 1.35,
                     fontWeight: FontWeight.w600,
@@ -680,20 +682,20 @@ class _FoodMeasurementSummary extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.lime.withValues(alpha: 0.3),
+            color: context.palette.lime.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(22),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.info_outline_rounded, color: AppColors.ink),
+              Icon(Icons.info_outline_rounded, color: context.palette.ink),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   l10n.scanFoodDisclaimer,
                   key: const Key('food_disclaimer'),
-                  style: const TextStyle(
-                    color: AppColors.ink,
+                  style: TextStyle(
+                    color: context.palette.ink,
                     height: 1.45,
                     fontSize: 12.5,
                   ),
@@ -750,8 +752,8 @@ class _FoodComponentSummary extends StatelessWidget {
                   unitSystem,
                   localeName: localeName,
                 ),
-                style: const TextStyle(
-                  color: AppColors.ink,
+                style: TextStyle(
+                  color: context.palette.ink,
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
                   fontFeatures: [FontFeature.tabularFigures()],
@@ -764,8 +766,8 @@ class _FoodComponentSummary extends StatelessWidget {
             '${l10n.scanOriginalAiRange}: '
             '${formatWeight(component.lowerBoundGrams, unitSystem, localeName: localeName)} — '
             '${formatWeight(component.upperBoundGrams, unitSystem, localeName: localeName)}',
-            style: const TextStyle(
-              color: AppColors.inkMuted,
+            style: TextStyle(
+              color: context.palette.inkMuted,
               fontSize: 11.5,
               height: 1.35,
               fontWeight: FontWeight.w600,
@@ -774,8 +776,8 @@ class _FoodComponentSummary extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             '${l10n.scanConfidence}: ${localizedConfidence(l10n, component.confidence)}',
-            style: const TextStyle(
-              color: AppColors.inkMuted,
+            style: TextStyle(
+              color: context.palette.inkMuted,
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
             ),
@@ -784,16 +786,16 @@ class _FoodComponentSummary extends StatelessWidget {
             const SizedBox(height: 5),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.edit_rounded,
                   size: 13,
-                  color: AppColors.limeDark,
+                  color: context.palette.limeDark,
                 ),
                 const SizedBox(width: 5),
                 Text(
                   l10n.scanEditAmount,
-                  style: const TextStyle(
-                    color: AppColors.limeDark,
+                  style: TextStyle(
+                    color: context.palette.limeDark,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
@@ -806,8 +808,8 @@ class _FoodComponentSummary extends StatelessWidget {
             Text(
               l10n.scanNutritionMissing,
               key: ValueKey('food_detail_weight_only_$index'),
-              style: const TextStyle(
-                color: AppColors.inkMuted,
+              style: TextStyle(
+                color: context.palette.inkMuted,
                 fontSize: 12,
                 height: 1.35,
                 fontWeight: FontWeight.w600,
@@ -834,8 +836,8 @@ class _FoodComponentSummary extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               l10n.scanUsdaSource.toUpperCase(),
-              style: const TextStyle(
-                color: AppColors.inkMuted,
+              style: TextStyle(
+                color: context.palette.inkMuted,
                 fontSize: 9.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1,
@@ -844,8 +846,8 @@ class _FoodComponentSummary extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               component.nutrition!.description,
-              style: const TextStyle(
-                color: AppColors.ink,
+              style: TextStyle(
+                color: context.palette.ink,
                 fontSize: 12,
                 height: 1.35,
                 fontWeight: FontWeight.w700,
@@ -854,8 +856,8 @@ class _FoodComponentSummary extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               '${component.nutrition!.dataType} · FDC ${component.nutrition!.fdcId}',
-              style: const TextStyle(
-                color: AppColors.inkMuted,
+              style: TextStyle(
+                color: context.palette.inkMuted,
                 fontSize: 10.5,
                 height: 1.3,
               ),
@@ -879,7 +881,7 @@ class _NutritionMetric extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 92),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.navySoft,
+        color: context.palette.navySoft,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Column(
@@ -887,8 +889,8 @@ class _NutritionMetric extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.inkMuted,
+            style: TextStyle(
+              color: context.palette.inkMuted,
               fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
@@ -896,8 +898,8 @@ class _NutritionMetric extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
-            style: const TextStyle(
-              color: AppColors.ink,
+            style: TextStyle(
+              color: context.palette.ink,
               fontSize: 14,
               fontWeight: FontWeight.w900,
               fontFeatures: [FontFeature.tabularFigures()],
@@ -930,13 +932,13 @@ class _ResultSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, size: 19, color: AppColors.limeDark),
+                Icon(icon, size: 19, color: context.palette.limeDark),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     title.toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.inkMuted,
+                    style: TextStyle(
+                      color: context.palette.inkMuted,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.1,
@@ -965,26 +967,26 @@ class _AssumptionItem extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.navySoft,
+        color: context.palette.navySoft,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 2),
             child: Icon(
               Icons.check_circle_outline_rounded,
               size: 16,
-              color: AppColors.limeDark,
+              color: context.palette.limeDark,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: AppColors.ink,
+              style: TextStyle(
+                color: context.palette.ink,
                 fontSize: 12,
                 height: 1.35,
                 fontWeight: FontWeight.w600,

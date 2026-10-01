@@ -139,6 +139,19 @@ class AppAdService {
   Future<void> _initialize() async {
     if (_initialized) return;
     _initialized = true;
+    if (kDebugMode && AdMobConfig.useTestIds) {
+      // Official Google sample units do not serve production advertising.
+      // Keep debug ad testing independent of a production consent message.
+      try {
+        await MobileAds.instance.initialize();
+        _canRequestAds = true;
+        if (kDebugMode) debugPrint('MassLens: Google test ads initialized.');
+      } on Object {
+        _initialized = false;
+        rethrow;
+      }
+      return;
+    }
     final consentFinished = Completer<void>();
     ConsentInformation.instance.requestConsentInfoUpdate(
       ConsentRequestParameters(),
@@ -321,11 +334,7 @@ class AppAdService {
   /// Shows at a user-initiated drawer transition between the two primary app
   /// modes. It shares inventory and the global interstitial cooldown.
   Future<bool> showDrawerModeInterstitial({required bool aiScan}) =>
-      _showInterstitial(
-        placement: aiScan
-            ? 'drawer_ai_scan_interstitial'
-            : 'drawer_digital_scale_interstitial',
-      );
+      _showInterstitial(placement: 'drawer_ai_scan_interstitial');
 
   /// History is another content destination, but it is kept separate from
   /// settings and help so utility navigation stays interruption-free.

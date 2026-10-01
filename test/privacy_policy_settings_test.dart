@@ -32,6 +32,8 @@ void main() {
 
     final legalLink = find.text('Legal');
     await tester.scrollUntilVisible(legalLink, 300);
+    await tester.ensureVisible(legalLink);
+    await tester.pumpAndSettle();
     await tester.tap(legalLink);
     await tester.pumpAndSettle();
 
@@ -43,6 +45,8 @@ void main() {
       const Key('open_published_privacy_policy'),
     );
     await tester.scrollUntilVisible(publishedLink, 300);
+    await tester.ensureVisible(publishedLink);
+    await tester.pumpAndSettle();
     await tester.tap(publishedLink);
     await tester.pump();
 

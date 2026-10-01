@@ -69,26 +69,42 @@ void main() {
     expect(EstimateEngineConfig.productionModelLabel, 'gpt-5-nano');
   });
 
-  test('ads-only access has three starters and a rewarded balance cap', () {
+  test('two starter scans and rewarded ads follow server access', () {
     const access = AccessStatus.fallback();
-    expect(access.starterScansRemaining, 3);
+    expect(access.starterScansRemaining, 2);
     expect(access.rewardBalanceCap, 3);
+    expect(access.canEarnReward, isFalse);
     expect(access.rewardedScans, 0);
     expect(access.canScan, isFalse);
 
     final enforced = AccessStatus.fromJson(const {
-      'starterScansRemaining': 3,
+      'starterScansRemaining': 1,
       'rewardedScans': 0,
       'legacyScans': 0,
-      'remainingScans': 3,
+      'remainingScans': 1,
       'rewardBalanceCap': 3,
+      'hasLifetime': false,
       'scanAccessEnforced': true,
       'adsEnabled': true,
     });
     expect(enforced.canScan, isTrue);
+    expect(enforced.canEarnReward, isTrue);
+
+    final lifetime = AccessStatus.fromJson(const {
+      'starterScansRemaining': 0,
+      'rewardedScans': 0,
+      'legacyScans': 0,
+      'remainingScans': 0,
+      'rewardBalanceCap': 3,
+      'hasLifetime': true,
+      'scanAccessEnforced': true,
+      'adsEnabled': false,
+    });
+    expect(lifetime.canScan, isTrue);
+    expect(lifetime.canEarnReward, isFalse);
 
     final preview = AccessStatus.fromJson(const {
-      'remainingScans': 3,
+      'remainingScans': 1,
       'scanAccessEnforced': false,
       'adsEnabled': false,
     });

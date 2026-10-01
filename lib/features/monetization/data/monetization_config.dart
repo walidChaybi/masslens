@@ -23,35 +23,34 @@ abstract final class MonetizationConfig {
 }
 
 abstract final class AdMobConfig {
-  /// Ads remain completely disabled unless this is explicitly enabled at
-  /// build time. This makes test and review builds deterministic.
+  /// Debug builds request Google test ads by default. Widget tests can disable
+  /// platform ad loading with --dart-define=ADMOB_ENABLED=false.
   static const enabled = bool.fromEnvironment(
     'ADMOB_ENABLED',
-    defaultValue: false,
+    defaultValue: kDebugMode,
   );
-  static const useTestIds = bool.fromEnvironment(
-    'ADMOB_USE_TEST_IDS',
-    defaultValue: true,
-  );
+  static const useTestIds =
+      kDebugMode ||
+      bool.fromEnvironment('ADMOB_USE_TEST_IDS', defaultValue: true);
   static const _testDeviceIdsValue = String.fromEnvironment(
     'ADMOB_TEST_DEVICE_IDS',
   );
 
   static const _nativeProduction = String.fromEnvironment(
     'ADMOB_NATIVE_AD_UNIT_ID',
-    defaultValue: 'ca-app-pub-7681170430097585/1035038854',
+    defaultValue: 'ca-app-pub-7681170430097585/5319406676',
   );
   static const _rewardedProduction = String.fromEnvironment(
     'ADMOB_REWARDED_AD_UNIT_ID',
-    defaultValue: 'ca-app-pub-7681170430097585/3756662851',
+    defaultValue: 'ca-app-pub-7681170430097585/7055249463',
   );
   static const _appOpenProduction = String.fromEnvironment(
     'ADMOB_APP_OPEN_AD_UNIT_ID',
-    defaultValue: 'ca-app-pub-7681170430097585/3116075891',
+    defaultValue: 'ca-app-pub-7681170430097585/2932171620',
   );
   static const _interstitialProduction = String.fromEnvironment(
     'ADMOB_INTERSTITIAL_AD_UNIT_ID',
-    defaultValue: 'ca-app-pub-7681170430097585/5269089498',
+    defaultValue: 'ca-app-pub-7681170430097585/5742167797',
   );
   // Reserved for future placements. These IDs are intentionally excluded from
   // readiness, validation, and every loader until their UX is implemented.

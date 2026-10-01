@@ -9,6 +9,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+dependencies {
+    implementation("com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1")
+    testImplementation("junit:junit:4.13.2")
+}
+
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -78,9 +83,8 @@ android {
     }
 
     defaultConfig {
-        // This ID matches the existing Google Play listing formerly used by
-        // VirtuAI. It must remain unchanged for every update to that listing.
-        applicationId = "com.lilai.aivirtual"
+        // New application identity for the photo-estimation app.
+        applicationId = "com.lilai.masslens.photoestimates"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -97,6 +101,7 @@ android {
             }
         }
         manifestPlaceholders["admobAppId"] = adMobAppId
+        manifestPlaceholders["massLensAppLabel"] = "MassLens"
     }
 
     signingConfigs {
@@ -112,6 +117,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".archeck"
+            manifestPlaceholders["massLensAppLabel"] = "MassLens Debug"
+        }
         release {
             signingConfig = signingConfigs.getByName("release")
         }

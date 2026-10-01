@@ -40,6 +40,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return SafeArea(
       key: const Key('history_screen'),
+      maintainBottomViewPadding: true,
       child: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -56,19 +57,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           const SizedBox(height: 8),
                           Text(
                             l10n.historyTitle,
-                            style: Theme.of(context).textTheme.headlineLarge,
+                            style: Theme.of(
+                              context,
+                            ).textTheme.headlineLarge?.copyWith(fontSize: 28),
                           ),
                         ],
                       ),
                     ),
-                    IconButton.filledTonal(
+                    const SizedBox(width: 12),
+                    IconButton.filled(
                       tooltip: l10n.historyNewEstimate,
                       onPressed: widget.onScan,
-                      icon: const Icon(Icons.add_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: context.palette.lime,
+                        foregroundColor: context.palette.onLime,
+                        fixedSize: const Size.square(52),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 26),
                     ),
                   ],
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 18),
                 _HistoryStats(
                   total: controller.measurements.length,
                   categories: controller.measurements
@@ -164,67 +173,47 @@ class _HistoryStats extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
       decoration: BoxDecoration(
-        color: AppColors.ink,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [context.palette.inkRaised, context.palette.inkDeep],
+        ),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final divider = Container(
+      child: Row(
+        children: [
+          Expanded(
+            child: _StatValue(value: '$total', label: l10n.historySavedStat),
+          ),
+          Container(
             width: 1,
-            height: 38,
-            margin: const EdgeInsets.symmetric(horizontal: 18),
-            color: Colors.white.withValues(alpha: 0.15),
-          );
-          final localBadge = StatusPill(
+            height: 40,
+            margin: const EdgeInsets.symmetric(horizontal: 14),
+            color: Colors.white.withValues(alpha: 0.12),
+          ),
+          Expanded(
+            child: _StatValue(
+              value: '$categories',
+              label: l10n.historyCategoriesStat,
+            ),
+          ),
+          const SizedBox(width: 8),
+          StatusPill(
             label: l10n.historyLocalBadge,
             icon: Icons.lock_outline_rounded,
-            background: AppColors.lime,
-          );
-          if (constraints.maxWidth < 360) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _Stat(
-                        value: '$total',
-                        label: l10n.historySavedStat,
-                      ),
-                    ),
-                    divider,
-                    Expanded(
-                      child: _Stat(
-                        value: '$categories',
-                        label: l10n.historyCategoriesStat,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                localBadge,
-              ],
-            );
-          }
-          return Row(
-            children: [
-              _Stat(value: '$total', label: l10n.historySavedStat),
-              divider,
-              _Stat(value: '$categories', label: l10n.historyCategoriesStat),
-              const Spacer(),
-              localBadge,
-            ],
-          );
-        },
+            background: Colors.white.withValues(alpha: 0.10),
+            foreground: context.palette.lime,
+          ),
+        ],
       ),
     );
   }
 }
 
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
+class _StatValue extends StatelessWidget {
+  const _StatValue({required this.value, required this.label});
 
   final String value;
   final String label;
@@ -233,18 +222,28 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
+            fontSize: 28,
+            height: 1.05,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.5,
           ),
         ),
+        const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(color: Colors.white60, fontSize: 11),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: context.palette.onInkMuted,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );

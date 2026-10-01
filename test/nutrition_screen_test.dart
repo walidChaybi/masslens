@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mass_lens/app/app_controller.dart';
-import 'package:mass_lens/features/home/presentation/home_screen.dart';
+import 'package:mass_lens/app/mass_lens_app.dart';
 import 'package:mass_lens/features/measurements/data/measurement_store.dart';
 import 'package:mass_lens/features/measurements/domain/measurement.dart';
 import 'package:mass_lens/features/nutrition/application/nutrition_diary_controller.dart';
@@ -17,32 +17,56 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('home shows a separate Nutrition & Trends entry card', (
+  testWidgets('food logging is reachable from the drawer, not buried on home', (
     tester,
   ) async {
-    var opened = false;
-    final controller = _controller();
-    addTearDown(controller.dispose);
-    await _pump(
-      tester,
-      controller,
-      Scaffold(
-        body: HomeScreen(
-          onMeasure: (_) {},
-          onGallery: (_) {},
-          onViewHistory: () {},
-          onOpenNutrition: () => opened = true,
-        ),
+    final controller = AppController(
+      measurementStore: const MeasurementStore(),
+      onboardingComplete: true,
+      appUnlockedThisSession: true,
+      nutritionDiaryController: NutritionDiaryController(
+        store: const NutritionLogStore(),
       ),
     );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MassLensApp(controller: controller),
+      duration: const Duration(seconds: 1),
+    );
 
-    final card = find.byKey(const Key('home_nutrition_button'));
-    expect(card, findsOneWidget);
+    expect(find.byKey(const Key('home_nutrition_button')), findsNothing);
+    expect(find.byKey(const Key('home_nutrition_hint')), findsNothing);
     expect(find.byKey(const Key('home_scan_button')), findsOneWidget);
-    await tester.ensureVisible(card);
-    await tester.tap(card);
 
-    expect(opened, isTrue);
+    await tester.tap(find.byKey(const Key('open_navigation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('nav_nutrition')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NutritionScreen), findsOneWidget);
+  });
+
+  testWidgets('daily goals sheet updates remaining calories', (tester) async {
+    final controller = _controller();
+    addTearDown(controller.dispose);
+    await _pump(tester, controller, const Scaffold(body: NutritionScreen()));
+
+    await tester.tap(find.byKey(const Key('nutrition_edit_goals')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('nutrition_goal_calories')),
+      '1800',
+    );
+    await tester.tap(find.byKey(const Key('nutrition_save_goals')));
+    await tester.pumpAndSettle();
+
+    expect(controller.nutritionDiary.goals.calorieGoalKcal, 1800);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('nutrition_remaining_kcal')))
+          .data,
+      '1800',
+    );
   });
 
   testWidgets('manual entry updates day totals and renders trend charts', (
@@ -51,6 +75,10 @@ void main() {
     final controller = _controller();
     addTearDown(controller.dispose);
     await _pump(tester, controller, const Scaffold(body: NutritionScreen()));
+
+    expect(find.byKey(const Key('nutrition_hero_card')), findsOneWidget);
+    expect(find.byKey(const Key('nutrition_scan_meal')), findsOneWidget);
+    expect(find.byKey(const Key('nutrition_remaining_kcal')), findsOneWidget);
 
     final add = find.byKey(const Key('nutrition_add_food'));
     await tester.ensureVisible(add);
@@ -180,21 +208,23 @@ void main() {
       await _pump(
         tester,
         controller,
-        Scaffold(
-          body: NutritionScreen(key: ValueKey(locale.languageCode)),
-        ),
+        Scaffold(body: NutritionScreen(key: ValueKey(locale.languageCode))),
         locale: locale,
         logicalSize: const Size(360, 800),
         textScale: 1.3,
       );
       expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('nutrition_hero_card')), findsOneWidget);
       final l10n = AppLocalizations.of(
         tester.element(find.byKey(const Key('nutrition_view_selector'))),
       );
       await tester.tap(find.text(l10n.nutritionTrendsTab));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
-      expect(find.byKey(const Key('nutrition_period_selector')), findsOneWidget);
+      expect(
+        find.byKey(const Key('nutrition_period_selector')),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
       await tester.drag(find.byType(ListView), const Offset(0, -900));
       await tester.pump();
